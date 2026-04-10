@@ -5,6 +5,7 @@ import threading
 import sys
 import os
 import logging
+import psutil
 from datetime import datetime
 from paho.mqtt import client as mqtt_client
 
@@ -89,6 +90,7 @@ class SHOS_Backbone:
         self.last_heartbeat = time.time()
         self.hardware_connected = True
         self.watchdog_timeout = 10
+        self.max_cpu_percent = 85.0
         
         # Initialiser MQTT
         self._init_mqtt()
@@ -237,28 +239,43 @@ class SHOS_Backbone:
         time.sleep(2)
         logger.info("✅ Système réinitialisé")
     
+    # ... tes autres fonctions ...
+
     def watchdog_loop(self):
-        """Surveillance hardware"""
-        logger.info("👁️  Watchdog activé")
+        # Cette ligne doit être décalée par rapport au "def"
+        logger.info("👁️ Watchdog & Resource Monitor activé")
         
         while self.running:
+            # 1. Vérification Hardware (ton code existant)
             elapsed = time.time() - self.last_heartbeat
             
-            if elapsed > self.watchdog_timeout:
-                if self.hardware_connected:
-                    logger.error(f"❌ Timeout hardware ({elapsed:.1f}s)")
-                    self.hardware_connected = False
-                    self.mqtt_client.publish(
-                        "shos/system/status",
-                        json.dumps({'status': 'disconnected'}),
-                        qos=1
-                    )
-            else:
-                if not self.hardware_connected:
-                    logger.info("✅ Hardware reconnecté")
-                    self.hardware_connected = True
+            # 2. Vérification Ressources CPU/RAM
+            cpu_usage = psutil.cpu_percent(interval=None)
+            ram_usage = psutil.virtual_memory().percent
             
-            time.sleep(1)
+            if cpu_usage > self.max_cpu_percent:
+                logger.warning(f"⚠️ SURCHARGE CPU: {cpu_usage}%")
+                self.mqtt_client.publish("nova/system/overload", json.dumps({
+                    "cpu": cpu_usage,
+                    "ram": ram_usage,
+                    "action": "limit_modules"
+                }))
+
+            # Publication de la télémétrie
+            self.mqtt_client.publish("nova/system/telemetry", json.dumps({
+                "cpu": cpu_usage,
+                "ram": ram_usage,
+                "temp": self._get_pi_temp()
+            }))
+            
+            time.sleep(2)
+
+    def _get_pi_temp(self):
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+                return int(f.read()) / 1000
+        except:
+            return 0
     
     def run(self):
         """Démarrer le système"""
