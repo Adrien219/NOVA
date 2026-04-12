@@ -19,7 +19,7 @@ from queue import Queue, Empty
 import numpy as np
 import time
 
-from flask import Flask, render_template, Response, jsonify
+from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
 from paho.mqtt import client as mqtt_client
 from jinja2 import ChoiceLoader, FileSystemLoader
@@ -627,17 +627,17 @@ def profile_manager():
 
 @app.route('/api/get_profiles', methods=['GET'])
 def get_profiles():
-    """API : Récupère la liste des profils pour l'interface dynamique"""
+    """Version simplifiée pour éviter l'erreur de liaison API"""
     try:
         config = config_manager.load_config()
+        # On renvoie directement les données sans le wrapper 'status'
         return jsonify({
-            "status": "success",
             "profiles": config.get("profiles", {}),
             "current": config.get("current_active_profile", "")
         })
     except Exception as e:
-        logger.error(f"❌ Erreur API get_profiles: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+        logger.error(f"❌ Erreur API: {e}")
+        return jsonify({"profiles": {}, "current": ""}), 500
 
 @app.route('/api/activate_profile', methods=['POST'])
 def api_activate_profile():
@@ -655,33 +655,34 @@ def api_activate_profile():
 
 @app.route('/save_profile', methods=['POST'])
 def save_profile():
-    """Sauvegarde un nouveau profil et notifie le Backbone via MQTT"""
     try:
         data = request.json
-        main_mod = data.get('main_module')
-        secondary_mods = data.get('secondary_modules', [])
-        
-        # Structure des priorités pour SHOS
-        allowed_modules = {main_mod: 1}
-        for mod in secondary_mods:
-            allowed_modules[mod] = 2
+        if not data:
+            return jsonify({"status": "error", "message": "Données vides"}), 400
 
+        profile_name = data.get('name')
+        profile_id = profile_name.lower().replace(" ", "_")
+
+        # 1. Enregistrement physique dans config.json
+        config = config_manager.load_config()
+        config["profiles"][profile_id] = {
+            "name": profile_name,
+            "main_module": data.get('main_module'),
+            "secondary_modules": data.get('secondary_modules', [])
+        }
+        config_manager.save_config(config)
+
+        # 2. Notification MQTT pour activation immédiate
         profile_payload = {
             "action": "SWITCH_PROFILE",
-            "profile_name": data.get('name'),
-            "allowed_modules": allowed_modules
+            "profile_name": profile_name,
+            "allowed_modules": {data.get('main_module'): 1}
         }
+        mqtt_bridge.client.publish("shos/system/profile/switch", json.dumps(profile_payload))
 
-        # Publication sur le topic harmonisé shos/ (anciennement nova/ ou helmet/)
-        mqtt_bridge.client.publish(
-            "shos/system/profile/switch", 
-            json.dumps(profile_payload),
-            retain=True
-        )
-        logger.info(f"💾 Profil '{data.get('name')}' enregistré et publié")
-        return jsonify({"status": "success", "profile": data.get('name')})
+        return jsonify({"status": "success", "profile": profile_name})
     except Exception as e:
-        logger.error(f"❌ Erreur save_profile : {e}")
+        logger.error(f"❌ Erreur critique : {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ============================================================================
