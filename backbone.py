@@ -86,6 +86,13 @@ class SHOS_Backbone:
     def __init__(self):
         self.running = True
         self.mqtt_client = None
+
+
+
+        self.running = True
+        self.mqtt_client = None
+        self.active_modules = {}
+        self.max_concurrent_modules = 2
         self.last_sensor_data = None
         self.last_heartbeat = time.time()
         self.hardware_connected = True
@@ -130,6 +137,7 @@ class SHOS_Backbone:
                 ("shos/sensors/raw", 1),         # Arduino Bridge
                 ("shos/esp32/telemetry", 1),    # ESP32
                 ("shos/mobile/sensors", 1),     # Téléphone
+                ("nova/system/profile/switch", 1),
                 ("shos/system/reset", 0),
                 ("nova/benchmark/ping", 1),
             ])
@@ -143,45 +151,96 @@ class SHOS_Backbone:
             logger.warning(f"⚠️  Déconnexion MQTT (code {rc})")
     
     def _on_mqtt_message(self, client, userdata, msg):
-        """Traiter les messages MQTT"""
+        """Traiter les messages MQTT - VERSION HARMONISÉE N.O.V.A"""
         topic = msg.topic
-        payload = msg.payload.decode('utf-8')
+        # 1. On récupère le texte brut
+        raw_content = msg.payload.decode('utf-8')
         
         try:
+            # 2. Tentative de conversion en JSON
+            payload = json.loads(raw_content)
             
-            if topic == "nova/benchmark/ping":
-                # Effet miroir immédiat
-                self.mqtt_client.publish("nova/benchmark/pong", payload)
+            # 3. Sécurité Windows/CMD : si le JSON est encore une string, on re-parse
+            if isinstance(payload, str):
+                try:
+                    payload = json.loads(payload)
+                except:
+                    payload = {"data": payload}
+
+            # -----------------------------------------------------------
+            # ROUTAGE DES COMMANDES SYSTÈME (NOVA)
+            # -----------------------------------------------------------
+            if topic == "nova/system/profile/switch":
+                self._handle_profile_switch(payload)
                 return
-            
-            
-            # ✅ DONNÉES ARDUINO (avec normalisation correcte!)
-            if topic == "shos/sensors/raw":
-                raw_data = json.loads(payload)
-                self._process_sensor_data(raw_data)
-            
-            # ESP32 Telemetry
+
+            elif topic == "nova/modules/register":
+                self._handle_module_registration(payload)
+                return
+
+            elif topic == "nova/benchmark/ping":
+                self.mqtt_client.publish("nova/benchmark/pong", json.dumps(payload))
+                return
+
+            # -----------------------------------------------------------
+            # TRAITEMENT DES CAPTEURS (SENSORS)
+            # -----------------------------------------------------------
+            elif topic == "shos/sensors/raw":
+                self._process_sensor_data(payload)
+
             elif topic == "shos/esp32/telemetry":
-                esp32_data = json.loads(payload)
-                logger.info(f"📡 ESP32: {esp32_data}")
-                self.mqtt_client.publish("shos/sensors/esp32", payload, qos=1)
-            
-            # Mobile Sensors
+                logger.info(f"📡 ESP32: {payload}")
+                self.mqtt_client.publish("shos/sensors/esp32", json.dumps(payload), qos=1)
+
             elif topic == "shos/mobile/sensors":
-                mobile_data = json.loads(payload)
-                logger.info(f"📱 Téléphone: {mobile_data}")
-                self.mqtt_client.publish("shos/sensors/mobile", payload, qos=1)
-            
-            # System Reset
+                logger.info(f"📱 Téléphone: {payload}")
+                self.mqtt_client.publish("shos/sensors/mobile", json.dumps(payload), qos=1)
+
             elif topic == "shos/system/reset":
-                logger.warning("🔄 Reset système")
+                logger.warning("🔄 Reset système demandé")
                 self._system_reset()
-        
+
         except json.JSONDecodeError:
-            logger.error(f"❌ JSON invalide de {topic}")
+            # Si c'est du texte brut (pas du JSON), on évite le crash
+            logger.debug(f"ℹ️ Message non-JSON reçu sur {topic}: {raw_content}")
+            
         except Exception as e:
-            logger.error(f"❌ Erreur traitement: {e}")
+            logger.error(f"❌ Erreur de traitement sur {topic}: {e}")
     
+
+    def _handle_profile_switch(self, data):
+        """Met à jour les règles d'admission du Backbone"""
+        new_profile = data.get('profile_name', 'Inconnu')
+        allowed = data.get('allowed_modules', {})
+        
+        logger.info(f"🔄 SWITCH PROFIL : Application du mode '{new_profile}'")
+        
+        # 1. On identifie les modules qui ne sont plus autorisés dans le nouveau profil
+        to_kill = []
+        for active_mod in self.active_modules:
+            if active_mod not in allowed:
+                to_kill.append(active_mod)
+        
+        # 2. On les éteint proprement pour libérer de la RAM/CPU
+        for mod_name in to_kill:
+            logger.warning(f"💀 Profil {new_profile} : Arrêt du module non-autorisé '{mod_name}'")
+            self.mqtt_client.publish(f"nova/modules/{mod_name}/control", "STOP")
+            del self.active_modules[mod_name]
+
+        # 3. Optionnel : On peut envoyer un message global de bienvenue
+        self.mqtt_client.publish("nova/system/status", f"Profile {new_profile} Active")
+
+
+
+
+
+
+
+
+
+
+
+
     def _process_sensor_data(self, raw_data):
         """Traiter et normaliser les données"""
         logger.debug(f"📥 Données brutes: {raw_data}")
