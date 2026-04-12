@@ -3,12 +3,12 @@ import json
 import time
 
 # --- CONFIGURATION DES TOPICS ---
-TOPIC_SENSORS = "helmet/sensors/raw"
-TOPIC_CONTROL = "helmet/plugins/danger_monitor/control"
-TOPIC_GLOBAL = "helmet/plugins/control"
-TOPIC_RESULTS = "helmet/plugins/danger_monitor/data"
-TOPIC_VOICE = "helmet/plugins/voice_assistant/control" # Pour parler
-TOPIC_ARDUINO_CMD = "helmet/arduino/cmd" # Pour retour physique
+TOPIC_SENSORS = "shos/sensors/raw"
+TOPIC_CONTROL = "shos/plugins/danger_monitor/control"
+TOPIC_GLOBAL = "shos/plugins/control"
+TOPIC_RESULTS = "shos/plugins/danger_monitor/data"
+TOPIC_VOICE = "shos/plugins/voice_assistant/control" # Pour parler
+TOPIC_ARDUINO_CMD = "shos/arduino/cmd" # Pour retour physique
 
 class DangerMonitor:
     def __init__(self):

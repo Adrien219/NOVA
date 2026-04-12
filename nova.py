@@ -23,6 +23,9 @@ from flask import Flask, render_template, Response, jsonify
 from flask_socketio import SocketIO, emit
 from paho.mqtt import client as mqtt_client
 from jinja2 import ChoiceLoader, FileSystemLoader
+# --- AJOUTE CECI AU DÉBUT (vers ligne 60) ---
+from utils import ConfigManager # Assure-toi que ConfigManager est dans utils.py
+config_manager = ConfigManager()
 
 # ============================================================================
 # CONFIGURATION LOGGING
@@ -588,60 +591,9 @@ DEFAULT_PROFILE = {'name': 'ADRIEN_ASUS', 'id': '01'}
 
 @app.route('/')
 def index():
-    # On passe AVAILABLE_MODULES pour que l'accueil affiche les tuiles dynamiquement
+    """Page d'accueil avec les tuiles de modules"""
     return render_template('index.html', modules=AVAILABLE_MODULES, profile=DEFAULT_PROFILE)
 
-from flask import render_template_string
-
-@app.route('/module/<module_id>')
-def universal_module_route(module_id):
-    if module_id in AVAILABLE_MODULES:
-        config = AVAILABLE_MODULES[module_id]
-        # On construit le chemin ABSOLU vers le fichier
-        file_path = modules_dir / module_id / config.get('template', 'interface.html')
-        
-        if not file_path.exists():
-            logger.error(f"❌ Fichier manquant : {file_path}")
-            return f"Fichier introuvable : {file_path}", 404
-            
-        try:
-            # On lit le contenu du fichier HTML directement
-            with open(file_path, 'r', encoding='utf-8') as f:
-                html_content = f.read()
-            
-            # On utilise render_template_string pour injecter les variables
-            return render_template_string(html_content, 
-                                        config=config, 
-                                        profile={'name': 'Adrien'})
-        except Exception as e:
-            logger.error(f"❌ Erreur lecture module {module_id}: {e}")
-            return f"Erreur de rendu : {str(e)}", 500
-            
-    return "Module non trouvé", 404
-
-@app.route('/profile_manager')
-def profile_manager():
-    try:
-        return render_template('profile_manager.html', modules=AVAILABLE_MODULES, profile=DEFAULT_PROFILE)
-    except Exception as e:
-        return f"Erreur Profile Manager: {str(e)}", 500
-
-@app.route('/hud')
-def hud():
-    return render_template('hud.html', profile=DEFAULT_PROFILE)
-
-@app.route('/user_interface')
-def user_interface():
-    return render_template('user_interface.html', profile=DEFAULT_PROFILE)
-
-@app.route('/save_profile', methods=['POST'])
-def save_profile():
-    from flask import request
-    data = request.json
-    logger.info(f"👤 Nouveau profil reçu : {data.get('name')}")
-    return jsonify({"status": "success"})
-
-# Routes statiques restantes
 @app.route('/dashboard')
 def dashboard(): return render_template('dashboard.html')
 
@@ -654,6 +606,108 @@ def settings(): return render_template('settings.html')
 @app.route('/mobile')
 def mobile(): return render_template('mobile.html')
 
+@app.route('/hud')
+def hud(): return render_template('hud.html', profile=DEFAULT_PROFILE)
+
+@app.route('/user_interface')
+def user_interface(): return render_template('user_interface.html', profile=DEFAULT_PROFILE)
+
+# ============================================================================
+# GESTION DES PROFILS (API & MANAGER)
+# ============================================================================
+
+@app.route('/profile_manager')
+def profile_manager():
+    """Interface de création et gestion des profils"""
+    try:
+        return render_template('profile_manager.html', modules=AVAILABLE_MODULES, profile=DEFAULT_PROFILE)
+    except Exception as e:
+        logger.error(f"❌ Erreur Profile Manager: {e}")
+        return f"Erreur Profile Manager: {str(e)}", 500
+
+@app.route('/api/get_profiles', methods=['GET'])
+def get_profiles():
+    """API : Récupère la liste des profils pour l'interface dynamique"""
+    try:
+        config = config_manager.load_config()
+        return jsonify({
+            "status": "success",
+            "profiles": config.get("profiles", {}),
+            "current": config.get("current_active_profile", "")
+        })
+    except Exception as e:
+        logger.error(f"❌ Erreur API get_profiles: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/activate_profile', methods=['POST'])
+def api_activate_profile():
+    """API : Active un profil via un clic sur l'interface"""
+    try:
+        data = request.json
+        profile_id = data.get('profile_id')
+        success = config_manager.activate_profile(profile_id)
+        if success:
+            logger.info(f"🚀 Profil activé : {profile_id}")
+            return jsonify({"status": "success"})
+        return jsonify({"status": "error", "message": "Échec activation"}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/save_profile', methods=['POST'])
+def save_profile():
+    """Sauvegarde un nouveau profil et notifie le Backbone via MQTT"""
+    try:
+        data = request.json
+        main_mod = data.get('main_module')
+        secondary_mods = data.get('secondary_modules', [])
+        
+        # Structure des priorités pour SHOS
+        allowed_modules = {main_mod: 1}
+        for mod in secondary_mods:
+            allowed_modules[mod] = 2
+
+        profile_payload = {
+            "action": "SWITCH_PROFILE",
+            "profile_name": data.get('name'),
+            "allowed_modules": allowed_modules
+        }
+
+        # Publication sur le topic harmonisé shos/ (anciennement nova/ ou helmet/)
+        mqtt_bridge.client.publish(
+            "shos/system/profile/switch", 
+            json.dumps(profile_payload),
+            retain=True
+        )
+        logger.info(f"💾 Profil '{data.get('name')}' enregistré et publié")
+        return jsonify({"status": "success", "profile": data.get('name')})
+    except Exception as e:
+        logger.error(f"❌ Erreur save_profile : {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+# ============================================================================
+# ROUTES MODULES DYNAMIQUES
+# ============================================================================
+
+from flask import render_template_string
+
+@app.route('/module/<module_id>')
+def universal_module_route(module_id):
+    """Charge dynamiquement l'interface HTML d'un module spécifique"""
+    if module_id in AVAILABLE_MODULES:
+        config = AVAILABLE_MODULES[module_id]
+        file_path = modules_dir / module_id / config.get('template', 'interface.html')
+        
+        if not file_path.exists():
+            return f"Fichier introuvable : {file_path}", 404
+            
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            return render_template_string(html_content, config=config, profile=DEFAULT_PROFILE)
+        except Exception as e:
+            return f"Erreur de rendu : {str(e)}", 500
+            
+    return "Module non trouvé", 404
 # ============================================================================
 # FLUX VIDÉO & API
 # ============================================================================

@@ -6,10 +6,10 @@ import os
 from ultralytics import YOLO
 
 # --- CONFIGURATION DES TOPICS ---
-TOPIC_CAMERA = "helmet/camera/raw"
-TOPIC_CONTROL = "helmet/plugins/vision_objet/control"
-TOPIC_GLOBAL = "helmet/plugins/control"
-TOPIC_RESULTS = "helmet/plugins/vision_objet/data"
+TOPIC_CAMERA = "shos/camera/raw"
+TOPIC_CONTROL = "shos/plugins/vision_objet/control"
+TOPIC_GLOBAL = "shos/plugins/control"
+TOPIC_RESULTS = "shos/plugins/vision_objet/data"
 
 # Chemin vers ton modèle (vérifie bien que le dossier modeles est au bon endroit)
 MODEL_PATH = "../../modeles/yolov8n.pt"

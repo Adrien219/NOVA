@@ -1,25 +1,97 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
+    <meta charset="UTF-8">
     <title>S.H.O.S - PROFILE MANAGER</title>
     <style>
-        body { background: #050505; color: #36f6ff; font-family: monospace; padding: 50px; }
-        .form-group { margin-bottom: 25px; border-left: 3px solid #36f6ff; padding-left: 15px; }
-        input, select { background: #111; border: 1px solid #36f6ff; color: #36f6ff; padding: 10px; width: 300px; }
-        .module-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 400px; }
-        button { background: #36f6ff; color: #000; border: none; padding: 15px 30px; cursor: pointer; font-weight: bold; margin-top: 30px; }
+        body { 
+            background: #050505; 
+            color: #36f6ff; 
+            font-family: 'Courier New', Courier, monospace; 
+            padding: 40px; 
+            text-transform: uppercase;
+        }
+
+        /* Barre de statut du profil actif */
+        .status-bar {
+            border: 1px solid #36f6ff;
+            background: rgba(54, 246, 255, 0.1);
+            padding: 15px;
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-active { color: #fff; font-weight: bold; text-shadow: 0 0 10px #36f6ff; }
+
+        h1 { letter-spacing: 5px; border-bottom: 2px solid #36f6ff; padding-bottom: 10px; }
+
+        .form-group { margin-bottom: 30px; border-left: 3px solid #36f6ff; padding-left: 20px; }
+        
+        label { display: block; margin-bottom: 10px; font-size: 0.9em; opacity: 0.8; }
+
+        input, select { 
+            background: #111; 
+            border: 1px solid #36f6ff; 
+            color: #36f6ff; 
+            padding: 12px; 
+            width: 350px; 
+            outline: none;
+        }
+
+        input:focus, select:focus { box-shadow: 0 0 15px rgba(54, 246, 255, 0.5); }
+
+        .module-list { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+            width: 500px; 
+            background: #0a0a0a;
+            padding: 15px;
+            border: 1px dashed #36f6ff;
+        }
+
+        .checkbox-item { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+        .checkbox-item input { width: auto; cursor: pointer; }
+
+        .btn-compiler { 
+            background: #36f6ff; 
+            color: #000; 
+            border: none; 
+            padding: 20px 40px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            margin-top: 20px;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+
+        .btn-compiler:hover { 
+            background: #fff; 
+            box-shadow: 0 0 20px #36f6ff;
+            transform: scale(1.02);
+        }
+
+        .back-link { display: block; margin-top: 30px; color: #36f6ff; text-decoration: none; font-size: 0.8em; }
     </style>
 </head>
 <body>
-    <h1>[ NEW PROFILE CREATION ]</h1>
+
+    <div class="status-bar">
+        <span>SYSTÈME : <span style="color: #00ff00;">OPÉRATIONNEL</span></span>
+        <span>PROFIL ACTIF : <span id="active-profile-display" class="status-active">AUCUN</span></span>
+    </div>
+
+    <h1>[ CRÉATION D'UN NOUVEAU PROFIL ]</h1>
 
     <div class="form-group">
-        <label>PROFILE NAME:</label><br>
-        <input type="text" id="p-name" placeholder="EX: COMBAT_UNIT_01">
+        <label>NOM DU PROFIL :</label>
+        <input type="text" id="p-name" placeholder="EX: UNITE_DE_COMBAT_01">
     </div>
 
     <div class="form-group">
-        <label>MAIN MODULE (Primary View):</label><br>
+        <label>MODULE PRINCIPAL (Vue principale) :</label>
         <select id="p-main">
             {% for id, mod in modules.items() %}
             <option value="{{ id }}">{{ mod.name }}</option>
@@ -28,17 +100,21 @@
     </div>
 
     <div class="form-group">
-        <label>SECONDARY MODULES (Widgets):</label><br>
+        <label>MODULES SECONDAIRES (Widgets) :</label>
         <div class="module-list">
             {% for id, mod in modules.items() %}
-            <div>
-                <input type="checkbox" class="sec-mod" value="{{ id }}" style="width: auto;"> {{ mod.name }}
-            </div>
+            <label class="checkbox-item">
+                <input type="checkbox" class="sec-mod" value="{{ id }}"> {{ mod.name }}
+            </label>
             {% endfor %}
         </div>
     </div>
 
-    <button onclick="saveProfile()">COMPILE & SAVE PROFILE</button>
+    <button class="btn-compiler" onclick="saveProfile()">
+        COMPILER ET ENREGISTRER LE PROFIL
+    </button>
+
+    <a href="/" class="back-link">< RETOUR AU DASHBOARD</a>
 
     <script>
         function saveProfile() {
@@ -46,15 +122,43 @@
             const main = document.getElementById('p-main').value;
             const secondary = Array.from(document.querySelectorAll('.sec-mod:checked')).map(cb => cb.value);
 
-            if(!name) return alert("Veuillez donner un nom !");
+            if(!name) {
+                alert("ERREUR : LE NOM DU PROFIL EST REQUIS");
+                return;
+            }
+
+            // Bouton en mode "chargement"
+            const btn = document.querySelector('.btn-compiler');
+            btn.innerText = "COMPILATION EN COURS...";
+            btn.style.opacity = "0.5";
 
             fetch('/save_profile', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({name: name, main_module: main, secondary_modules: secondary})
-            }).then(() => {
-                alert("Profil enregistré !");
-                window.location.href = "/";
+                body: JSON.stringify({
+                    name: name, 
+                    main_module: main, 
+                    secondary_modules: secondary
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.status === "success") {
+                    document.getElementById('active-profile-display').innerText = name.toUpperCase();
+                    alert("✅ PROFIL TRANSMIS AU BACKBONE AVEC SUCCÈS");
+                    // Optionnel : redirection après 1 seconde
+                    // window.location.href = "/";
+                } else {
+                    alert("❌ ERREUR LORS DE L'ENVOI");
+                }
+            })
+            .catch(err => {
+                console.error("Erreur:", err);
+                alert("❌ ERREUR RÉSEAU");
+            })
+            .finally(() => {
+                btn.innerText = "COMPILER ET ENREGISTRER LE PROFIL";
+                btn.style.opacity = "1";
             });
         }
     </script>

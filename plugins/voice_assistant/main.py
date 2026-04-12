@@ -4,11 +4,11 @@ import os
 import time
 
 # --- CONFIGURATION DES TOPICS ---
-TOPIC_CONTROL = "helmet/plugins/voice_assistant/control"
-TOPIC_GLOBAL = "helmet/plugins/control"
+TOPIC_CONTROL = "shos/plugins/voice_assistant/control"
+TOPIC_GLOBAL = "shos/plugins/control"
 # On écoute les sorties des autres plugins pour les annoncer
-TOPIC_VISION = "helmet/plugins/vision_objet/data"
-TOPIC_DANGER = "helmet/plugins/danger_monitor/data"
+TOPIC_VISION = "shos/plugins/vision_objet/data"
+TOPIC_DANGER = "shos/plugins/danger_monitor/data"
 
 class VoiceAssistant:
     def __init__(self):
