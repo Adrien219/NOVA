@@ -46,9 +46,7 @@ class ConfigManager:
         print(f"🚀 N.O.V.A : Préparation du profil '{profile['name']}'")
 
         # --- LOGIQUE HARMONISÉE NOVA ---
-        # Au lieu de démarrer les modules un par un, on envoie le "Manifeste"
-        # Le Backbone recevra cette liste et saura qui autoriser ou couper.
-        
+       
         payload = {
             "action": "SWITCH_PROFILE",
             "profile_id": profile_id,
@@ -57,7 +55,6 @@ class ConfigManager:
         }
 
         # On publie sur le topic système de NOVA
-        # retain=True est crucial pour que les modules sachent le profil au boot
         self.mqtt_client.publish(
             "nova/system/profile/switch", 
             json.dumps(payload), 
@@ -74,5 +71,5 @@ class ConfigManager:
 
 if __name__ == "__main__":
     cm = ConfigManager()
-    # Test : Assure-toi que "default" existe dans ton config.json
+   
     cm.activate_profile("default")
