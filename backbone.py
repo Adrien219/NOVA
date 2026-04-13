@@ -95,13 +95,15 @@ class SHOS_Backbone:
         self.max_concurrent_modules = 2
         self.last_sensor_data = None
         self.last_heartbeat = time.time()
-        self.hardware_connected = True
-        self.watchdog_timeout = 10
         self.max_cpu_percent = 85.0
         
-        # Initialiser MQTT
+        # --- SECTIONS À AJOUTER ---
+        self.active_modules = {}  # Stocke { "nom_du_module": priorité_int }
+        self.max_concurrent_modules = 2 # Ta limite de sécurité
+        # --------------------------
+        
         self._init_mqtt()
-        logger.info("🚀 Backbone initialisé")
+        logger.info("🚀 Backbone N.O.V.A initialisé")
     
     def _init_mqtt(self):
         """Initialiser MQTT avec support paho-mqtt 1.x et 2.x"""
@@ -135,6 +137,7 @@ class SHOS_Backbone:
             logger.info("📡 Connecté au broker MQTT")
             client.subscribe([
                 ("shos/sensors/raw", 1),         # Arduino Bridge
+                ("nova/modules/register", 1),
                 ("shos/esp32/telemetry", 1),    # ESP32
                 ("shos/mobile/sensors", 1),     # Téléphone
                 ("nova/system/profile/switch", 1),
@@ -160,6 +163,7 @@ class SHOS_Backbone:
             # 2. Tentative de conversion en JSON
             payload = json.loads(raw_content)
             
+<<<<<<< HEAD
             # 3. Sécurité Windows/CMD : si le JSON est encore une string, on re-parse
             if isinstance(payload, str):
                 try:
@@ -172,6 +176,20 @@ class SHOS_Backbone:
             # -----------------------------------------------------------
             if topic == "nova/system/profile/switch":
                 self._handle_profile_switch(payload)
+=======
+            # --- LOGIQUE DYNAMIQUE ---
+            if topic == "nova/modules/register":
+                self._handle_module_registration(payload)
+                return
+            # -------------------------
+
+            if topic == "nova/benchmark/ping":
+                self.mqtt_client.publish("nova/benchmark/pong", payload)
+            
+            if topic == "nova/benchmark/ping":
+                # Effet miroir immédiat
+                self.mqtt_client.publish("nova/benchmark/pong", payload)
+>>>>>>> 7398f26 (Description claire)
                 return
 
             elif topic == "nova/modules/register":
@@ -207,6 +225,7 @@ class SHOS_Backbone:
         except Exception as e:
             logger.error(f"❌ Erreur de traitement sur {topic}: {e}")
     
+<<<<<<< HEAD
 
     def _handle_profile_switch(self, data):
         """Met à jour les règles d'admission du Backbone"""
@@ -241,6 +260,31 @@ class SHOS_Backbone:
 
 
 
+=======
+    def _handle_module_registration(self, data):
+        """Décide si un module peut se lancer ou doit en tuer un autre"""
+        name = data.get('name', 'unknown')
+        priority = data.get('priority', 3) # 1=Urgent, 3=Confort
+
+        # Si on est déjà au max (2 modules)
+        if len(self.active_modules) >= self.max_concurrent_modules:
+            # On cherche le module le MOINS prioritaire (le chiffre le plus élevé)
+            less_important = max(self.active_modules, key=self.active_modules.get)
+            
+            if self.active_modules[less_important] > priority:
+                logger.warning(f"♻️ Substitution : {name} remplace {less_important}")
+                self.mqtt_client.publish(f"nova/modules/{less_important}/control", "STOP")
+                del self.active_modules[less_important]
+            else:
+                logger.error(f"🚫 Refus : {name} n'est pas assez prioritaire")
+                self.mqtt_client.publish(f"nova/modules/{name}/control", "WAIT")
+                return
+
+        # Si on arrive ici, le module est accepté
+        self.active_modules[name] = priority
+        self.mqtt_client.publish(f"nova/modules/{name}/control", "START")
+    
+>>>>>>> 7398f26 (Description claire)
     def _process_sensor_data(self, raw_data):
         """Traiter et normaliser les données"""
         logger.debug(f"📥 Données brutes: {raw_data}")
