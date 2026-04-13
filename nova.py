@@ -551,46 +551,43 @@ class MQTTHandler:
             print(f"❌ [MQTT] Erreur de connexion : {e}")
             
     def _on_connect(self, client, userdata, flags, rc, properties=None):
-        print(f"✅ [MQTT] Connecté au Broker (Code {rc})")
-        # On s'abonne aux capteurs classiques ET au nouveau système de discovery
+        print(f"✅ [MQTT] Connecté au Broker avec code {rc}")
+        # --- C'EST ICI QUE TOUT SE JOUE ---
+        # On dit à nova.py d'écouter ces 4 topics spécifiques :
         client.subscribe([
             ("shos/sensors/normalized", 1),
             ("shos/sensors/mobile", 1),
             ("shos/sensors/esp32", 1),
-            ("nova/modules/register", 1),     # Pour détecter les nouveaux modules
-            ("nova/modules/+/data", 1),       # Pour recevoir les données de TOUS les modules (+)
-            ("nova/system/telemetry", 1)      # Pour le monitoring CPU/RAM du Backbone
+            ("shos/benchmark/ping", 1)  # <--- LE VOILÀ, LE MAILLON MANQUANT !
         ])
+        print("📡 [MQTT] En écoute des capteurs ET du benchmark...")
         
     def _on_message(self, client, userdata, msg):
         try:
             topic = msg.topic
-            payload = json.loads(msg.payload.decode('utf-8'))
+            payload_raw = msg.payload.decode('utf-8')
             
-            # --- LOGIQUE DYNAMIQUE (Nouveaux Modules) ---
+            # --- LOGIQUE DE BENCHMARK (ÉCHO) ---
+            if topic == "shos/benchmark/ping":
+                self.client.publish("shos/benchmark/pong", payload_raw)
+                return 
+
+            # Décodage JSON pour les autres messages
+            payload = json.loads(payload_raw)
+
             if topic == "nova/modules/register":
                 mod_name = payload.get('name', 'unknown')
                 self.active_modules[mod_name] = payload
                 socketio.emit('module_registered', payload)
-                print(f"✨ [DISCOVERY] Nouveau module détecté : {mod_name}")
+                print(f"✨ [DISCOVERY] Nouveau module : {mod_name}")
 
             elif "/data" in topic:
-                # Transmet automatiquement les données de n'importe quel module au Web
-                mod_name = topic.split('/')[2]
+                parts = topic.split('/')
+                mod_name = parts[1] if parts[0] == "shos" else parts[2]
                 socketio.emit('module_update', {'module': mod_name, 'data': payload})
 
-            # --- LOGIQUE CLASSIQUE (Rétro-compatibilité) ---
             elif topic == "shos/sensors/normalized":
                 socketio.emit('sensor_update', payload)
-            
-            elif topic == "shos/sensors/mobile":
-                socketio.emit('mobile_update', payload)
-            
-            elif topic == "nova/system/telemetry":
-                # Mise à jour des jauges CPU/RAM sur le dashboard
-                socketio.emit('backbone_telemetry', payload)
-
-            # print(f"📥 [MQTT] Flux sur {topic}") # Optionnel : trop de logs tue le log
             
         except Exception as e:
             print(f"❌ [MQTT] Erreur routing sur {msg.topic}: {e}")

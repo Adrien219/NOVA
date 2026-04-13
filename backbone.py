@@ -163,7 +163,7 @@ class SHOS_Backbone:
             # 2. Tentative de conversion en JSON
             payload = json.loads(raw_content)
             
-<<<<<<< HEAD
+
             # 3. Sécurité Windows/CMD : si le JSON est encore une string, on re-parse
             if isinstance(payload, str):
                 try:
@@ -176,7 +176,7 @@ class SHOS_Backbone:
             # -----------------------------------------------------------
             if topic == "nova/system/profile/switch":
                 self._handle_profile_switch(payload)
-=======
+
             # --- LOGIQUE DYNAMIQUE ---
             if topic == "nova/modules/register":
                 self._handle_module_registration(payload)
@@ -189,7 +189,6 @@ class SHOS_Backbone:
             if topic == "nova/benchmark/ping":
                 # Effet miroir immédiat
                 self.mqtt_client.publish("nova/benchmark/pong", payload)
->>>>>>> 7398f26 (Description claire)
                 return
 
             elif topic == "nova/modules/register":
@@ -225,7 +224,7 @@ class SHOS_Backbone:
         except Exception as e:
             logger.error(f"❌ Erreur de traitement sur {topic}: {e}")
     
-<<<<<<< HEAD
+
 
     def _handle_profile_switch(self, data):
         """Met à jour les règles d'admission du Backbone"""
@@ -260,7 +259,7 @@ class SHOS_Backbone:
 
 
 
-=======
+
     def _handle_module_registration(self, data):
         """Décide si un module peut se lancer ou doit en tuer un autre"""
         name = data.get('name', 'unknown')
@@ -284,7 +283,7 @@ class SHOS_Backbone:
         self.active_modules[name] = priority
         self.mqtt_client.publish(f"nova/modules/{name}/control", "START")
     
->>>>>>> 7398f26 (Description claire)
+
     def _process_sensor_data(self, raw_data):
         """Traiter et normaliser les données"""
         logger.debug(f"📥 Données brutes: {raw_data}")
