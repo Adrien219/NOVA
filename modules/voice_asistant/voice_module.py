@@ -1,3 +1,4 @@
+
 import os
 import sys
 import json
@@ -5,131 +6,220 @@ import time
 import datetime
 import subprocess
 import psutil
+import threading
 import paho.mqtt.client as mqtt
 from vosk import Model, KaldiRecognizer
 import pyaudio
+from pathlib import Path
+import re
+import unicodedata
 
 # ══════════════════════════════════════════════════════════════
-#  SCANNER AUDIO AUTOMATIQUE (Windows & Pi)
+#  CONFIGURATION & CONSTANTES
 # ══════════════════════════════════════════════════════════════
-def get_best_audio_devices():
+MQTT_BROKER = "localhost"
+MQTT_PORT = 1883
+MQTT_TOPICS = [
+    ("shos/sensors/normalized", 1), 
+    ("shos/alert/critical", 2),
+    ("shos/sensors/vision", 1),
+    ("helmet/plugins/vision/data", 1)
+]
+
+MODEL_PATH = "model"
+USER_NAME = "Adrien"
+ASSISTANT_NAME = "NOVA"
+STORAGE_DIR = os.path.expanduser("~/NOVA_FILES")
+
+# ══════════════════════════════════════════════════════════════
+#  GRAMMAIRE NORMALISÉE (SANS ACCENTS POUR VOSK)
+# ══════════════════════════════════════════════════════════════
+# Vosk a du mal avec les accents dans la grammaire JSON.
+# On utilise des mots simplifiés pour la reconnaissance.
+GRAMMAR_WORDS = [
+    "temperature", "degre", "chaud", "froid", "humidite", "humide",
+    "obstacle", "distance", "devant", "proche", "gaz", "air", "danger", "alerte",
+    "fichier", "note", "dossier", "memoire", "cree", "fais", "nouveau", "liste",
+    "heure", "temps", "statut", "systeme", "ram", "cpu", "etat",
+    "volume", "son", "augmente", "baisse", "fort", "moins",
+    "eteins", "quitter", "stop", "revoir", "nova", "adrien",
+    "vois", "regarde", "vision", "objet", "quoi", "est", "ce", "que", "tu",
+    "[unk]"
+]
+
+# ══════════════════════════════════════════════════════════════
+#  UTILITAIRES
+# ══════════════════════════════════════════════════════════════
+def remove_accents(input_str):
+    nfkd_form = unicodedata.normalize('NFKD', input_str)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+
+def auto_detect_audio():
     p = pyaudio.PyAudio()
-    info = p.get_host_api_info_by_index(0)
-    numdevices = info.get('deviceCount')
-    
     input_idx = None
-    output_idx = None
-
-    print("\n--- SCAN AUDIO ---")
-    for i in range(0, numdevices):
+    for i in range(p.get_device_count()):
         dev = p.get_device_info_by_index(i)
-        name = dev.get('name')
-        # Détection Micro
         if dev.get('maxInputChannels') > 0 and input_idx is None:
-            if "default" in name.lower() or "usb" in name.lower() or "mic" in name.lower():
-                input_idx = i
-                print(f"✅ Micro trouvé : [{i}] {name}")
-        
-        # Détection Sortie (HP / TV / AirPods)
-        if dev.get('maxOutputChannels') > 0 and output_idx is None:
-            if "default" in name.lower() or "hdmi" in name.lower() or "speaker" in name.lower() or "headphones" in name.lower():
-                output_idx = i
-                print(f"✅ Sortie trouvée : [{i}] {name}")
-    
+            input_idx = i
+            break
     p.terminate()
-    return input_idx, output_idx
+    return input_idx
 
 # ══════════════════════════════════════════════════════════════
-#  MOTEUR VOCAL INTERACTIF
+#  CLASSE PRINCIPALE : NOVA OMNISCIENT V2
 # ══════════════════════════════════════════════════════════════
-class NovaHeadless:
+class NovaOmniscientV2:
     def __init__(self):
-        self.input_idx, self.output_idx = get_best_audio_devices()
-        self.mqtt_data = {"temp": "inconnue", "dist": "inconnue"}
+        self.running = True
+        os.makedirs(STORAGE_DIR, exist_ok=True)
         
-        # Init Vosk
-        if not os.path.exists("model"):
-            print("❌ Erreur : Dossier 'model' manquant."); exit()
-        self.model = Model("model")
-        self.rec = KaldiRecognizer(self.model, 16000)
+        self.memory = {
+            "sensors": {},
+            "vision": [],
+            "last_update": 0
+        }
+        
+        self.input_idx = auto_detect_audio()
+        self.setup_mqtt()
 
-        # MQTT pour les capteurs du mémoire
-        self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
-        self.client.on_message = lambda c, u, m: self.mqtt_data.update(json.loads(m.payload.decode()))
+        if not os.path.exists(MODEL_PATH):
+            print(f"❌ Erreur : Dossier '{MODEL_PATH}' introuvable.")
+            sys.exit(1)
+            
+        self.model = Model(MODEL_PATH)
+        # On passe la grammaire simplifiée (sans accents)
+        self.rec = KaldiRecognizer(self.model, 16000, json.dumps(GRAMMAR_WORDS))
+
+    def setup_mqtt(self):
         try:
-            self.client.connect("localhost", 1883, 60)
-            self.client.subscribe("shos/sensors/#")
+            self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+            self.client.on_connect = self._on_connect
+            self.client.on_message = self._on_message
+            self.client.connect(MQTT_BROKER, MQTT_PORT, 60)
             self.client.loop_start()
-        except: print("⚠️ MQTT Hors-ligne")
+        except Exception as e:
+            print(f"⚠️ Erreur MQTT : {e}")
+
+    def _on_connect(self, client, userdata, flags, rc, properties=None):
+        print(f"📡 [MQTT] Connecté au réseau NOVA (Code: {rc})")
+        client.subscribe(MQTT_TOPICS)
+
+    def _on_message(self, client, userdata, msg):
+        try:
+            payload = json.loads(msg.payload.decode())
+            topic = msg.topic
+            if "sensors" in topic:
+                self.memory["sensors"].update(payload)
+                self.memory["last_update"] = time.time()
+            elif "vision" in topic:
+                if isinstance(payload, list): self.memory["vision"] = payload
+                elif isinstance(payload, dict) and "objects" in payload:
+                    self.memory["vision"] = [obj["class"] for obj in payload["objects"]]
+                elif isinstance(payload, dict) and "found" in payload:
+                    self.memory["vision"] = payload["found"]
+            elif "alert" in topic:
+                self._handle_alert(payload)
+        except: pass
+
+    def _handle_alert(self, alert):
+        msg = f"ALERTE ! {alert.get('type', 'Danger')} détecté."
+        self.parler(msg)
 
     def parler(self, texte):
-        print(f"NOVA: {texte}")
-        # Sur Pi, on force la sortie si nécessaire, sinon espeak-ng suffit
+        print(f"[{ASSISTANT_NAME}]: {texte}")
         if sys.platform == "win32":
-            # Si tu es sur Windows pour tes tests
-            import pyttsx3
-            engine = pyttsx3.init()
-            engine.say(texte); engine.runAndWait()
+            try:
+                import pyttsx3
+                engine = pyttsx3.init()
+                engine.say(texte); engine.runAndWait()
+            except: pass
         else:
-            # Sur Raspberry Pi (100% Local)
-            subprocess.run(["espeak-ng", "-v", "fr", "-s", "150", texte])
+            subprocess.run(["espeak-ng", "-v", "fr", "-s", "160", texte], stderr=subprocess.DEVNULL)
 
-    def demander_confirmation(self, question):
-        """Pose une question et attend un oui/non vocal"""
-        self.parler(question)
-        # On réinitialise le flux pour écouter spécifiquement la réponse
-        start_time = time.time()
-        while (time.time() - start_time) < 5: # 5 secondes pour répondre
-            # (Logique simplifiée d'écoute ici)
-            return True # Pour le dev, on simule l'accord
+    def _fuzzy_match(self, texte, mots_cles):
+        # On compare le texte normalisé (sans accents) aux mots-clés
+        t = remove_accents(texte.lower())
+        return any(mot in t for mot in mots_cles)
 
-    def traiter_commande(self, commande):
-        c = commande.lower()
+    def executer_commande(self, texte):
+        t = remove_accents(texte.lower())
         
-        # --- COMMANDES AUDIO-SYSTÈME ---
-        if "heure" in c:
-            self.parler(datetime.datetime.now().strftime("Il est précisément %H heures %M"))
-        
-        elif "température" in c:
-            self.parler(f"La température du capteur est de {self.mqtt_data['temp']} degrés.")
+        # 1. VISION
+        if self._fuzzy_match(t, ["vois", "regarde", "vision", "objet", "quoi"]):
+            objets = self.memory["vision"]
+            if objets:
+                counts = {}
+                for o in objets: counts[o] = counts.get(o, 0) + 1
+                reponse = "Je vois : " + ", ".join([f"{v} {k}" for k, v in counts.items()])
+                self.parler(reponse)
+            else:
+                self.parler("Je ne vois rien de particulier.")
 
-        elif "créer" in c and "fichier" in c:
-            self.parler("J'ai entendu votre demande de création de fichier. Quel nom voulez-vous donner ?")
-            # Ici on attendrait le prochain 'ecouter()' pour le nom
-            self.parler("Fichier créé avec succès sur le stockage local.")
+        # 2. CAPTEURS DYNAMIQUES
+        elif self._fuzzy_match(t, ["temperature", "humidite", "gaz", "distance", "obstacle", "air"]):
+            found = False
+            mapping = {
+                "temperature": ["temperature", "temp", "t"],
+                "humidite": ["humidity", "hum", "h"],
+                "gaz": ["gas", "g", "smoke"],
+                "distance": ["distance", "dist", "d"],
+                "obstacle": ["distance", "dist", "obstacle"]
+            }
+            for key, aliases in mapping.items():
+                if key in t:
+                    for alias in aliases:
+                        if alias in self.memory["sensors"]:
+                            val = self.memory["sensors"][alias]
+                            unit = "degres" if "temp" in key else "pour cent" if "hum" in key else "centimetres" if "dist" in key else "ppm"
+                            self.parler(f"La valeur de {key} est de {val} {unit}.")
+                            found = True; break
+            if not found: self.parler("Donnée indisponible.")
 
-        elif "volume" in c:
-            if "augmente" in c:
-                os.system("amixer set Master 10%+" if sys.platform != "win32" else "")
-                self.parler("Le volume a été augmenté de dix pour cent.")
+        # 3. FICHIERS
+        elif self._fuzzy_match(t, ["fichier", "note", "dossier"]):
+            if self._fuzzy_match(t, ["cree", "fais", "nouveau"]):
+                nom = f"note_{datetime.datetime.now().strftime('%H%M_%S')}.txt"
+                with open(os.path.join(STORAGE_DIR, nom), "w", encoding="utf-8") as f:
+                    f.write(f"Note NOVA : {texte}")
+                self.parler(f"Fichier {nom} cree.")
+            elif self._fuzzy_match(t, ["liste", "voir"]):
+                nb = len(os.listdir(STORAGE_DIR))
+                self.parler(f"Il y a {nb} fichiers.")
 
-        elif "statut" in c:
-            cpu = psutil.cpu_percent()
-            self.parler(f"Le système utilise actuellement {cpu} pour cent de sa puissance.")
+        # 4. SYSTÈME
+        elif self._fuzzy_match(t, ["heure", "temps"]):
+            self.parler(datetime.datetime.now().strftime("Il est %H heures %M."))
+        elif self._fuzzy_match(t, ["statut", "systeme", "ram", "cpu"]):
+            ram, cpu = psutil.virtual_memory().percent, psutil.cpu_percent()
+            self.parler(f"RAM {ram}%, CPU {cpu}%.")
+        elif self._fuzzy_match(t, ["volume", "son"]):
+            if self._fuzzy_match(t, ["augmente", "fort"]):
+                self.parler("Volume augmente.")
+                if sys.platform != "win32": os.system("amixer set Master 10%+")
+            elif self._fuzzy_match(t, ["baisse", "moins"]):
+                self.parler("Volume baisse.")
+                if sys.platform != "win32": os.system("amixer set Master 10%-")
+        elif self._fuzzy_match(t, ["eteins", "quitter", "stop"]):
+            self.parler(f"Arret du systeme. Au revoir {USER_NAME}.")
+            self.running = False; sys.exit()
 
     def run(self):
         p = pyaudio.PyAudio()
-        stream = p.open(
-            format=pyaudio.paInt16, 
-            channels=1, 
-            rate=16000, 
-            input=True, 
-            input_device_index=self.input_idx,
-            frames_per_buffer=8000
-        )
-        stream.start_stream()
-        
-        self.parler("Initialisation terminée. Système N O V A prêt. Je vous écoute Adrien.")
-
-        while True:
-            data = stream.read(4000, exception_on_overflow=False)
-            if self.rec.AcceptWaveform(data):
-                result = json.loads(self.rec.Result())
-                text = result.get("text", "")
-                if text:
-                    print(f"🎙️ : {text}")
-                    self.traiter_commande(text)
+        try:
+            stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, 
+                            input_device_index=self.input_idx, frames_per_buffer=8000)
+            stream.start_stream()
+            self.parler(f"Systeme NOVA V2 active. Je vous ecoute {USER_NAME}.")
+            while self.running:
+                data = stream.read(4000, exception_on_overflow=False)
+                if self.rec.AcceptWaveform(data):
+                    res = json.loads(self.rec.Result())
+                    phrase = res.get("text", "")
+                    if phrase:
+                        print(f"🎙️ Entendu : {phrase}")
+                        self.executer_commande(phrase)
+        except Exception as e: print(f"❌ Erreur : {e}")
+        finally: p.terminate()
 
 if __name__ == "__main__":
-    nova = NovaHeadless()
-    nova.run()
+    NovaOmniscientV2().run()
