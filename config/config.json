@@ -18,6 +18,13 @@
             "secondary_modules": [
                 "hand_control"
             ]
+        },
+        "test5": {
+            "name": "test5",
+            "main_module": "hand_control",
+            "secondary_modules": [
+                "hand_control"
+            ]
         }
     },
     "current_active_profile": "test1"
