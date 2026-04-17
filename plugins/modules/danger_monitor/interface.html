@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N.O.V.A - {{ config.name }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        :root {
+            --safe-green: #00ff88;
+            --warn-orange: #ffaa00;
+            --danger-red: #ff0044;
+            --panel-bg: rgba(10, 10, 10, 0.9);
+        }
+
+        body {
+            background: #000;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 4px solid var(--safe-green);
+            transition: border-color 0.3s;
+        }
+
+        /* État Alerte Critique */
+        body.alert-active {
+            border-color: var(--danger-red);
+            animation: pulse-border 0.5s infinite alternate;
+        }
+
+        @keyframes pulse-border {
+            from { box-shadow: inset 0 0 20px var(--danger-red); }
+            to { box-shadow: inset 0 0 60px var(--danger-red); }
+        }
+
+        .header {
+            padding: 20px;
+            background: var(--panel-bg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .status-text {
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Radar / Zone centrale */
+        .monitor-zone {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .radar-circle {
+            width: 200px;
+            height: 200px;
+            border: 2px solid var(--safe-green);
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .radar-sweep {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, transparent, rgba(0, 255, 136, 0.2));
+            animation: rotate 4s linear infinite;
+        }
+
+        @keyframes rotate { from {transform: rotate(0deg);} to {transform: rotate(360deg);} }
+
+        /* Panneau de logs d'alertes */
+        .alerts-log {
+            height: 200px;
+            background: var(--panel-bg);
+            padding: 15px;
+            overflow-y: auto;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .alert-entry {
+            padding: 10px;
+            margin-bottom: 5px;
+            border-left: 4px solid var(--danger-red);
+            background: rgba(255, 0, 68, 0.1);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            border: 1px solid white;
+            color: white;
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="status-text" id="global-status">SURVEILLANCE ACTIVE</div>
+        <div id="connection-badge" style="color: var(--safe-green);">● BACKBONE CONNECTÉ</div>
+    </div>
+
+    <a href="/" class="back-btn">X FERMER</a>
+
+    <div class="monitor-zone" id="main-view">
+        <div class="radar-circle" id="radar">
+            <div class="radar-sweep"></div>
+            <div id="dist-val" style="font-size: 2rem; font-weight: bold;">--</div>
+            <div style="font-size: 0.8rem; position: absolute; bottom: 40px;">CM</div>
+        </div>
+        <div id="gas-val" style="margin-top: 20px; color: #aaa;">Gaz: <span id="gas-num">--</span> ppm</div>
+    </div>
+
+    <div class="alerts-log" id="log">
+        <div style="color: #555; text-align: center;">En attente de données capteurs...</div>
+    </div>
+
+    <script>
+        const socket = io();
+        const body = document.body;
+        const log = document.getElementById('log');
+        const distVal = document.getElementById('dist-val');
+        const gasNum = document.getElementById('gas-num');
+        const statusText = document.getElementById('global-status');
+
+        socket.on('plugin_data', function(data) {
+            if (data.plugin === "danger_monitor") {
+                renderAlerts(data.alerts);
+            }
+        });
+
+        // On écoute aussi les données brutes des capteurs pour mettre à jour les chiffres
+        socket.on('sensor_data', function(data) {
+            if (data.dist) distVal.innerText = Math.round(data.dist);
+            if (data.gas) gasNum.innerText = data.gas;
+        });
+
+        function renderAlerts(alerts) {
+            if (!alerts || alerts.length === 0) {
+                body.classList.remove('alert-active');
+                statusText.innerText = "SURVEILLANCE ACTIVE";
+                statusText.style.color = "var(--safe-green)";
+                return;
+            }
+
+            // Activer l'alerte visuelle
+            body.classList.add('alert-active');
+            statusText.innerText = "⚠️ DANGER DÉTECTÉ";
+            statusText.style.color = "var(--danger-red)";
+
+            alerts.forEach(alert => {
+                const entry = document.createElement('div');
+                entry.className = 'alert-entry';
+                const time = new Date().toLocaleTimeString();
+                entry.innerHTML = `<strong>[${time}] ${alert.type}</strong> : Valeur ${alert.value} (${alert.level})`;
+                
+                log.prepend(entry);
+                
+                // Supprimer les vieux logs après 5 entrées
+                if (log.children.length > 6) log.lastElementChild.remove();
+            });
+        }
+    </script>
+</body>
+</html>

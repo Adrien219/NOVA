@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N.O.V.A - {{ config.name }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        :root {
+            --ocr-gold: #ffcc00;
+            --ocr-bg: #050505;
+        }
+
+        body {
+            background: var(--ocr-bg);
+            color: white;
+            font-family: 'Consolas', 'Courier New', monospace;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            border: 2px solid var(--ocr-gold);
+            overflow: hidden;
+        }
+
+        /* En-tête Tactique */
+        .header {
+            padding: 10px 20px;
+            background: rgba(255, 204, 0, 0.1);
+            border-bottom: 1px solid var(--ocr-gold);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            letter-spacing: 1px;
+        }
+
+        .scanning-loader {
+            color: var(--ocr-gold);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        /* Zone de Vision */
+        .viewport {
+            position: relative;
+            flex-grow: 1;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .camera-stream {
+            max-width: 100%;
+            max-height: 100%;
+            opacity: 0.7; /* Légère transparence pour le style HUD */
+        }
+
+        /* Cadre de visée (Targeting Box) */
+        .aim-box {
+            position: absolute;
+            width: 70%;
+            height: 35%;
+            border: 2px solid var(--ocr-gold);
+            box-shadow: 0 0 20px rgba(255, 204, 0, 0.3);
+            pointer-events: none;
+        }
+
+        .aim-box::after {
+            content: "ZONE D'EXTRACTION OCR";
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.7rem;
+            color: var(--ocr-gold);
+        }
+
+        /* Panneau de Résultat (Bas de l'écran) */
+        .result-panel {
+            height: 25%;
+            background: rgba(0, 0, 0, 0.9);
+            border-top: 1px solid var(--ocr-gold);
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .text-output {
+            font-size: 1.2rem;
+            line-height: 1.5;
+            color: #ffffff;
+            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+        }
+
+        .placeholder {
+            color: #444;
+            font-style: italic;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .back-link {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            color: var(--ocr-gold);
+            text-decoration: none;
+            border: 1px solid var(--ocr-gold);
+            padding: 5px 10px;
+            font-size: 0.8rem;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <span>UNITÉ : {{ config.name }}</span>
+        <span class="scanning-loader" id="status">RECHERCHE DE CARACTÈRES...</span>
+    </div>
+
+    <a href="/" class="back-link">X QUITTER</a>
+
+    <div class="viewport">
+        <img src="/video_feed_pi" class="camera-stream">
+        
+        <div class="aim-box"></div>
+    </div>
+
+    <div class="result-panel">
+        <div id="no-text" class="placeholder">Aucun texte détecté dans la zone de visée...</div>
+        <div id="output" class="text-output"></div>
+    </div>
+
+    <script>
+        const socket = io();
+        const output = document.getElementById('output');
+        const noText = document.getElementById('no-text');
+        const status = document.getElementById('status');
+
+        // Réception des données du plugin
+        socket.on('plugin_data', function(data) {
+            if (data.plugin === "text_reader") {
+                if (data.text && data.text.length > 2) {
+                    noText.style.display = 'none';
+                    output.innerText = data.text;
+                    status.innerText = "TEXTE ANALYSÉ ✅";
+                    status.style.color = "#00ff88";
+                } else {
+                    status.innerText = "RECHERCHE DE CARACTÈRES...";
+                    status.style.color = "#ffcc00";
+                }
+            }
+        });
+    </script>
+</body>
+</html>
