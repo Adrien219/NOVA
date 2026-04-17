@@ -6,8 +6,8 @@ Modifications :
 - Correction de l'ordre d'initialisation (NameError: app)
 """
 
-#import eventlet
-#eventlet.monkey_patch()
+import eventlet
+eventlet.monkey_patch()
 
 import cv2
 
@@ -18,6 +18,12 @@ from threading import Lock, Event
 from queue import Queue, Empty
 import numpy as np
 import time
+
+
+from flask import Flask, render_template
+from flask_socketio import SocketIO
+from jinja2 import ChoiceLoader, FileSystemLoader
+from pathlib import Path
 
 from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
@@ -43,19 +49,25 @@ logger = logging.getLogger("SHOS_V3.0")
 # ============================================================================
 # INITIALISATION FLASK & CONFIGURATION MULTI-TEMPLATES
 # ============================================================================
-PROJECT_ROOT = Path(__file__).parent
-template_dir = PROJECT_ROOT / "templates"
-modules_dir = PROJECT_ROOT / "modules"
 
+# Chemin absolu du projet pour éviter les erreurs de dossier courant
+PROJECT_ROOT = Path(__file__).resolve().parent
+template_dir = PROJECT_ROOT / "templates"
+# On pointe précisément vers le dossier qui contient les sous-dossiers des modules
+modules_root = PROJECT_ROOT / "plugins" / "modules"
+
+# Initialisation de l'application Flask
 app = Flask(__name__, template_folder=str(template_dir))
 app.config['SECRET_KEY'] = 'shos_secret_key_2026'
 
-# SOLUTION MASTER : On autorise Flask à chercher dans /templates ET dans /modules
+# --- LE LOADER : C'est ici que la magie opère ---
+# On utilise ChoiceLoader pour scanner 'templates' PUIS 'plugins/modules'
 app.jinja_loader = ChoiceLoader([
     FileSystemLoader(str(template_dir)),
-    FileSystemLoader(str(modules_dir))
+    FileSystemLoader(str(modules_root))
 ])
 
+# Initialisation de SocketIO
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*", 
@@ -64,36 +76,64 @@ socketio = SocketIO(
     engineio_logger=False
 )
 
+# Petit check de sécurité au démarrage dans la console
+if not (modules_root / "hand_control" / "interface.html").exists():
+    print(f"⚠️ ATTENTION : Fichier hand_control/interface.html introuvable dans {modules_root}")
+else:
+    print(f"✅ Structure des modules validée.")
 # ============================================================================
-# CONFIGURATION PATHS & MODULES DYNAMIQUES
+# CONFIGURATION PATHS & MODULES DYNAMIQUES (VERSION FINALE)
 # ============================================================================
-# On définit SNAPSHOTS_DIR en majuscule pour que SnapshotManager le trouve
+# On définit SNAPSHOTS_DIR pour le SnapshotManager
 SNAPSHOTS_DIR = PROJECT_ROOT / "data" / "snapshots"
 SNAPSHOTS_DIR.mkdir(parents=True, exist_ok=True)
 
-# On garde aussi la version minuscule si ton code en a besoin ailleurs
-snapshots_dir = SNAPSHOTS_DIR 
+# Définition du chemin des modules conforme à ton arborescence : plugins/modules
+PLUGINS_BASE_DIR = PROJECT_ROOT / "plugins" / "modules"
+
+modules_dir = PLUGINS_BASE_DIR  # Alias pour la compatibilité avec le reste du code
+
+# MISE À JOUR DU LOADER JINJA2 : Indispensable pour que Flask trouve les interface.html
+# On ajoute le nouveau chemin PLUGINS_BASE_DIR à la liste des dossiers de templates
+app.jinja_loader = ChoiceLoader([
+    FileSystemLoader(str(template_dir)),
+    FileSystemLoader(str(PLUGINS_BASE_DIR)) # Ajoutez cette ligne
+])
 
 AVAILABLE_MODULES = {}
 
 def load_dynamic_modules():
     global AVAILABLE_MODULES
-    if not modules_dir.exists():
-        modules_dir.mkdir()
+    if not PLUGINS_BASE_DIR.exists():
+        PLUGINS_BASE_DIR.mkdir(parents=True)
     
-    for folder in os.listdir(modules_dir):
-        config_file = modules_dir / folder / "config.json"
-        if config_file.exists():
-            try:
-                with open(config_file, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                    AVAILABLE_MODULES[folder] = config
-                    logger.info(f"📦 Module chargé : {config['name']}")
-            except Exception as e:
-                logger.error(f"❌ Erreur config {folder}: {e}")
+    print(f"\n🔍 [SCAN] Recherche de modules dans : {PLUGINS_BASE_DIR}")
+    
+    # On liste les dossiers dans plugins/modules/
+    for folder in os.listdir(PLUGINS_BASE_DIR):
+        current_folder_path = PLUGINS_BASE_DIR / folder
+        
+        # On ne traite que les répertoires pour éviter les fichiers racines comme hand.py
+        if current_folder_path.is_dir():
+            config_file = current_folder_path / "config.json"
+            
+            if config_file.exists():
+                try:
+                    with open(config_file, 'r', encoding='utf-8') as f:
+                        config = json.load(f)
+                        # On indexe par l'ID du dossier (ex: 'voice_assistant')
+                        AVAILABLE_MODULES[folder] = config
+                        logger.info(f"📦 Module chargé : {config.get('name', folder)}")
+                except Exception as e:
+                    logger.error(f"❌ Erreur lecture config dans {folder}: {e}")
+            else:
+                # Ignore les dossiers systèmes ou de modèles sans config.json
+                print(f"ℹ️  Dossier ignoré (pas de config.json) : {folder}")
 
+    print(f"✅ [SCAN] {len(AVAILABLE_MODULES)} modules détectés et prêts.\n")
+
+# Lancement immédiat du scan au démarrage
 load_dynamic_modules()
-
 # ============================================================================
 # YOLOV8N - DÉTECTION D'OBJETS
 # ============================================================================
@@ -606,7 +646,7 @@ DEFAULT_PROFILE = {'name': 'ADRIEN_ASUS', 'id': '01'}
 
 @app.route('/')
 def index():
-    """Page d'accueil avec les tuiles de modules"""
+    """Page d'accueil avec les tuiles de modules dynamiques"""
     return render_template('index.html', modules=AVAILABLE_MODULES, profile=DEFAULT_PROFILE)
 
 @app.route('/dashboard')
@@ -621,11 +661,22 @@ def settings(): return render_template('settings.html')
 @app.route('/mobile')
 def mobile(): return render_template('mobile.html')
 
+@app.route('/diagnostic_ultimate')
+def diagnostic_ultimate(): 
+    return render_template('diagnostic_ultimate.html')
+
+@app.route('/profiles')
+def profiles_page():
+    # On passe les profils à la page pour qu'elle puisse les afficher
+    config = config_manager.load_config()
+    return render_template('profiles.html', profiles=config.get("profiles", {}))
+
 @app.route('/hud')
 def hud(): return render_template('hud.html', profile=DEFAULT_PROFILE)
 
 @app.route('/user_interface')
-def user_interface(): return render_template('user_interface.html', profile=DEFAULT_PROFILE)
+def user_interface(): 
+    return render_template('user_interface.html', profile=DEFAULT_PROFILE)
 
 # ============================================================================
 # GESTION DES PROFILS (API & MANAGER)
@@ -642,27 +693,26 @@ def profile_manager():
 
 @app.route('/api/get_profiles', methods=['GET'])
 def get_profiles():
-    """Version simplifiée pour éviter l'erreur de liaison API"""
+    """Récupère la liste des profils enregistrés"""
     try:
         config = config_manager.load_config()
-        # On renvoie directement les données sans le wrapper 'status'
         return jsonify({
             "profiles": config.get("profiles", {}),
             "current": config.get("current_active_profile", "")
         })
     except Exception as e:
-        logger.error(f"❌ Erreur API: {e}")
+        logger.error(f"❌ Erreur API get_profiles: {e}")
         return jsonify({"profiles": {}, "current": ""}), 500
 
 @app.route('/api/activate_profile', methods=['POST'])
 def api_activate_profile():
-    """API : Active un profil via un clic sur l'interface"""
+    """Active un profil spécifique"""
     try:
         data = request.json
         profile_id = data.get('profile_id')
         success = config_manager.activate_profile(profile_id)
         if success:
-            logger.info(f"🚀 Profil activé : {profile_id}")
+            logger.info(f"🚀 Profil activé via API : {profile_id}")
             return jsonify({"status": "success"})
         return jsonify({"status": "error", "message": "Échec activation"}), 400
     except Exception as e:
@@ -670,6 +720,7 @@ def api_activate_profile():
 
 @app.route('/save_profile', methods=['POST'])
 def save_profile():
+    """Sauvegarde un nouveau profil et notifie le système via MQTT"""
     try:
         data = request.json
         if not data:
@@ -678,7 +729,7 @@ def save_profile():
         profile_name = data.get('name')
         profile_id = profile_name.lower().replace(" ", "_")
 
-        # 1. Enregistrement physique dans config.json
+        # 1. Enregistrement dans config.json
         config = config_manager.load_config()
         config["profiles"][profile_id] = {
             "name": profile_name,
@@ -687,7 +738,7 @@ def save_profile():
         }
         config_manager.save_config(config)
 
-        # 2. Notification MQTT pour activation immédiate
+        # 2. Notification MQTT pour changement immédiat sur le HUD/Casque
         profile_payload = {
             "action": "SWITCH_PROFILE",
             "profile_name": profile_name,
@@ -697,33 +748,47 @@ def save_profile():
 
         return jsonify({"status": "success", "profile": profile_name})
     except Exception as e:
-        logger.error(f"❌ Erreur critique : {e}")
+        logger.error(f"❌ Erreur critique save_profile : {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 # ============================================================================
-# ROUTES MODULES DYNAMIQUES
+# ROUTES MODULES DYNAMIQUES 
 # ============================================================================
-
-from flask import render_template_string
-
-@app.route('/module/<module_id>')
+# On utilise <path:module_id> pour capturer l'ID du module, même s'il contient des slashs
+@app.route('/module/<path:module_id>')
 def universal_module_route(module_id):
-    """Charge dynamiquement l'interface HTML d'un module spécifique"""
+    """Charge l'interface d'un module en utilisant le loader configuré"""
+    
+    # Nettoyage de l'ID (au cas où il y a un slash à la fin)
+    module_id = module_id.strip('/')
+    logger.info(f"🔍 S.H.O.S demande l'accès au module : '{module_id}'")
+    
     if module_id in AVAILABLE_MODULES:
         config = AVAILABLE_MODULES[module_id]
-        file_path = modules_dir / module_id / config.get('template', 'interface.html')
+        # On récupère le nom du template depuis le config.json, sinon par défaut 'interface.html'
+        template_name = config.get('template', 'interface.html')
         
-        if not file_path.exists():
-            return f"Fichier introuvable : {file_path}", 404
-            
+        # Le chemin exact que Jinja va chercher (ex: "hand_control/interface.html")
+        # Rappel : Votre ChoiceLoader doit inclure le dossier "plugins/modules"
+        template_path = f"{module_id}/{template_name}"
+        logger.info(f"📂 Tentative de chargement du fichier : {template_path}")
+        
         try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                html_content = f.read()
-            return render_template_string(html_content, config=config, profile=DEFAULT_PROFILE)
+            return render_template(template_path, config=config, profile=DEFAULT_PROFILE)
         except Exception as e:
-            return f"Erreur de rendu : {str(e)}", 500
+            logger.error(f"❌ Erreur de rendu pour {module_id} : {e}")
+            return (f"<div style='color:red; font-family:sans-serif; padding:20px;'>"
+                    f"<h1>Erreur d'affichage</h1>"
+                    f"<p>Flask n'arrive pas à trouver le fichier : <b>{template_path}</b></p>"
+                    f"<p>Vérifie que dans ton dossier <b>plugins/modules/</b>, tu as bien un dossier nommé <b>{module_id}</b> contenant un fichier <b>{template_name}</b>.</p>"
+                    f"</div>"), 500
             
-    return "Module non trouvé", 404
+    logger.warning(f"⚠️ Module '{module_id}' introuvable dans AVAILABLE_MODULES.")
+    return (f"<div style='color:orange; font-family:sans-serif; padding:20px;'>"
+            f"<h1>Erreur 404</h1>"
+            f"<p>Le module '<b>{module_id}</b>' n'est pas chargé par le système S.H.O.S.</p>"
+            f"</div>"), 404
+
 # ============================================================================
 # FLUX VIDÉO & API
 # ============================================================================
@@ -816,6 +881,35 @@ def background_monitoring():
         except Exception as e:
             logger.error(f"❌ Erreur monitoring: {e}")
             eventlet.sleep(5)
+
+# --- LOGIQUE DE STREAMING VIDÉO ---
+
+def generate_frames():
+    """Capture le flux de la caméra et le prépare pour le web"""
+    # 0 est l'index de ta caméra USB ou Raspberry Pi
+    camera = cv2.VideoCapture(0) 
+    
+    while True:
+        success, frame = camera.read()
+        if not success:
+            break
+        else:
+            # On compresse l'image en JPEG pour qu'elle soit légère
+            ret, buffer = cv2.imencode('.jpg', frame)
+            frame = buffer.tobytes()
+            
+            # On envoie l'image au format "flux continu" (MJPEG)
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+
+@app.route('/video_feed')
+def video_feed():
+    """Cette route distribue le flux vidéo à ton HTML"""
+    return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+
 
 
 # ============================================================================

@@ -166,14 +166,22 @@
 
         <div class="menu">
             {% for id, mod in modules.items() %}
-            <a href="{{ mod.route }}" class="menu-item module-dynamic">
-                <span class="menu-item-icon">{{ mod.icon }}</span>
+            <a href="/module/{{ id }}" class="menu-item module-dynamic">
+                <span class="menu-item-icon">
+                    {% if mod.icon %}<i class="fas fa-{{ mod.icon }}"></i>{% else %}🧩{% endif %}
+                </span>
                 <span class="menu-item-title">{{ mod.name }}</span>
                 <span class="menu-item-desc">{{ mod.description }}</span>
             </a>
             {% endfor %}
 
             <hr style="grid-column: 1/-1; border: 1px dashed rgba(0,255,136,0.2); margin: 10px 0;">
+
+              <a href="/user_interface" class="menu-item">
+                <span class="menu-item-icon">👓</span>
+                <span class="menu-item-title">Interface Utilisateur</span>
+                <span class="menu-item-desc">Contrôle et configuration</span>
+            </a>
 
             <a href="/dashboard" class="menu-item">
                 <span class="menu-item-icon">📊</span>
@@ -203,6 +211,20 @@
                 <span class="menu-item-icon">👓</span>
                 <span class="menu-item-title">Mode HUD</span>
                 <span class="menu-item-desc">Affichage tête haute</span>
+            </a>
+
+              <a href="/ESP32" class="menu-item">
+                <span class="menu-item-icon">📷</span>
+                <span class="menu-item-title">Esp32 Cam</span>
+                <span class="menu-item-desc">Caméra ESP32</span>
+            </a>
+
+               <a href="/diagnostic" class="menu-item">
+                <span class="menu-item-icon">🚀</span>
+                <span class="menu-item-title">Diagnostic pro </span>
+                 <span class="menu-item-desc">Analyse profonde IA</span>
+                </span>
+                <span class="menu-item-desc">Capteurs temps réel</span>
             </a>
 
             <a href="/settings" class="menu-item">

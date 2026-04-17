@@ -1,8 +1,0 @@
-{
-    "id": "hand_control",
-    "name": "CONTRÔLE GESTUEL",
-    "icon": "👋",
-    "route": "/module/hand_control",
-    "template": "interface.html",
-    "description": "Pilotez SHOS avec les mains"
-}

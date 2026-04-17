@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.O.S - {{ config.name }}</title>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #00ff88;
+            font-family: monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            border: 2px dashed rgba(0, 255, 136, 0.5);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.3);
+        }
+        .btn-back {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 20px;
+            color: white;
+            text-decoration: none;
+            border: 1px solid white;
+            border-radius: 5px;
+            transition: 0.3s;
+        }
+        .btn-back:hover {
+            background: white;
+            color: #0f172a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ SYSTEME ACTIF</h1>
+        <h2>Module : {{ config.name }}</h2>
+        <p style="color: #888;">{{ config.description }}</p>
+        
+        <div style="margin: 30px 0;">
+            <p>En attente des commandes MQTT...</p>
+        </div>
+
+        <a href="/" class="btn-back">⬅ Retour à la base</a>
+    </div>
+</body>
+</html>

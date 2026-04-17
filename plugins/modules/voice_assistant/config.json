@@ -1,0 +1,9 @@
+{
+  "id": "voice_assistant",
+  "name": "Assistant Vocal NOVA",
+  "description": "Reconnaissance vocale hors-ligne via Vosk et synthèse espeak-ng",
+  "template": "interface.html",
+  "entry_point": "plugins.modules.voice_assistant.voice_module",
+  "enabled": true,
+  "icon": "mic"
+}

@@ -1,0 +1,7 @@
+{
+    "id": "text_reader",
+    "name": "Lecteur de Texte",
+    "description": "Reconnaissance optique de caractères (OCR)",
+    "icon": "font",
+    "template": "interface.html"
+}

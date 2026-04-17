@@ -13,6 +13,7 @@ import pyaudio
 from pathlib import Path
 import re
 import unicodedata
+from flask_socketio import emit
 
 # ══════════════════════════════════════════════════════════════
 #  CONFIGURATION & CONSTANTES
@@ -69,8 +70,9 @@ def auto_detect_audio():
 #  CLASSE PRINCIPALE : NOVA OMNISCIENT V2
 # ══════════════════════════════════════════════════════════════
 class NovaOmniscientV2:
-    def __init__(self):
-        self.running = True
+    def __init__(self, gui_callback=None):
+        self.gui_callback = gui_callback
+        
         os.makedirs(STORAGE_DIR, exist_ok=True)
         
         self.memory = {
@@ -209,17 +211,51 @@ class NovaOmniscientV2:
             stream = p.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, 
                             input_device_index=self.input_idx, frames_per_buffer=8000)
             stream.start_stream()
+            
+            # Envoi du statut à l'interface au démarrage
+            if self.gui_callback: self.gui_callback("status", "PRÊT / ÉCOUTE")
+            
             self.parler(f"Systeme NOVA V2 active. Je vous ecoute {USER_NAME}.")
+            
             while self.running:
                 data = stream.read(4000, exception_on_overflow=False)
                 if self.rec.AcceptWaveform(data):
                     res = json.loads(self.rec.Result())
                     phrase = res.get("text", "")
                     if phrase:
+                        # ENVOI DYNAMIQUE À L'INTERFACE
+                        if self.gui_callback:
+                            self.gui_callback("transcription", phrase)
+                        
                         print(f"🎙️ Entendu : {phrase}")
                         self.executer_commande(phrase)
         except Exception as e: print(f"❌ Erreur : {e}")
         finally: p.terminate()
+
+# ══════════════════════════════════════════════════════════════
+#  INTERFACE DE PLUGIN (À AJOUTER ICI)
+# ══════════════════════════════════════════════════════════════
+
+class ModuleApp:
+    def __init__(self, name):
+        self.name = name
+        # Remplace 'TonDetecteur' par le nom de ta classe principale (ex: GestureDetector)
+        self.logic = GestureDetector() 
+
+    def send_to_ui(self, type, message):
+        """Envoie les données au dashboard via MQTT"""
+        import paho.mqtt.publish as publish
+        import json
+        # Modifie "mon_module" par l'ID du module (ex: "hand")
+        payload = {"module": "mon_module", "type": type, "value": message}
+        publish.single("shos/modules/mon_module/data", json.dumps(payload), hostname="localhost")
+
+    def run(self):
+        """Boucle de fonctionnement du module"""
+        # Appelle ici la méthode de démarrage de ton module
+        self.logic.run()
+
+
 
 if __name__ == "__main__":
     NovaOmniscientV2().run()

@@ -1,0 +1,7 @@
+{
+    "id": "danger_monitor",
+    "name": "Moniteur de Danger",
+    "description": "Analyse des risques environnants",
+    "icon": "exclamation-triangle",
+    "template": "interface.html"
+}

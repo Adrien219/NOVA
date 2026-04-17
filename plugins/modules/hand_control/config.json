@@ -1,0 +1,8 @@
+{
+  "id": "hand_control",
+  "name": "Contrôle Gestuel",
+  "description": "Pilotage SHOS avec les mains",
+  "template": "interface.html",
+  "entry_point": "plugins.modules.hand_control.hand_module",
+  "enabled": true
+}

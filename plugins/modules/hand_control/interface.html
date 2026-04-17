@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHOS - {{ config.name }}</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        :root { --neon-green: #09f687; --neon-blue: #00b4ff; --bg-dark: #0a0e14; }
+        
+        body { 
+            background: var(--bg-dark); 
+            color: white; 
+            font-family: 'Segoe UI', sans-serif; 
+            margin: 0; 
+            overflow: hidden;
+            border: 2px solid var(--neon-green);
+            height: 98vh;
+        }
+
+        .hud-container {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            gap: 20px;
+            padding: 20px;
+            height: 90%;
+        }
+
+        .video-section {
+            position: relative;
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 20px rgba(0, 180, 255, 0.2);
+            border-radius: 10px;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-feed { width: 100%; height: auto; border-radius: 5px; }
+
+        .gesture-badge {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid var(--neon-green);
+            padding: 10px 20px;
+            font-weight: bold;
+            color: var(--neon-green);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .info-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid var(--neon-blue);
+            padding: 15px;
+            border-radius: 0 10px 10px 0;
+        }
+
+        .command-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .command-item {
+            padding: 10px;
+            margin-bottom: 5px;
+            border: 1px solid rgba(0, 255, 136, 0.1);
+            font-size: 0.9rem;
+            transition: 0.3s;
+        }
+
+        .command-item.active {
+            background: var(--neon-green);
+            color: black;
+            font-weight: bold;
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+
+        .back-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 10px 25px;
+            background: transparent;
+            border: 1px solid var(--neon-blue);
+            color: var(--neon-blue);
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div style="padding: 10px 20px; background: rgba(0, 255, 136, 0.1); border-bottom: 1px solid #00ff88;">
+        <span style="color: #00ff88;">SYSTEM:</span> {{ config.name }} | <span style="color: #00f2ff;">USER:</span> {{ profile.name }}
+    </div>
+
+    <div class="hud-container" style="display: flex; gap: 20px; padding: 20px;">
+        
+        <div class="video-section" style="flex: 2; position: relative;">
+            <div class="gesture-badge" id="current-gesture" 
+                 style="position: absolute; top: 10px; left: 10px; z-index: 10; padding: 5px 15px; background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; border-radius: 5px; color: #00ff88;">
+                 SCANNING...
+            </div>
+                                
+            <div class="video-container" style="position: relative; border: 2px solid #00f2ff; background: #000; min-height: 300px;">
+                <img id="main-video" src="{{ url_for('video_feed') }}" 
+                     style="width: 100%; height: auto; display: block;" 
+                     onerror="this.src='https://via.placeholder.com/640x480?text=CAMERA+OFFLINE';">
+            
+                <div id="video-loader" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #00f2ff; font-weight: bold;">
+                    CHARGEMENT DU FLUX...
+                </div>
+            </div>
+
+            <script>
+                // Cache le message de chargement dès que le premier flux arrive
+                const vimg = document.getElementById('main-video');
+                vimg.onload = function() {
+                    document.getElementById('video-loader').style.display = 'none';
+                };
+            </script>
+        </div>
+
+        <div class="sidebar" style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
+            <div class="info-card" style="border: 1px solid #00f2ff; padding: 15px; background: rgba(0, 242, 255, 0.05);">
+                <h3 style="margin:0; color: #00f2ff; font-size: 1rem;">STATUT IA</h3>
+                <p id="ai-status" style="font-size: 0.8rem; opacity: 0.8; color: #fff;">Médiapipe opérationnel</p>
+            </div>
+
+            <div class="info-card" style="border: 1px solid #00ff88; padding: 15px; background: rgba(0, 255, 136, 0.05);">
+                <h4 style="margin:0 0 10px 0; color: #00ff88;">BIBLIOTHÈQUE</h4>
+                <div class="command-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <div id="PALM" class="command-item" style="padding: 5px; border-radius: 3px; border: 1px solid transparent;">🖐️ PLEINE MAIN : START</div>
+                    <div id="FIST" class="command-item" style="padding: 5px; border-radius: 3px; border: 1px solid transparent;">✊ POING : STOP</div>
+                    <div id="POINT" class="command-item" style="padding: 5px; border-radius: 3px; border: 1px solid transparent;">☝️ INDEX : ANALYSE</div>
+                    <div id="THUMBS_UP" class="command-item" style="padding: 5px; border-radius: 3px; border: 1px solid transparent;">👍 POUCE : VALIDATION</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .command-item.active {
+            background: rgba(0, 255, 136, 0.3);
+            border-color: #00ff88;
+            color: #fff;
+            font-weight: bold;
+        }
+        .back-btn {
+            display: inline-block;
+            margin: 20px;
+            padding: 10px 20px;
+            border: 1px solid #fff;
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+        .back-btn:hover { background: #fff; color: #000; }
+    </style>
+
+    <a href="/" class="back-btn">RETOUR MENU</a>
+
+    <script>
+        const socket = io();
+        
+        socket.on('camera_status', function(data) {
+            const gesture = data.gesture;
+            const badge = document.getElementById('current-gesture');
+            
+            // Mise à jour du badge supérieur
+            if (gesture !== "NONE" && gesture !== "") {
+                badge.textContent = "DETECTÉ: " + gesture;
+                badge.style.background = "rgba(0, 180, 255, 0.6)";
+                badge.style.borderColor = "#00f2ff";
+            } else {
+                badge.textContent = "SCANNING...";
+                badge.style.background = "rgba(0, 255, 136, 0.2)";
+                badge.style.borderColor = "#00ff88";
+            }
+
+            // Allumage visuel de la commande correspondante dans la liste
+            document.querySelectorAll('.command-item').forEach(el => el.classList.remove('active'));
+            const activeItem = document.getElementById(gesture);
+            if (activeItem) activeItem.classList.add('active');
+        });
+
+        // Demander des mises à jour toutes les 100ms au serveur
+        setInterval(() => {
+            socket.emit('request_camera_status');
+        }, 100);
+    </script>
+</body>
+</html>

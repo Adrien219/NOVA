@@ -1,0 +1,7 @@
+{
+    "id": "vision_objet",
+    "name": "Vision d'Objet",
+    "description": "Détection et suivi d'objets dans la scène",
+    "icon": "binoculars",
+    "template": "interface.html"
+}
