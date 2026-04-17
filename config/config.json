@@ -1,45 +1,12 @@
 {
     "profiles": {
-        "gardien": {
-            "name": "Gardien",
-            "main_module": "vision_control",
-            "secondary_modules": []
-        },
-        "test_gestu3": {
-            "name": "test gestu3",
-            "main_module": "hand_control",
-            "secondary_modules": [
-                "hand_control"
-            ]
-        },
-        "test1": {
-            "name": "test1",
-            "main_module": "hand_control",
-            "secondary_modules": [
-                "hand_control"
-            ]
-        },
-        "test5": {
-            "name": "test5",
-            "main_module": "hand_control",
-            "secondary_modules": [
-                "hand_control"
-            ]
-        },
-        "test_1": {
-            "name": "test_1",
-            "main_module": "voice_assistant",
-            "secondary_modules": [
-                "hand_control"
-            ]
-        },
         "test_gestu": {
             "name": "test gestu",
-            "main_module": "voice_assistant",
+            "main_module": "hand_control",
             "secondary_modules": [
-                "hand_control"
+                "vision_objet"
             ]
         }
     },
-    "current_active_profile": "test_1"
+    "current_active_profile": "test_gestu"
 }

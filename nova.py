@@ -29,8 +29,10 @@ from flask import Flask, render_template, Response, jsonify, request
 from flask_socketio import SocketIO, emit
 from paho.mqtt import client as mqtt_client
 from jinja2 import ChoiceLoader, FileSystemLoader
-# --- AJOUTE CECI AU DÉBUT (vers ligne 60) ---
-from utils import ConfigManager # Assure-toi que ConfigManager est dans utils.py
+from utils import ConfigManager 
+
+from flask import Flask, render_template, Response, jsonify, request, render_template_string
+
 config_manager = ConfigManager()
 
 # ============================================================================
@@ -755,39 +757,45 @@ def save_profile():
 # ROUTES MODULES DYNAMIQUES 
 # ============================================================================
 # On utilise <path:module_id> pour capturer l'ID du module, même s'il contient des slashs
+# ============================================================================
+# ROUTES MODULES DYNAMIQUES (OPTION NUCLÉAIRE)
+# ============================================================================
+
 @app.route('/module/<path:module_id>')
 def universal_module_route(module_id):
-    """Charge l'interface d'un module en utilisant le loader configuré"""
-    
-    # Nettoyage de l'ID (au cas où il y a un slash à la fin)
+    # Nettoyage de l'ID
     module_id = module_id.strip('/')
-    logger.info(f"🔍 S.H.O.S demande l'accès au module : '{module_id}'")
+    logger.info(f"🔍 Demande d'accès au module : '{module_id}'")
     
     if module_id in AVAILABLE_MODULES:
         config = AVAILABLE_MODULES[module_id]
-        # On récupère le nom du template depuis le config.json, sinon par défaut 'interface.html'
         template_name = config.get('template', 'interface.html')
         
-        # Le chemin exact que Jinja va chercher (ex: "hand_control/interface.html")
-        # Rappel : Votre ChoiceLoader doit inclure le dossier "plugins/modules"
-        template_path = f"{module_id}/{template_name}"
-        logger.info(f"📂 Tentative de chargement du fichier : {template_path}")
+        # On construit le CHEMIN ABSOLU EXACT sur ton Windows
+        # Ex: D:\NOVA\plugins\modules\hand_control\interface.html
+        chemin_physique = PROJECT_ROOT / "plugins" / "modules" / module_id / template_name
         
+        # 1. Vérification système : Est-ce que Windows voit le fichier ?
+        if not chemin_physique.exists():
+            logger.error(f"❌ Fichier introuvable sur le disque : {chemin_physique}")
+            return f"<h2>Erreur Critique</h2><p>Windows ne trouve pas le fichier ici : <br><b>{chemin_physique}</b></p>", 500
+        
+        # 2. Court-circuitage de Jinja : Lecture directe !
         try:
-            return render_template(template_path, config=config, profile=DEFAULT_PROFILE)
-        except Exception as e:
-            logger.error(f"❌ Erreur de rendu pour {module_id} : {e}")
-            return (f"<div style='color:red; font-family:sans-serif; padding:20px;'>"
-                    f"<h1>Erreur d'affichage</h1>"
-                    f"<p>Flask n'arrive pas à trouver le fichier : <b>{template_path}</b></p>"
-                    f"<p>Vérifie que dans ton dossier <b>plugins/modules/</b>, tu as bien un dossier nommé <b>{module_id}</b> contenant un fichier <b>{template_name}</b>.</p>"
-                    f"</div>"), 500
+            logger.info(f"⚡ Lecture directe du fichier : {chemin_physique}")
             
-    logger.warning(f"⚠️ Module '{module_id}' introuvable dans AVAILABLE_MODULES.")
-    return (f"<div style='color:orange; font-family:sans-serif; padding:20px;'>"
-            f"<h1>Erreur 404</h1>"
-            f"<p>Le module '<b>{module_id}</b>' n'est pas chargé par le système S.H.O.S.</p>"
-            f"</div>"), 404
+            # On lit le code HTML nous-mêmes
+            with open(chemin_physique, 'r', encoding='utf-8') as f:
+                contenu_html = f.read()
+            
+            # On force Flask à le compiler à la volée, sans passer par les dossiers configurés
+            return render_template_string(contenu_html, config=config, profile=DEFAULT_PROFILE)
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur lors de la lecture ou du rendu : {e}")
+            return f"<h2>Erreur de rendu</h2><p>Le fichier a été trouvé, mais n'a pas pu être affiché : {e}</p>", 500
+            
+    return f"<h2>Erreur 404</h2><p>Le module '{module_id}' n'est pas chargé.</p>", 404
 
 # ============================================================================
 # FLUX VIDÉO & API
