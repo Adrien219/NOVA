@@ -6,6 +6,14 @@
             "secondary_modules": [
                 "vision_objet"
             ]
+        },
+        "vision": {
+            "name": "vision",
+            "main_module": "vision_objet",
+            "secondary_modules": [
+                "vision_objet",
+                "voice_assistant"
+            ]
         }
     },
     "current_active_profile": "test_gestu"
