@@ -35,6 +35,10 @@ from flask import Flask, render_template, Response, jsonify, request, render_tem
 
 config_manager = ConfigManager()
 
+global_frame = None
+frame_lock = Lock() 
+
+
 # ============================================================================
 # CONFIGURATION LOGGING
 # ============================================================================
@@ -71,11 +75,11 @@ app.jinja_loader = ChoiceLoader([
 
 # Initialisation de SocketIO
 socketio = SocketIO(
-    app, 
-    cors_allowed_origins="*", 
-    async_mode='eventlet', 
-    logger=False, 
-    engineio_logger=False
+    app,
+    async_mode='eventlet', # <-- À CHANGER (était 'threading')
+    cors_allowed_origins="*",
+    logger=False,           
+    engineio_logger=False   
 )
 
 # Petit check de sécurité au démarrage dans la console
@@ -276,8 +280,9 @@ class LibCameraCapture:
             
             # Configurer les propriétés
             if self.cap:
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                # Force une résolution plus basse pour soulager le bus mémoire
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
                 self.cap.set(cv2.CAP_PROP_FPS, self.fps)
                 
                 logger.info(f"✅ Caméra Pi initialisée: {self.width}x{self.height} @ {self.fps} FPS")
@@ -305,46 +310,56 @@ class LibCameraCapture:
             return False, None
     
     def _capture_thread(self):
-        """Thread de capture (peut bloquer sans affecter Flask)"""
-        logger.info("🎬 Thread de capture démarré")
+        """Thread de capture avec conversion de format forcée"""
+        logger.info("🎬 Thread de capture S.H.O.S démarré")
         self.thread_running = True
+        import numpy as np
         
         while self.thread_running:
             try:
                 if self.cap is None or not self.cap.isOpened():
-                    self.error_count += 1
-                    if self.error_count > self.max_errors:
-                        logger.error("❌ Trop d'erreurs caméra, arrêt capture")
-                        break
-                    time.sleep(1)
+                    eventlet.sleep(1)
                     continue
                 
                 ret, frame = self.cap.read()
                 
-                if not ret:
-                    self.error_count += 1
-                    time.sleep(0.1)
+                if not ret or frame is None or frame.size == 0:
+                    eventlet.sleep(0.1)
                     continue
-                
-                self.error_count = 0
-                self.frame_count += 1
-                
-                with self.lock:
-                    self.last_frame = frame
-                
-                # Ajouter à queue (drop si full)
+
+                # --- LA CORRECTION MAGIQUE ---
+                # On force la conversion en BGR pour s'assurer que l'image est "standard"
+                # Si libcamerify envoie un format bizarre, ceci le stabilisera.
                 try:
-                    self.frame_queue.put(frame, block=False)
+                    if len(frame.shape) == 3:
+                        # On s'assure que c'est bien du 8-bit
+                        frame = cv2.convertScaleAbs(frame) 
+                    else:
+                        # Si c'est du noir et blanc, on convertit en couleur
+                        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
                 except:
-                    pass  # Queue full, drop frame
+                    pass 
+
+                # On crée une copie propre et contiguë en mémoire
+                clean_frame = np.ascontiguousarray(frame)
+
+                with self.lock:
+                    self.last_frame = clean_frame
+                
+                global global_frame
+                with frame_lock:
+                    global_frame = clean_frame.copy()
+                
+                # Alimentation de la queue YOLO
+                if not self.frame_queue.full():
+                    self.frame_queue.put(clean_frame.copy())
                 
                 eventlet.sleep(1 / self.fps)
-            
+                
             except Exception as e:
                 logger.error(f"❌ Erreur capture: {e}")
-                self.error_count += 1
                 eventlet.sleep(1)
-    
+        
     def start(self):
         """Démarrer le thread de capture"""
         if self.cap is None:
@@ -541,12 +556,13 @@ class SnapshotManager:
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max
 
-socketio = SocketIO(
-    app,
-    async_mode='threading', # Change eventlet par threading
-    cors_allowed_origins="*",
-    logger=False,           # Mets sur False pour gagner en vitesse
-    engineio_logger=False   # Mets sur False
+socketio = SocketIO(app, 
+    async_mode='eventlet', 
+    cors_allowed_origins="*", 
+    logger=False, 
+    engineio_logger=False,
+    # Retire la ligne transports=['websocket'] ou remplace par :
+    transports=['websocket', 'polling'] 
 )
 
 # Initialiser les modules
@@ -578,7 +594,7 @@ class MQTTHandler:
         try:
             # Support paho-mqtt 2.0 (CallbackAPIVersion) avec fallback 1.x
             from paho.mqtt.enums import CallbackAPIVersion
-            self.client = mqtt_client.Client(CallbackAPIVersion.VERSION1, "NOVA_WEB_BRIDGE")
+            self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, "NOVA_WEB_BRIDGE")
         except:
             self.client = mqtt_client.Client("NOVA_WEB_BRIDGE")
             
@@ -629,15 +645,13 @@ class MQTTHandler:
                 socketio.emit('module_update', {'module': mod_name, 'data': payload})
 
             elif topic == "shos/sensors/normalized":
-                socketio.emit('sensor_update', payload)
+                socketio.emit('sensor_update', payload)#broadcast=True)
             
         except Exception as e:
             print(f"❌ [MQTT] Erreur routing sur {msg.topic}: {e}")
 
 # --- INSTANCIATION DU PONT ---
 mqtt_bridge = MQTTHandler()
-
-
 
 # ============================================================================
 # ROUTES PRINCIPALES (WEB UI)
@@ -756,10 +770,6 @@ def save_profile():
 # ============================================================================
 # ROUTES MODULES DYNAMIQUES 
 # ============================================================================
-# On utilise <path:module_id> pour capturer l'ID du module, même s'il contient des slashs
-# ============================================================================
-# ROUTES MODULES DYNAMIQUES (OPTION NUCLÉAIRE)
-# ============================================================================
 
 @app.route('/module/<path:module_id>')
 def universal_module_route(module_id):
@@ -798,33 +808,6 @@ def universal_module_route(module_id):
     return f"<h2>Erreur 404</h2><p>Le module '{module_id}' n'est pas chargé.</p>", 404
 
 # ============================================================================
-# FLUX VIDÉO & API
-# ============================================================================
-
-@app.route('/video_feed_pi')
-def video_feed_pi():
-    def gen_frames():
-        while True:
-            # On ne fait QUE lire et envoyer, l'IA sera traitée ailleurs
-            ret, frame = pi_camera.read(timeout=0.2)
-            if not ret or frame is None:
-                time.sleep(0.1)
-                continue
-
-            try:
-                # Compression légère pour la fluidité
-                _, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
-                frame_bytes = buffer.tobytes()
-                
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-                time.sleep(0.04) # Limite à 25 FPS
-            except Exception as e:
-                continue
-    
-    return Response(gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
-
-# ============================================================================
 # SOCKET.IO EVENTS
 # ============================================================================
 
@@ -849,23 +832,23 @@ def handle_camera_status():
 
 @socketio.on('request_snapshot')
 def handle_snapshot_request():
-    """Demande de snapshot manuel"""
-    if last_frame_pi is not None:
-        from io import BytesIO
-        frame_array = np.frombuffer(last_frame_pi, dtype=np.uint8)
-        frame = cv2.imdecode(frame_array, cv2.IMREAD_COLOR)
-        
-        filepath = snapshot_manager.capture(
-            frame,
-            gesture="MANUAL",
-            metadata={"triggered_by": "user"}
-        )
+    """Demande de snapshot manuel utilisant le flux partagé"""
+    global global_frame
+    if global_frame is not None:
+        with frame_lock:
+            # On utilise directement l'image stockée dans le tiroir global
+            filepath = snapshot_manager.capture(
+                global_frame.copy(),
+                gesture="MANUAL",
+                metadata={"triggered_by": "user"}
+            )
         
         emit('snapshot_captured', {
             'filepath': str(filepath),
             'timestamp': datetime.now().isoformat()
         })
-
+    else:
+        logger.warning("📸 Impossible de capturer : aucune image dans global_frame")
 
 # ============================================================================
 # BACKGROUND TASKS
@@ -877,53 +860,77 @@ def background_monitoring():
         try:
             cpu_percent = psutil.cpu_percent(interval=1)
             ram_percent = psutil.virtual_memory().percent
+            disk_percent = psutil.disk_usage('/').percent
             
-            socketio.emit('system_stats', {
+            try:
+                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+                    temp_raw = int(f.read()) / 1000
+            except:
+                temp_raw = 0
+            
+            uptime = psutil.boot_time()
+            
+            socketio.emit('sys_update', {  # ⬅️ Changé: system_stats → sys_update
                 'cpu': cpu_percent,
                 'ram': ram_percent,
+                'disk': disk_percent,
+                'temp': temp_raw,
+                'uptime': time.time() - uptime,
                 'timestamp': datetime.now().isoformat()
-            })
+            })  # ⬅️ Ajouté: broadcast=True
             
-            time.sleep(5)
+            eventlet.sleep(5)  
         
         except Exception as e:
             logger.error(f"❌ Erreur monitoring: {e}")
             eventlet.sleep(5)
 
 # --- LOGIQUE DE STREAMING VIDÉO ---
-
 def generate_frames():
-    """Capture le flux de la caméra et le prépare pour le web"""
-    # 0 est l'index de ta caméra USB ou Raspberry Pi
-    camera = cv2.VideoCapture(0) 
+    global global_frame
+    import time
+    
+    last_processed_time = 0
+    fps_limit = 15 # On descend à 15 FPS pour stabiliser
     
     while True:
-        success, frame = camera.read()
-        if not success:
-            break
-        else:
-            # On compresse l'image en JPEG pour qu'elle soit légère
-            ret, buffer = cv2.imencode('.jpg', frame)
-            frame = buffer.tobytes()
-            
-            # On envoie l'image au format "flux continu" (MJPEG)
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+        current_time = time.time()
+        if current_time - last_processed_time < (1.0 / fps_limit):
+            eventlet.sleep(0.01)
+            continue
 
+        if global_frame is None:
+            eventlet.sleep(0.1)
+            continue
+        
+        try:
+            # On récupère l'image sans faire de copie lourde au début
+            with frame_lock:
+                if global_frame.size == 0: continue
+                # On redimensionne ici pour être SÛR que l'encodeur ne panique pas
+                temp_frame = cv2.resize(global_frame, (480, 360)) 
+
+            success, buffer = cv2.imencode('.jpg', temp_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
+            
+            if success:
+                last_processed_time = current_time
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+        except Exception as e:
+            # Si ça bug, on attend un peu pour laisser le CPU respirer
+            eventlet.sleep(0.2)
+            
+        eventlet.sleep(0.01)
+        
 @app.route('/video_feed')
 def video_feed():
     """Cette route distribue le flux vidéo à ton HTML"""
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 
-
-
-
-
 # ============================================================================
 # MAIN
 # ============================================================================
-
 
 if __name__ == '__main__':
     logger.info("="*80)
