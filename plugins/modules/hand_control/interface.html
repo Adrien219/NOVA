@@ -107,11 +107,11 @@
         
         <div class="video-section" style="flex: 2; position: relative;">
             <div class="gesture-badge" id="current-gesture" 
-                 style="position: absolute; top: 10px; left: 10px; z-index: 10; padding: 5px 15px; background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; border-radius: 5px; color: #00ff88;">
+                 style="position: absolute; top: 10px; left: 10px; z-index: 10; padding: 5px 15px; background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; border-radius: 5px; color: #00ff88; font-family: monospace; font-weight: bold;">
                  SCANNING...
             </div>
                                 
-            <div class="video-container" style="position: relative; border: 2px solid #00f2ff; background: #000; min-height: 300px;">
+            <div class="video-container" style="position: relative; border: 2px solid #00f2ff; background: #000; min-height: 300px; box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);">
                 <img id="main-video" src="{{ url_for('video_feed') }}" 
                      style="width: 100%; height: auto; display: block;" 
                      onerror="this.src='https://via.placeholder.com/640x480?text=CAMERA+OFFLINE';">
@@ -120,83 +120,129 @@
                     CHARGEMENT DU FLUX...
                 </div>
             </div>
-
-            <script>
-                // Cache le message de chargement dès que le premier flux arrive
-                const vimg = document.getElementById('main-video');
-                vimg.onload = function() {
-                    document.getElementById('video-loader').style.display = 'none';
-                };
-            </script>
         </div>
 
         <div class="sidebar" style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
             <div class="info-card" style="border: 1px solid #00f2ff; padding: 15px; background: rgba(0, 242, 255, 0.05);">
-                <h3 style="margin:0; color: #00f2ff; font-size: 1rem;">STATUT IA</h3>
-                <p id="ai-status" style="font-size: 0.8rem; opacity: 0.8; color: #fff;">Médiapipe opérationnel</p>
+                <h3 style="margin:0; color: #00f2ff; font-size: 1rem; letter-spacing: 1px;">STATUT IA</h3>
+                <p id="ai-status" style="font-size: 0.8rem; opacity: 0.8; color: #fff; margin-top: 5px;">Médiapipe Hand Tracking : OK</p>
             </div>
 
             <div class="info-card" style="border: 1px solid #00ff88; padding: 15px; background: rgba(0, 255, 136, 0.05);">
-                <h4 style="margin:0 0 10px 0; color: #00ff88;">BIBLIOTHÈQUE</h4>
+                <h4 style="margin:0 0 10px 0; color: #00ff88; font-size: 0.9rem;">BIBLIOTHÈQUE DE COMMANDES</h4>
                 <div class="command-list" style="display: flex; flex-direction: column; gap: 10px;">
-                    <div id="PALM" class="command-item" style="padding: 5px; border-radius: 3px; border: 1px solid transparent;">🖐️ PLEINE MAIN : START</div>
-                    <div id="FIST" class="command-item" style="padding: 5px; border-radius: 3px; border: 1px solid transparent;">✊ POING : STOP</div>
-                    <div id="POINT" class="command-item" style="padding: 5px; border-radius: 3px; border: 1px solid transparent;">☝️ INDEX : ANALYSE</div>
-                    <div id="THUMBS_UP" class="command-item" style="padding: 5px; border-radius: 3px; border: 1px solid transparent;">👍 POUCE : VALIDATION</div>
+                    <div id="START_SYSTEM" class="command-item">🖐️ PLEINE MAIN : START</div>
+                    <div id="STOP_SYSTEM" class="command-item">✊ POING : STOP</div>
+                    <div id="READ_TEXT" class="command-item">☝️ INDEX : LIRE TEXTE</div>
+                    <div id="TRIGGER_FLORENCE" class="command-item">👍 POUCE : FLORENCE-2</div>
                 </div>
             </div>
         </div>
     </div>
 
     <style>
+        body { background: #000; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; overflow: hidden; }
+        
+        .command-item {
+            padding: 8px;
+            border-radius: 3px;
+            border: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.85rem;
+            transition: all 0.3s ease;
+            color: rgba(255,255,255,0.6);
+        }
+
         .command-item.active {
             background: rgba(0, 255, 136, 0.3);
             border-color: #00ff88;
             color: #fff;
             font-weight: bold;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+            transform: scale(1.02);
         }
+
         .back-btn {
             display: inline-block;
-            margin: 20px;
-            padding: 10px 20px;
-            border: 1px solid #fff;
-            color: #fff;
+            margin: 0 20px 20px;
+            padding: 8px 15px;
+            border: 1px solid rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.7);
             text-decoration: none;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
+            transition: 0.3s;
         }
-        .back-btn:hover { background: #fff; color: #000; }
+        .back-btn:hover { background: #fff; color: #000; border-color: #fff; }
     </style>
 
-    <a href="/" class="back-btn">RETOUR MENU</a>
-
+    <a href="/" class="back-btn">RETOUR MENU PRINCIPAL</a>
+    <div id="status-toast" style="position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); 
+     padding: 15px 30px; background: rgba(0, 242, 255, 0.9); color: #000; font-weight: bold; 
+     border-radius: 50px; display: none; z-index: 1000; box-shadow: 0 0 20px #00f2ff;
+     text-transform: uppercase; letter-spacing: 2px; font-size: 1.2rem;">
+    COMMANDE VALIDÉE
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
-        const socket = io();
-        
-        socket.on('camera_status', function(data) {
+    const socket = io();
+    const badge = document.getElementById('current-gesture');
+    const vimg = document.getElementById('main-video');
+    const toast = document.getElementById('status-toast');
+    
+    // Cacher le loader quand le flux vidéo est reçu
+    vimg.onload = () => { 
+        document.getElementById('video-loader').style.display = 'none'; 
+    };
+
+    // Réception des données du plugin (via le pont MQTT de nova.py)
+    socket.on('plugin_data', function(data) {
+        // On vérifie que les données viennent bien du module de gestion des mains
+        if (data.plugin === "hand_control") {
             const gesture = data.gesture;
-            const badge = document.getElementById('current-gesture');
-            
-            // Mise à jour du badge supérieur
-            if (gesture !== "NONE" && gesture !== "") {
-                badge.textContent = "DETECTÉ: " + gesture;
+            const isConfirmed = data.status === "confirmed";
+
+            // 1. MISE À JOUR DU BADGE (État en temps réel)
+            if (gesture !== "NONE") {
+                badge.textContent = "ACTION: " + gesture.replace('_', ' ');
                 badge.style.background = "rgba(0, 180, 255, 0.6)";
                 badge.style.borderColor = "#00f2ff";
+                badge.style.color = "#fff";
             } else {
                 badge.textContent = "SCANNING...";
                 badge.style.background = "rgba(0, 255, 136, 0.2)";
                 badge.style.borderColor = "#00ff88";
+                badge.style.color = "#00ff88";
             }
 
-            // Allumage visuel de la commande correspondante dans la liste
+            // 2. MISE À JOUR DE LA LISTE (Highlight de sélection)
             document.querySelectorAll('.command-item').forEach(el => el.classList.remove('active'));
             const activeItem = document.getElementById(gesture);
-            if (activeItem) activeItem.classList.add('active');
-        });
+            if (activeItem) {
+                activeItem.classList.add('active');
+            }
 
-        // Demander des mises à jour toutes les 100ms au serveur
-        setInterval(() => {
-            socket.emit('request_camera_status');
-        }, 100);
-    </script>
+            // 3. RETOUR DE VALIDATION (Flash et Toast)
+            if (isConfirmed && gesture !== "NONE") {
+                // Affichage du toast central
+                toast.innerHTML = `<span style="font-size: 1.5rem;">✅</span> ${gesture.replace('_', ' ')}`;
+                toast.style.display = 'block';
+                
+                // Petit effet de "clignotement" sur la commande active
+                if (activeItem) {
+                    activeItem.style.background = "rgba(255, 255, 255, 0.9)";
+                    activeItem.style.color = "#000";
+                    setTimeout(() => {
+                        activeItem.style.background = "";
+                        activeItem.style.color = "";
+                    }, 300);
+                }
+
+                // Disparition du toast après 2 secondes
+                setTimeout(() => {
+                    toast.style.display = 'none';
+                }, 2000);
+            }
+        }
+    });
+</script>
 </body>
 </html>

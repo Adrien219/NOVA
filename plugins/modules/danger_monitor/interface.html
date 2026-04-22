@@ -116,10 +116,9 @@
     </style>
 </head>
 <body>
-
     <div class="header">
         <div class="status-text" id="global-status">SURVEILLANCE ACTIVE</div>
-        <div id="connection-badge" style="color: var(--safe-green);">● BACKBONE CONNECTÉ</div>
+        <div id="connection-badge" style="color: #00ff88;">● BACKBONE CONNECTÉ</div>
     </div>
 
     <a href="/" class="back-btn">X FERMER</a>
@@ -127,61 +126,154 @@
     <div class="monitor-zone" id="main-view">
         <div class="radar-circle" id="radar">
             <div class="radar-sweep"></div>
-            <div id="dist-val" style="font-size: 2rem; font-weight: bold;">--</div>
-            <div style="font-size: 0.8rem; position: absolute; bottom: 40px;">CM</div>
+            <div id="dist-val" style="font-size: 2.5rem; font-weight: bold; text-shadow: 0 0 10px #00f2ff;">--</div>
+            <div style="font-size: 0.8rem; position: absolute; bottom: 40px; letter-spacing: 2px;">DISTANCE (CM)</div>
         </div>
-        <div id="gas-val" style="margin-top: 20px; color: #aaa;">Gaz: <span id="gas-num">--</span> ppm</div>
+        <div id="gas-val" style="margin-top: 30px; font-family: 'Courier New', monospace;">
+            GAZ : <span id="gas-num" style="color: #ffcc00; font-weight: bold;">--</span> <span style="font-size: 0.7rem;">PPM</span>
+        </div>
     </div>
 
     <div class="alerts-log" id="log">
-        <div style="color: #555; text-align: center;">En attente de données capteurs...</div>
+        <div id="log-placeholder" style="color: #555; text-align: center; padding-top: 20px;">
+            En attente de données capteurs...
+        </div>
     </div>
 
     <script>
         const socket = io();
         const body = document.body;
         const log = document.getElementById('log');
+        const logPlaceholder = document.getElementById('log-placeholder');
         const distVal = document.getElementById('dist-val');
         const gasNum = document.getElementById('gas-num');
         const statusText = document.getElementById('global-status');
+        const radar = document.getElementById('radar');
 
-        socket.on('plugin_data', function(data) {
-            if (data.plugin === "danger_monitor") {
-                renderAlerts(data.alerts);
+        let lastDangerTime = 0;
+
+        // 1. Réception des alertes traitées par le plugin Python
+        socket.on('module_update', function(msg) {
+            if (msg.module === "danger_monitor") {
+                renderAlerts(msg.data.alerts);
+                lastDangerTime = Date.now();
             }
         });
 
-        // On écoute aussi les données brutes des capteurs pour mettre à jour les chiffres
-        socket.on('sensor_data', function(data) {
-            if (data.dist) distVal.innerText = Math.round(data.dist);
-            if (data.gas) gasNum.innerText = data.gas;
+        // 2. Mise à jour des valeurs en temps réel (via nova.py : sensor_update)
+        socket.on('sensor_update', function(data) {
+            if (data.dist !== undefined) {
+                distVal.innerText = Math.round(data.dist);
+                // Si la distance est critique (< 30), le radar devient rouge
+                radar.style.borderColor = data.dist < 30 ? "#ff0044" : "#00f2ff";
+                radar.style.boxShadow = data.dist < 30 ? "0 0 20px #ff0044" : "0 0 15px rgba(0, 242, 255, 0.3)";
+            }
+            if (data.gas !== undefined) {
+                gasNum.innerText = data.gas;
+                gasNum.style.color = data.gas > 400 ? "#ff0044" : "#ffcc00";
+            }
         });
 
         function renderAlerts(alerts) {
-            if (!alerts || alerts.length === 0) {
-                body.classList.remove('alert-active');
-                statusText.innerText = "SURVEILLANCE ACTIVE";
-                statusText.style.color = "var(--safe-green)";
-                return;
-            }
+            if (!alerts || alerts.length === 0) return;
 
-            // Activer l'alerte visuelle
+            if (logPlaceholder) logPlaceholder.remove();
+
+            // Activer l'alerte visuelle globale
             body.classList.add('alert-active');
             statusText.innerText = "⚠️ DANGER DÉTECTÉ";
-            statusText.style.color = "var(--danger-red)";
+            statusText.style.color = "#ff0044";
 
             alerts.forEach(alert => {
                 const entry = document.createElement('div');
                 entry.className = 'alert-entry';
-                const time = new Date().toLocaleTimeString();
-                entry.innerHTML = `<strong>[${time}] ${alert.type}</strong> : Valeur ${alert.value} (${alert.level})`;
+                entry.style.borderLeft = alert.level === 'CRITICAL' ? "4px solid #ff0044" : "4px solid #ffcc00";
+                
+                const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                entry.innerHTML = `
+                    <div style="font-size: 0.7rem; color: #888;">${time}</div>
+                    <strong>${alert.type}</strong> : ${alert.value} <span style="font-size:0.8rem;">(${alert.level})</span>
+                `;
                 
                 log.prepend(entry);
                 
-                // Supprimer les vieux logs après 5 entrées
-                if (log.children.length > 6) log.lastElementChild.remove();
+                // Animation d'entrée
+                entry.style.animation = "slideIn 0.3s ease-out";
+                
+                // Limiter à 5 logs pour la lisibilité sur les lunettes
+                if (log.children.length > 5) log.lastElementChild.remove();
             });
         }
+
+        // Nettoyage automatique du statut après 4 secondes sans danger
+        setInterval(() => {
+            if (Date.now() - lastDangerTime > 4000) {
+                body.classList.remove('alert-active');
+                statusText.innerText = "SURVEILLANCE ACTIVE";
+                statusText.style.color = "#00ff88";
+            }
+        }, 1000);
     </script>
+
+    <style>
+        :root {
+            --safe-green: #00ff88;
+            --danger-red: #ff0044;
+            --hud-blue: #00f2ff;
+        }
+
+        body {
+            background-color: #000;
+            color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            overflow: hidden;
+            transition: background 0.5s;
+        }
+
+        .alert-active {
+            background-color: rgba(255, 0, 68, 0.15);
+        }
+
+        .radar-circle {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            border: 2px solid var(--hud-blue);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            margin: 0 auto;
+            transition: all 0.3s;
+        }
+
+        .radar-sweep {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, transparent 80%, rgba(0, 242, 255, 0.2));
+            animation: rotate 2s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .alert-entry {
+            background: rgba(255, 255, 255, 0.05);
+            margin: 5px 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
 </body>
 </html>

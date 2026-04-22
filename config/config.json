@@ -14,7 +14,14 @@
                 "vision_objet",
                 "voice_assistant"
             ]
+        },
+        "ttttttttttt": {
+            "name": "TTTTTTTTTTT",
+            "main_module": "vision_objet",
+            "secondary_modules": [
+                "hand_control"
+            ]
         }
     },
-    "current_active_profile": "test_gestu"
+    "current_active_profile": "vision"
 }

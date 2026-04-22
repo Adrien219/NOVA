@@ -114,10 +114,9 @@
     </style>
 </head>
 <body>
-
     <div class="header">
         <span>UNITÉ : {{ config.name }}</span>
-        <span class="scanning-loader" id="status">RECHERCHE DE CARACTÈRES...</span>
+        <span class="scanning-loader" id="status" style="transition: color 0.3s;">RECHERCHE DE CARACTÈRES...</span>
     </div>
 
     <a href="/" class="back-link">X QUITTER</a>
@@ -125,12 +124,14 @@
     <div class="viewport">
         <img src="/video_feed" id="video_stream" alt="Lecteur de Texte">
         
-        <div class="aim-box"></div>
+        <div class="aim-box">
+            <div class="scan-line"></div>
+        </div>
     </div>
 
     <div class="result-panel">
-        <div id="no-text" class="placeholder">Aucun texte détecté dans la zone de visée...</div>
-        <div id="output" class="text-output"></div>
+        <div id="no-text" class="placeholder">Positionnez le texte dans la zone de visée...</div>
+        <div id="output" class="text-output" style="display: none; white-space: pre-wrap;"></div>
     </div>
 
     <script>
@@ -138,21 +139,82 @@
         const output = document.getElementById('output');
         const noText = document.getElementById('no-text');
         const status = document.getElementById('status');
+        
+        let clearTimer;
 
-        // Réception des données du plugin
+        // Réception des données du plugin (via nova.py)
         socket.on('plugin_data', function(data) {
+            // On s'assure que le message vient du plugin OCR
             if (data.plugin === "text_reader") {
-                if (data.text && data.text.length > 2) {
+                
+                if (data.text && data.text.trim().length > 2) {
+                    // 1. Mise à jour du texte
                     noText.style.display = 'none';
+                    output.style.display = 'block';
                     output.innerText = data.text;
-                    status.innerText = "TEXTE ANALYSÉ ✅";
+
+                    // 2. Feedback visuel
+                    status.innerText = "TEXTE DÉTECTÉ ✅";
                     status.style.color = "#00ff88";
+
+                    // 3. Reset du timer de nettoyage
+                    // Si on ne reçoit plus rien pendant 3 secondes, on efface l'écran
+                    clearTimeout(clearTimer);
+                    clearTimer = setTimeout(() => {
+                        output.style.display = 'none';
+                        noText.style.display = 'block';
+                        status.innerText = "RECHERCHE DE CARACTÈRES...";
+                        status.style.color = "#00f2ff";
+                    }, 3000);
+
                 } else {
-                    status.innerText = "RECHERCHE DE CARACTÈRES...";
+                    // Si le texte est vide ou trop court
+                    status.innerText = "ANALYSE EN COURS...";
                     status.style.color = "#ffcc00";
                 }
             }
         });
+
+        // Gestion de la déconnexion
+        socket.on('disconnect', () => {
+            status.innerText = "ERREUR LIAISON S.H.O.S";
+            status.style.color = "#ff0044";
+        });
     </script>
+
+    <style>
+        /* Ajout de l'animation de scan pour le HUD */
+        .scan-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: rgba(0, 242, 255, 0.5);
+            box-shadow: 0 0 15px #00f2ff;
+            top: 0;
+            animation: scanMove 2s linear infinite;
+        }
+
+        @keyframes scanMove {
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+
+        .text-output {
+            color: #fff;
+            text-shadow: 0 0 5px #00f2ff;
+            background: rgba(0, 50, 80, 0.3);
+            padding: 15px;
+            border-left: 3px solid #00f2ff;
+            font-size: 1.2rem;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
 </body>
 </html>

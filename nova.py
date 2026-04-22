@@ -6,8 +6,8 @@ Modifications :
 - Correction de l'ordre d'initialisation (NameError: app)
 """
 
-import eventlet
-eventlet.monkey_patch()
+#import eventlet
+#eventlet.monkey_patch()
 
 import cv2
 
@@ -18,7 +18,6 @@ from threading import Lock, Event
 from queue import Queue, Empty
 import numpy as np
 import time
-
 
 from flask import Flask, render_template
 from flask_socketio import SocketIO
@@ -76,7 +75,7 @@ app.jinja_loader = ChoiceLoader([
 # Initialisation de SocketIO
 socketio = SocketIO(
     app,
-    async_mode='eventlet', # <-- À CHANGER (était 'threading')
+    async_mode='threading', # <-- À CHANGER (était 'threading')
     cors_allowed_origins="*",
     logger=False,           
     engineio_logger=False   
@@ -140,95 +139,194 @@ def load_dynamic_modules():
 
 # Lancement immédiat du scan au démarrage
 load_dynamic_modules()
+
+
 # ============================================================================
-# YOLOV8N - DÉTECTION D'OBJETS
+# MEDIAPIPE - DÉTECTION D'OBJETS (REMPLACE YOLO)
 # ============================================================================
-class YOLOv8nDetector:
+class MediaPipeObjectDetector:
     """
-    Détection d'objets légère pour Raspberry Pi
-    Utilise le modèle YOLOv8n (nano = très rapide)
+    Détection d'objets ultra-légère pour Raspberry Pi.
+    Utilise EfficientDet-Lite0 (.tflite) au lieu de YOLO.
     """
     
-    def __init__(self, model_path="models/yolov8n.pt", confidence=0.5):
-        """
-        Args:
-            model_path: Chemin vers yolov8n.pt
-            confidence: Seuil de confiance (0-1)
-        """
+    def __init__(self, model_path="models/efficientdet_lite0.tflite", confidence=0.5):
         self.confidence = confidence
-        self.model = None
-        self.device = "cpu"  # Raspberry Pi n'a pas de GPU
+        self.available = True
         
         try:
-            from ultralytics import YOLO
+            import mediapipe as mp
+            from mediapipe.tasks import python
+            from mediapipe.tasks.python import vision
             
             if os.path.exists(model_path):
-                logger.info(f"✅ Chargement YOLOv8n: {model_path}")
-                self.model = YOLO(model_path)
-                self.model.to(self.device)
+                logger.info(f"✅ Chargement MediaPipe Object Detector: {model_path}")
+                base_options = python.BaseOptions(model_asset_path=model_path)
+                
+                # On utilise le mode IMAGE pour une intégration facile comme remplacement de YOLO
+                options = vision.ObjectDetectorOptions(
+                    base_options=base_options,
+                    score_threshold=self.confidence,
+                    running_mode=vision.RunningMode.IMAGE
+                )
+                self.detector = vision.ObjectDetector.create_from_options(options)
             else:
-                logger.warning(f"⚠️ Modèle YOLOv8n non trouvé: {model_path}")
-                logger.info("   Télécharger: python -m pip install ultralytics")
-                logger.info("   Puis: from ultralytics import YOLO; YOLO('yolov8n.pt')")
+                logger.warning(f"⚠️ Modèle non trouvé: {model_path}")
+                self.available = False
+                
         except ImportError:
-            logger.warning("⚠️ ultralytics pas installé. Détection désactivée.")
-            self.model = None
-    
+            logger.warning("⚠️ MediaPipe Tasks pas installé. Détection désactivée.")
+            self.available = False
+            
     def detect(self, frame):
         """
-        Détecte les objets dans une frame
-        
-        Returns:
-            (frame_annotated, detections_dict)
-            detections_dict = {
-                "objects": [{"class": "person", "confidence": 0.95, "box": [x1,y1,x2,y2]}, ...],
-                "count": 2,
-                "inference_time_ms": 45
-            }
+        Détecte les objets avec la même structure de retour que l'ancien YOLO.
         """
-        if self.model is None:
+        if not self.available or frame is None:
             return frame, {"objects": [], "count": 0, "inference_time_ms": 0}
+            
+        import mediapipe as mp
+        import time
+        import cv2
+        
+        start_time = time.time()
         
         try:
-            start_time = time.time()
-            results = self.model.predict(frame, conf=self.confidence, verbose=False)
+            # MediaPipe attend une image au format RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+            
+            # Inférence
+            detection_result = self.detector.detect(mp_image)
             inference_time = (time.time() - start_time) * 1000
             
             detections = []
             annotated_frame = frame.copy()
             
-            if results and len(results) > 0:
-                result = results[0]
+            for detection in detection_result.detections:
+                # Extraction de la boîte
+                bbox = detection.bounding_box
+                x1 = int(bbox.origin_x)
+                y1 = int(bbox.origin_y)
+                x2 = x1 + int(bbox.width)
+                y2 = y1 + int(bbox.height)
                 
-                if result.boxes is not None:
-                    for box in result.boxes:
-                        x1, y1, x2, y2 = map(int, box.xyxy[0])
-                        confidence = float(box.conf[0])
-                        class_id = int(box.cls[0])
-                        class_name = self.model.names[class_id]
-                        
-                        detections.append({
-                            "class": class_name,
-                            "confidence": round(confidence, 3),
-                            "box": [x1, y1, x2, y2],
-                            "class_id": class_id
-                        })
-                        
-                        # Dessiner la boîte
-                        cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                        label = f"{class_name} {confidence:.2f}"
-                        cv2.putText(annotated_frame, label, (x1, y1-10),
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            
+                # Extraction de la catégorie
+                category = detection.categories[0]
+                class_name = category.category_name
+                conf = float(category.score)
+                
+                detections.append({
+                    "class": class_name,
+                    "confidence": round(conf, 3),
+                    "box": [x1, y1, x2, y2]
+                })
+                
+                # Dessin sur l'image
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                label = f"{class_name} {conf:.2f}"
+                cv2.putText(annotated_frame, label, (x1, max(y1-10, 10)),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                            
             return annotated_frame, {
                 "objects": detections,
                 "count": len(detections),
                 "inference_time_ms": round(inference_time, 2)
             }
-        
+            
         except Exception as e:
-            logger.error(f"❌ Erreur YOLOv8n: {e}")
+            logger.error(f"❌ Erreur MediaPipe Detect: {e}")
             return frame, {"objects": [], "count": 0, "inference_time_ms": 0, "error": str(e)}
+
+
+# ============================================================================
+# YOLOV8N - DÉTECTION D'OBJETS
+# ============================================================================
+#class YOLOv8nDetector:
+    """
+    Détection d'objets légère pour Raspberry Pi
+    Utilise le modèle YOLOv8n (nano = très rapide)
+    """
+    
+ #   def __init__(self, model_path="models/yolov8n.pt", confidence=0.5):
+    #     """
+    #     Args:
+    #         model_path: Chemin vers yolov8n.pt
+    #         confidence: Seuil de confiance (0-1)
+     #    """
+    #     self.confidence = confidence
+     #    self.model = None
+    #     self.device = "cpu"  # Raspberry Pi n'a pas de GPU
+        
+   #      try:
+    #         from ultralytics import YOLO
+            
+    #         if os.path.exists(model_path):
+    #             logger.info(f"✅ Chargement YOLOv8n: {model_path}")
+   #              self.model = YOLO(model_path)
+    #             self.model.to(self.device)
+    #         else:
+    #             logger.warning(f"⚠️ Modèle YOLOv8n non trouvé: {model_path}")
+    #             logger.info("   Télécharger: python -m pip install ultralytics")
+   #              logger.info("   Puis: from ultralytics import YOLO; YOLO('yolov8n.pt')")
+   #      except ImportError:
+    #         logger.warning("⚠️ ultralytics pas installé. Détection désactivée.")
+    #         self.model = None
+    
+  #  def detect(self, frame):
+    #     """
+     #    Détecte les objets dans une frame
+        
+     #    Returns:
+       #      (frame_annotated, detections_dict)
+       #      detections_dict = {
+      #           "objects": [{"class": "person", "confidence": 0.95, "box": [x1,y1,x2,y2]}, ...],
+       #          "inference_time_ms": 45
+       #      }
+      #   """
+   #     if self.model is None:
+  #          return frame, {"objects": [], "count": 0, "inference_time_ms": 0}
+        
+   #     try:
+   #         start_time = time.time()
+   #         results = self.model.predict(frame, conf=self.confidence, verbose=False)
+   #         inference_time = (time.time() - start_time) * 1000
+            
+   #         detections = []
+   #         annotated_frame = frame.copy()
+            
+   #         if results and len(results) > 0:
+   #             result = results[0]
+                
+  #              if result.boxes is not None:
+   #                 for box in result.boxes:
+   #                     x1, y1, x2, y2 = map(int, box.xyxy[0])
+   #                     confidence = float(box.conf[0])
+  #                      class_id = int(box.cls[0])
+   #                     class_name = self.model.names[class_id]
+                        
+   #                     detections.append({
+   #                         "class": class_name,
+   #                         "confidence": round(confidence, 3),
+   #                         "box": [x1, y1, x2, y2],
+   #                         "class_id": class_id
+     #                      })
+                        
+   #                     # Dessiner la boîte
+   #                     cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+   #                     label = f"{class_name} {confidence:.2f}"
+   #                     cv2.putText(annotated_frame, label, (x1, y1-10),
+   #                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+            
+    #        return annotated_frame, {
+    #            "objects": detections,
+      #          "count": len(detections),
+     #           "inference_time_ms": round(inference_time, 2)
+      #      }
+        
+     #   except Exception as e:
+      #      logger.error(f"❌ Erreur YOLOv8n: {e}")
+       #     return frame, {"objects": [], "count": 0, "inference_time_ms": 0, "error": str(e)}
 
 
 # ============================================================================
@@ -318,13 +416,13 @@ class LibCameraCapture:
         while self.thread_running:
             try:
                 if self.cap is None or not self.cap.isOpened():
-                    eventlet.sleep(1)
+                    time.sleep(1)
                     continue
                 
                 ret, frame = self.cap.read()
                 
                 if not ret or frame is None or frame.size == 0:
-                    eventlet.sleep(0.1)
+                    time.sleep(0.1)
                     continue
 
                 # --- LA CORRECTION MAGIQUE ---
@@ -354,11 +452,11 @@ class LibCameraCapture:
                 if not self.frame_queue.full():
                     self.frame_queue.put(clean_frame.copy())
                 
-                eventlet.sleep(1 / self.fps)
+                time.sleep(1 / self.fps)
                 
             except Exception as e:
                 logger.error(f"❌ Erreur capture: {e}")
-                eventlet.sleep(1)
+                time.sleep(1)
         
     def start(self):
         """Démarrer le thread de capture"""
@@ -557,7 +655,7 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB max
 
 socketio = SocketIO(app, 
-    async_mode='eventlet', 
+    async_mode='threading', 
     cors_allowed_origins="*", 
     logger=False, 
     engineio_logger=False,
@@ -572,7 +670,10 @@ pi_camera = LibCameraCapture(width=640, height=480, fps=30)
 pi_camera.start()
 
 gesture_detector = GestureDetector()
-yolo_detector = YOLOv8nDetector(model_path="models/yolov8n.pt", confidence=0.5)
+
+object_detector = MediaPipeObjectDetector(model_path="models/efficientdet_lite0.tflite", confidence=0.5)
+
+#yolo_detector = YOLOv8nDetector(model_path="models/yolov8n.pt", confidence=0.5)
 snapshot_manager = SnapshotManager()
 
 # Variables globales
@@ -607,48 +708,62 @@ class MQTTHandler:
             print("📡 [MQTT] Pont Dynamique N.O.V.A initialisé")
         except Exception as e:
             print(f"❌ [MQTT] Erreur de connexion : {e}")
-            
+               
     def _on_connect(self, client, userdata, flags, rc, properties=None):
-        print(f"✅ [MQTT] Connecté au Broker avec code {rc}")
-        # --- C'EST ICI QUE TOUT SE JOUE ---
-        # On dit à nova.py d'écouter ces 4 topics spécifiques :
+        # On s'abonne aux capteurs, à la vision, et surtout au flux vidéo avec squelette
         client.subscribe([
             ("shos/sensors/normalized", 1),
-            ("shos/sensors/mobile", 1),
-            ("shos/sensors/esp32", 1),
-            ("shos/benchmark/ping", 1)  # <--- LE VOILÀ, LE MAILLON MANQUANT !
+            ("shos/plugins/vision_objet/data", 1),
+            ("shos/plugins/hand_control/data", 1), # Données des gestes
+            ("shos/camera/processed", 1),           # FLUX VIDÉO AVEC SQUELETTE
+            ("shos/plugins/text_reader/data", 1),
+            ("shos/benchmark/ping", 1)
         ])
-        print("📡 [MQTT] En écoute des capteurs ET du benchmark...")
-        
+    print("📡 [MQTT] Backbone connecté : Écoute des capteurs, de l'IA et du flux Processed...")
+
     def _on_message(self, client, userdata, msg):
+        """Aiguillage des messages MQTT vers l'interface Web et gestion du flux vidéo"""
+        global global_frame
         try:
             topic = msg.topic
-            payload_raw = msg.payload.decode('utf-8')
-            
-            # --- LOGIQUE DE BENCHMARK (ÉCHO) ---
+
+            # --- GESTION DU FLUX VIDÉO (Squelette MediaPipe) ---
+            if topic == "shos/camera/processed":
+                # On décode l'image reçue du plugin Hand Control
+                nparr = np.frombuffer(msg.payload, np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                if frame is not None:
+                    with frame_lock:
+                        global_frame = frame # On remplace l'image brute par l'image avec squelette
+                return
+
+            # --- LOGIQUE DE BENCHMARK ---
             if topic == "shos/benchmark/ping":
+                payload_raw = msg.payload.decode('utf-8')
                 self.client.publish("shos/benchmark/pong", payload_raw)
                 return 
 
-            # Décodage JSON pour les autres messages
+            # Décodage JSON pour le reste
+            payload_raw = msg.payload.decode('utf-8')
             payload = json.loads(payload_raw)
 
-            if topic == "nova/modules/register":
-                mod_name = payload.get('name', 'unknown')
-                self.active_modules[mod_name] = payload
-                socketio.emit('module_registered', payload)
-                print(f"✨ [DISCOVERY] Nouveau module : {mod_name}")
-
-            elif "/data" in topic:
+            # --- DONNÉES DES PLUGINS (Vision, Gestes, etc.) ---
+            if "/data" in topic:
                 parts = topic.split('/')
-                mod_name = parts[1] if parts[0] == "shos" else parts[2]
+                mod_name = parts[2] if parts[1] == "plugins" else parts[1]
+                
+                # Envoi vers le JavaScript (SocketIO)
+                socketio.emit('plugin_data', payload) 
                 socketio.emit('module_update', {'module': mod_name, 'data': payload})
 
+            # --- DONNÉES CAPTEURS ---
             elif topic == "shos/sensors/normalized":
-                socketio.emit('sensor_update', payload)#broadcast=True)
+                socketio.emit('sensor_update', payload)
             
         except Exception as e:
-            print(f"❌ [MQTT] Erreur routing sur {msg.topic}: {e}")
+            # Optionnel : décommenter pour voir les erreurs de décodage
+            # print(f"❌ [MQTT] Erreur routing sur {topic}: {e}")
+            pass
 
 # --- INSTANCIATION DU PONT ---
 mqtt_bridge = MQTTHandler()
@@ -879,52 +994,63 @@ def background_monitoring():
                 'timestamp': datetime.now().isoformat()
             })  # ⬅️ Ajouté: broadcast=True
             
-            eventlet.sleep(5)  
+            time.sleep(5)  
         
         except Exception as e:
             logger.error(f"❌ Erreur monitoring: {e}")
-            eventlet.sleep(5)
+            time.sleep(5)
 
 # --- LOGIQUE DE STREAMING VIDÉO ---
 def generate_frames():
+    """Génère le flux vidéo et l'envoie simultanément à l'interface et au module IA"""
     global global_frame
     import time
     
     last_processed_time = 0
-    fps_limit = 15 # On descend à 15 FPS pour stabiliser
+    fps_limit = 15  # Limite à 15 FPS pour économiser les ressources du Pi
     
     while True:
         current_time = time.time()
+        
+        # Contrôle du débit d'images (FPS)
         if current_time - last_processed_time < (1.0 / fps_limit):
-            eventlet.sleep(0.01)
+            time.sleep(0.01)
             continue
 
         if global_frame is None:
-            eventlet.sleep(0.1)
+            time.sleep(0.1)
             continue
         
         try:
-            # On récupère l'image sans faire de copie lourde au début
+            # Protection de l'accès à la frame globale
             with frame_lock:
-                if global_frame.size == 0: continue
-                # On redimensionne ici pour être SÛR que l'encodeur ne panique pas
+                if global_frame.size == 0: 
+                    continue
+                # Redimensionnement pour fluidifier l'analyse et l'affichage
                 temp_frame = cv2.resize(global_frame, (480, 360)) 
 
+            # Encodage en JPEG (qualité 35 pour un bon compromis poids/visibilité)
             success, buffer = cv2.imencode('.jpg', temp_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
             
             if success:
+                # --- LIAISON MQTT : Envoi de l'image au plugin main.py ---
+                mqtt_bridge.client.publish("shos/camera/raw", buffer.tobytes())
+
                 last_processed_time = current_time
+                
+                # Envoi au navigateur (Streaming HTTP)
                 yield (b'--frame\r\n'
                        b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                       
         except Exception as e:
-            # Si ça bug, on attend un peu pour laisser le CPU respirer
-            eventlet.sleep(0.2)
+            # En cas d'erreur, pause de sécurité pour éviter une boucle infinie de crash
+            time.sleep(0.2)
             
-        eventlet.sleep(0.01)
+        time.sleep(0.01)
         
 @app.route('/video_feed')
 def video_feed():
-    """Cette route distribue le flux vidéo à ton HTML"""
+    """Route Flask distribuant le flux vidéo au HUD (interface HTML)"""
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
 

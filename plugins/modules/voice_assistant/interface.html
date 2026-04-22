@@ -3,52 +3,180 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.H.O.S - {{ config.name }}</title>
+    <title>NOVA - Assistant Vocal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
+        :root {
+            --nova-blue: #00f2ff;
+            --nova-glow: rgba(0, 242, 255, 0.5);
+            --bg-dark: #050a14;
+        }
+
         body {
-            background-color: #0f172a;
-            color: #00ff88;
-            font-family: monospace;
+            background-color: var(--bg-dark);
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: radial-gradient(circle at center, #0a192f 0%, #050a14 100%);
+        }
+
+        /* Header avec Scanline */
+        .header {
+            padding: 20px;
+            border-bottom: 1px solid var(--nova-glow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .status-badge {
+            color: var(--nova-blue);
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            animation: blink 2s infinite;
+        }
+
+        /* Cercle Central de l'Assistant */
+        .main-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .nova-orb {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: transparent;
+            border: 2px solid var(--nova-blue);
+            box-shadow: 0 0 20px var(--nova-glow), inset 0 0 20px var(--nova-glow);
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
-            margin: 0;
+            transition: all 0.3s ease;
         }
-        .container {
-            border: 2px dashed rgba(0, 255, 136, 0.5);
-            padding: 40px;
-            border-radius: 15px;
+
+        .nova-orb.listening {
+            transform: scale(1.1);
+            border-color: #fff;
+            box-shadow: 0 0 40px #fff;
+        }
+
+        /* Ondes Sonores Animées */
+        .wave {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 1px solid var(--nova-blue);
+            animation: ripple 2s linear infinite;
+            opacity: 0;
+        }
+
+        .wave:nth-child(2) { animation-delay: 0.7s; }
+        .wave:nth-child(3) { animation-delay: 1.4s; }
+
+        /* Transcription Textuelle */
+        .transcription-zone {
+            margin-top: 50px;
             text-align: center;
-            background: rgba(0, 0, 0, 0.3);
+            width: 80%;
+            max-width: 600px;
         }
+
+        #transcription-text {
+            font-size: 1.5rem;
+            font-weight: 300;
+            color: var(--nova-blue);
+            text-shadow: 0 0 10px var(--nova-glow);
+            min-height: 2em;
+        }
+
         .btn-back {
-            display: inline-block;
-            margin-top: 20px;
-            padding: 10px 20px;
-            color: white;
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            color: #444;
             text-decoration: none;
-            border: 1px solid white;
-            border-radius: 5px;
+            font-size: 0.8rem;
+            border: 1px solid #222;
+            padding: 5px 15px;
             transition: 0.3s;
         }
-        .btn-back:hover {
-            background: white;
-            color: #0f172a;
+
+        .btn-back:hover { color: var(--nova-blue); border-color: var(--nova-blue); }
+
+        @keyframes ripple {
+            0% { transform: scale(1); opacity: 0.5; }
+            100% { transform: scale(2.5); opacity: 0; }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎙️ SYSTEME ACTIF</h1>
-        <h2>Module : {{ config.name }}</h2>
-        <p style="color: #888;">{{ config.description }}</p>
-        
-        <div style="margin: 30px 0;">
-            <p>En attente des commandes MQTT...</p>
+    <div class="header">
+        <div>UNITÉ : <span style="color: var(--nova-blue);">{{ config.name }}</span></div>
+        <div id="status" class="status-badge">PRÊT / EN ATTENTE</div>
+    </div>
+
+    <div class="main-container">
+        <div class="nova-orb" id="orb">
+            <div class="wave"></div>
+            <div class="wave"></div>
+            <div class="wave"></div>
+            <span style="font-size: 2rem;">🎙️</span>
         </div>
 
-        <a href="/" class="btn-back">⬅ Retour à la base</a>
+        <div class="transcription-zone">
+            <div id="transcription-text">"Bonjour Adrien, je vous écoute..."</div>
+        </div>
     </div>
+
+    <a href="/" class="btn-back">RETOUR TERMINAL</a>
+
+    <script>
+        const socket = io();
+        const orb = document.getElementById('orb');
+        const textDisplay = document.getElementById('transcription-text');
+        const statusBadge = document.getElementById('status');
+
+        socket.on('plugin_data', function(data) {
+            // Vérification si les données viennent du plugin vocal
+            if (data.plugin === "voice_assistant" || data.module === "voice_assistant") {
+                
+                // 1. Mise à jour de la transcription
+                if (data.type === "transcription" || data.value) {
+                    const phrase = data.value || data.text;
+                    textDisplay.innerText = `"${phrase}"`;
+                    
+                    // Effet visuel "en écoute"
+                    orb.classList.add('listening');
+                    statusBadge.innerText = "NOVA ANALYSE...";
+                    statusBadge.style.color = "#fff";
+
+                    // Retour au calme après 2 secondes
+                    setTimeout(() => {
+                        orb.classList.remove('listening');
+                        statusBadge.innerText = "PRÊT / EN ATTENTE";
+                        statusBadge.style.color = "var(--nova-blue)";
+                    }, 2500);
+                }
+            }
+        });
+    </script>
 </body>
 </html>

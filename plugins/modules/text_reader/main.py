@@ -6,78 +6,67 @@ import time
 from paho.mqtt import client as mqtt_client
 
 # --- CONFIGURATION ---
+TOPIC_CAMERA_IN = "shos/camera/raw"  # On écoute le flux de NOVA
 TOPIC_RESULTS = "shos/plugins/text_reader/data"
-# Sur Windows, si Tesseract n'est pas dans ton PATH, décommente la ligne suivante :
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+BROKER = "localhost"
+
+# Configuration Tesseract Windows
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 def extract_text(frame):
-    """
-    Fonction optimisée pour extraire le texte d'une image OpenCV
-    """
     try:
-        # 1. Conversion en niveaux de gris
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-
-        # 2. Amélioration du contraste (Seuillage d'Otsu)
-        # On peut aussi ajouter un flou gaussien pour réduire le bruit si besoin
+        # Amélioration pour Tesseract
         processed_img = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-
-        # 3. OCR avec Tesseract (langue française forcée)
-        config = r'--oem 3 --psm 3'
-        text = pytesseract.image_to_string(processed_img, lang='fra', config=config)
-
+        text = pytesseract.image_to_string(processed_img, lang='fra', config='--oem 3 --psm 3')
         return text.strip()
     except Exception as e:
-        print(f"❌ Erreur OCR : {e}")
         return ""
 
 class TextReaderPlugin:
     def __init__(self):
+        # Utilisation de la version 2 de l'API Paho pour correspondre à ton nova.py
         self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, "PLUGIN_TEXT_READER")
-        try:
-            self.client.connect("localhost", 1883, 60)
-            print("📡 [OCR] Connecté au Backbone MQTT")
-        except Exception as e:
-            print(f"❌ [OCR] Erreur connexion MQTT : {e}")
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.last_ocr_time = 0
 
-    def run(self):
-        # On utilise l'index 0 pour la caméra par défaut (ou l'URL de ton flux Pi)
-        cap = cv2.VideoCapture(0)
-        
-        print("🚀 [OCR] Lecteur démarré. Prêt à scanner...")
-        
-        last_send_time = 0
-        
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
+    def on_connect(self, client, userdata, flags, rc, properties=None):
+        print("📡 [OCR] Connecté au Backbone NOVA. En attente d'images...")
+        client.subscribe(TOPIC_CAMERA_IN)
 
-            # On ne fait l'OCR que toutes les 1.5 secondes pour ne pas saturer le processeur
-            current_time = time.time()
-            if current_time - last_send_time > 1.5:
-                # Analyse du texte
+    def on_message(self, client, userdata, msg):
+        current_time = time.time()
+        # On ne traite une image que toutes les 1.5 secondes (pour le CPU)
+        if current_time - self.last_ocr_time > 1.5:
+            try:
+                # 1. Décodage de l'image reçue via MQTT
+                nparr = np.frombuffer(msg.payload, np.uint8)
+                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                
+                if frame is None: return
+
+                # 2. OCR
                 result_text = extract_text(frame)
 
-                if result_text:
-                    print(f"📝 [OCR] Texte détecté : {result_text[:30]}...")
-                    
-                    # Envoi des données vers l'interface
+                if result_text and len(result_text) > 2:
+                    print(f"📝 [OCR] Texte : {result_text[:40]}...")
                     payload = {
                         "plugin": "text_reader",
                         "text": result_text
                     }
                     self.client.publish(TOPIC_RESULTS, json.dumps(payload))
                 
-                last_send_time = current_time
+                self.last_ocr_time = current_time
+            except Exception as e:
+                print(f"❌ Erreur traitement : {e}")
 
-            # Optionnel : Affichage local pour debug (à commenter sur le Pi final)
-            # cv2.imshow("Debug OCR", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-
-        cap.release()
-        cv2.destroyAllWindows()
+    def run(self):
+        try:
+            self.client.connect(BROKER, 1883, 60)
+            self.client.loop_forever()
+        except KeyboardInterrupt:
+            print("🛑 Arrêt du lecteur.")
 
 if __name__ == "__main__":
     plugin = TextReaderPlugin()
