@@ -72,6 +72,7 @@ def auto_detect_audio():
 class NovaOmniscientV2:
     def __init__(self, gui_callback=None):
         self.gui_callback = gui_callback
+        self.running = True  # Correction : Initialisation de l'état de la boucle
         
         os.makedirs(STORAGE_DIR, exist_ok=True)
         
@@ -212,8 +213,11 @@ class NovaOmniscientV2:
                             input_device_index=self.input_idx, frames_per_buffer=8000)
             stream.start_stream()
             
-            # Envoi du statut à l'interface au démarrage
-            if self.gui_callback: self.gui_callback("status", "PRÊT / ÉCOUTE")
+            # Envoi du statut initial au HUD via MQTT
+            self.client.publish("shos/plugins/voice_assistant/data", json.dumps({
+                "plugin": "voice_assistant", 
+                "status": "ÉCOUTE ACTIVE"
+            }))
             
             self.parler(f"Systeme NOVA V2 active. Je vous ecoute {USER_NAME}.")
             
@@ -223,7 +227,13 @@ class NovaOmniscientV2:
                     res = json.loads(self.rec.Result())
                     phrase = res.get("text", "")
                     if phrase:
-                        # ENVOI DYNAMIQUE À L'INTERFACE
+                        # Publication de la transcription pour l'interface HUD
+                        self.client.publish("shos/plugins/voice_assistant/data", json.dumps({
+                            "plugin": "voice_assistant",
+                            "type": "transcription",
+                            "value": phrase
+                        }))
+                        
                         if self.gui_callback:
                             self.gui_callback("transcription", phrase)
                         
