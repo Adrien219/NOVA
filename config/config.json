@@ -21,6 +21,13 @@
             "secondary_modules": [
                 "hand_control"
             ]
+        },
+        "test_gestu1": {
+            "name": "test gestu1",
+            "main_module": "vision_objet",
+            "secondary_modules": [
+                "text_reader"
+            ]
         }
     },
     "current_active_profile": "vision"
