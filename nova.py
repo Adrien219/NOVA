@@ -10,7 +10,8 @@ Modifications :
 #eventlet.monkey_patch()
 
 import cv2
-
+import subprocess
+import signal
 import sys, os, time, json, logging, psutil, cv2
 from pathlib import Path
 from datetime import datetime
@@ -36,7 +37,6 @@ config_manager = ConfigManager()
 
 global_frame = None
 frame_lock = Lock() 
-
 
 # ============================================================================
 # CONFIGURATION LOGGING
@@ -330,162 +330,6 @@ class MediaPipeObjectDetector:
 
 
 # ============================================================================
-# LIBCAMERA - GESTION ROBUSTE DE LA PI CAMERA
-# ============================================================================
-class LibCameraCapture:
-    """
-    Capture vidéo compatible avec libcamera (Bullseye/Bookworm)
-    Utilise GStreamer comme pipeline pour éviter les blocages OpenCV
-    """
-    
-    def __init__(self, width=640, height=480, fps=30):
-        self.width = width
-        self.height = height
-        self.fps = fps
-        self.cap = None
-        self.thread_running = False
-        self.frame_queue = Queue(maxsize=2)  # Garder au max 2 frames
-        self.lock = Lock()
-        self.last_frame = None
-        self.frame_count = 0
-        self.error_count = 0
-        self.max_errors = 10
-        
-        self._init_camera()
-    
-    def _init_camera(self):
-        """Initialise la caméra avec GStreamer/libcamera"""
-        try:
-            # Pipeline GStreamer compatible libcamera
-            # Alternative 1: Utiliser libcamera directement
-            gst_pipeline = (
-                f"libcamerasrc ! "
-                f"video/x-raw,width={self.width},height={self.height},framerate={self.fps}/1 ! "
-                f"videoconvert ! appsink max-buffers=1 drop=true"
-            )
-            
-            logger.info("🎥 Initialisation caméra Pi avec GStreamer...")
-            self.cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
-            
-            if not self.cap.isOpened():
-                logger.warning("⚠️ GStreamer échoué, tentative cv2.VideoCapture(0)...")
-                self.cap = cv2.VideoCapture(0)
-                
-                if not self.cap.isOpened():
-                    logger.error("❌ Caméra non disponible!")
-                    self.cap = None
-                    return False
-            
-            # Configurer les propriétés
-            if self.cap:
-                # Force une résolution plus basse pour soulager le bus mémoire
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 240)
-                self.cap.set(cv2.CAP_PROP_FPS, self.fps)
-                
-                logger.info(f"✅ Caméra Pi initialisée: {self.width}x{self.height} @ {self.fps} FPS")
-            
-            return True
-        
-        except Exception as e:
-            logger.error(f"❌ Erreur initialisation caméra: {e}")
-            self.cap = None
-            return False
-    
-    def read(self, timeout=1.0):
-        """
-        Lit une frame de manière non-bloquante
-        
-        Returns:
-            (success, frame) ou (False, None) si erreur
-        """
-        try:
-            frame = self.frame_queue.get(timeout=timeout)
-            return True, frame
-        except Empty:
-            if self.last_frame is not None:
-                return True, self.last_frame
-            return False, None
-    
-    def _capture_thread(self):
-        """Thread de capture avec conversion de format forcée"""
-        logger.info("🎬 Thread de capture S.H.O.S démarré")
-        self.thread_running = True
-        import numpy as np
-        
-        while self.thread_running:
-            try:
-                if self.cap is None or not self.cap.isOpened():
-                    time.sleep(1)
-                    continue
-                
-                ret, frame = self.cap.read()
-                
-                if not ret or frame is None or frame.size == 0:
-                    time.sleep(0.1)
-                    continue
-
-                # --- LA CORRECTION MAGIQUE ---
-                # On force la conversion en BGR pour s'assurer que l'image est "standard"
-                # Si libcamerify envoie un format bizarre, ceci le stabilisera.
-                try:
-                    if len(frame.shape) == 3:
-                        # On s'assure que c'est bien du 8-bit
-                        frame = cv2.convertScaleAbs(frame) 
-                    else:
-                        # Si c'est du noir et blanc, on convertit en couleur
-                        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-                except:
-                    pass 
-
-                # On crée une copie propre et contiguë en mémoire
-                clean_frame = np.ascontiguousarray(frame)
-
-                with self.lock:
-                    self.last_frame = clean_frame
-                
-                global global_frame
-                with frame_lock:
-                    global_frame = clean_frame.copy()
-                
-                # Alimentation de la queue YOLO
-                if not self.frame_queue.full():
-                    self.frame_queue.put(clean_frame.copy())
-                
-                time.sleep(1 / self.fps)
-                
-            except Exception as e:
-                logger.error(f"❌ Erreur capture: {e}")
-                time.sleep(1)
-        
-    def start(self):
-        """Démarrer le thread de capture"""
-        if self.cap is None:
-            logger.error("❌ Caméra non initialisée")
-            return False
-        
-        from threading import Thread
-        thread = Thread(target=self._capture_thread, daemon=True)
-        thread.start()
-        return True
-    
-    def stop(self):
-        """Arrêter le thread de capture"""
-        self.thread_running = False
-        if self.cap:
-            self.cap.release()
-    
-    def get_stats(self):
-        """Retourner les stats de capture"""
-        return {
-            "frames_captured": self.frame_count,
-            "errors": self.error_count,
-            "has_frame": self.last_frame is not None,
-            "frame_shape": self.last_frame.shape if self.last_frame is not None else None
-        }
-
-
-# ============================================================================
 # GESTURE RECOGNITION - DÉTECTION DE GESTES
 # ============================================================================
 class GestureDetector:
@@ -666,8 +510,8 @@ socketio = SocketIO(app,
 # Initialiser les modules
 logger.info("🚀 Initialisation S.H.O.S V3.0...")
 
-pi_camera = LibCameraCapture(width=640, height=480, fps=30)
-pi_camera.start()
+#pi_camera = LibCameraCapture(width=640, height=480, fps=30)
+#pi_camera.start()
 
 gesture_detector = GestureDetector()
 
@@ -1001,84 +845,116 @@ def background_monitoring():
             time.sleep(5)
 
 # --- LOGIQUE DE STREAMING VIDÉO ---
-def generate_frames():
-    """Génère le flux vidéo et l'envoie simultanément à l'interface et au module IA"""
-    global global_frame
-    import time
+# def generate_frames():
+#     """Génère le flux vidéo et l'envoie simultanément à l'interface et au module IA"""
+ #    global global_frame
+#     import time
     
-    last_processed_time = 0
-    fps_limit = 15  # Limite à 15 FPS pour économiser les ressources du Pi
+#     last_processed_time = 0
+#     fps_limit = 15  # Limite à 15 FPS pour économiser les ressources du Pi
     
-    while True:
-        current_time = time.time()
+#     while True:
+ #        current_time = time.time()
         
         # Contrôle du débit d'images (FPS)
-        if current_time - last_processed_time < (1.0 / fps_limit):
-            time.sleep(0.01)
-            continue
+ #        if current_time - last_processed_time < (1.0 / fps_limit):
+#             time.sleep(0.01)
+ #            continue
 
-        if global_frame is None:
-            time.sleep(0.1)
-            continue
+ #        if global_frame is None:
+ #            time.sleep(0.1)
+ #            continue
         
-        try:
+ #        try:
             # Protection de l'accès à la frame globale
-            with frame_lock:
-                if global_frame.size == 0: 
-                    continue
+ #            with frame_lock:
+ #                if global_frame.size == 0: 
+ #                    continue
                 # Redimensionnement pour fluidifier l'analyse et l'affichage
-                temp_frame = cv2.resize(global_frame, (480, 360)) 
+  #               temp_frame = cv2.resize(global_frame, (480, 360)) 
 
             # Encodage en JPEG (qualité 35 pour un bon compromis poids/visibilité)
-            success, buffer = cv2.imencode('.jpg', temp_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
+ #            success, buffer = cv2.imencode('.jpg', temp_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
             
-            if success:
+ #            if success:
                 # --- LIAISON MQTT : Envoi de l'image au plugin main.py ---
-                mqtt_bridge.client.publish("shos/camera/raw", buffer.tobytes())
+ #                mqtt_bridge.client.publish("shos/camera/raw", buffer.tobytes())
 
-                last_processed_time = current_time
+#                 last_processed_time = current_time
                 
                 # Envoi au navigateur (Streaming HTTP)
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+ #                yield (b'--frame\r\n'
+  #                      b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
                        
-        except Exception as e:
+  #       except Exception as e:
             # En cas d'erreur, pause de sécurité pour éviter une boucle infinie de crash
-            time.sleep(0.2)
+  #           time.sleep(0.2)
             
-        time.sleep(0.01)
+  #       time.sleep(0.01)
         
-@app.route('/video_feed')
-def video_feed():
-    """Route Flask distribuant le flux vidéo au HUD (interface HTML)"""
-    return Response(generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+# @app.route('/video_feed')
+# def video_feed():
+ #    """Route Flask distribuant le flux vidéo au HUD (interface HTML)"""
+  #   return Response(generate_frames(),
+       #              mimetype='multipart/x-mixed-replace; boundary=frame')
 
+
+
+# --- GESTION DES SERVICES NOVA ---
+running_processes = []
+
+def start_nova_services():
+    """Lance l'orchestrateur et la vision en arrière-plan"""
+    # Liste des scripts à exécuter (vérifie bien les noms de fichiers)
+    services = ["orchestrator.py", "vision_service.py"]
+    
+    for script in services:
+        try:
+            # sys.executable utilise le Python de ton environnement actuel
+            p = subprocess.Popen([sys.executable, script])
+            running_processes.append(p)
+            logger.info(f"🚀 Service démarré : {script} (PID: {p.pid})")
+        except Exception as e:
+            logger.error(f"❌ Erreur lors du lancement de {script} : {e}")
+
+def stop_nova_services(sig, frame):
+    """Arrête proprement tous les services lors d'un Ctrl+C"""
+    logger.info("🛑 Arrêt global des services NOVA...")
+    for p in running_processes:
+        p.terminate()
+    sys.exit(0)
+    
 # ============================================================================
 # MAIN
 # ============================================================================
 
 if __name__ == '__main__':
     logger.info("="*80)
-    logger.info("🎬 S.H.O.S V3.0 - Démarrage du serveur Flask")
+    logger.info("🎬 S.H.O.S V3.0 - DÉMARRAGE DU SUPERVISEUR")
     logger.info("="*80)
-    
-    # Démarrer monitoring
+
+    # 1. Lancer l'orchestrateur et la vision automatiquement
+    start_nova_services()
+
+    # 2. Capturer le signal Ctrl+C pour tout éteindre proprement
+    signal.signal(signal.SIGINT, stop_nova_services)
+
+    # 3. Démarrer le monitoring d'arrière-plan habituel
     socketio.start_background_task(background_monitoring)
     
     try:
+        # Note : debug=False et use_reloader=False sont obligatoires 
+        # pour éviter de lancer les services en double
         socketio.run(
             app,
             host='0.0.0.0',
             port=5000,
             debug=False,
-            use_reloader=False,
-            log_output=True
+            use_reloader=False
         )
-    
-    except KeyboardInterrupt:
-        logger.info("⛔ Arrêt du serveur...")
-    
+    except Exception as e:
+        logger.error(f"Erreur fatale du serveur : {e}")
     finally:
-        pi_camera.stop()
-        logger.info("✅ Serveur arrêté")
+        # Sécurité finale si le try échoue
+        for p in running_processes:
+            p.terminate()
