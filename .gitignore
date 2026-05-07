@@ -4,3 +4,7 @@ __pycache__/
 data/snapshots/
 models/*.pt
 shos_env/
+*$py.class
+.env
+*.log
+.DS_Store

@@ -9,7 +9,7 @@ Modifications :
 #import eventlet
 #eventlet.monkey_patch()
 
-import cv2
+#import cv2
 import subprocess
 import signal
 import sys, os, time, json, logging, psutil, cv2
@@ -17,7 +17,7 @@ from pathlib import Path
 from datetime import datetime
 from threading import Lock, Event
 from queue import Queue, Empty
-import numpy as np
+#import numpy as np
 import time
 
 from flask import Flask, render_template
@@ -144,109 +144,109 @@ load_dynamic_modules()
 # ============================================================================
 # MEDIAPIPE - DÉTECTION D'OBJETS (REMPLACE YOLO)
 # ============================================================================
-class MediaPipeObjectDetector:
-    """
-    Détection d'objets ultra-légère pour Raspberry Pi.
-    Utilise EfficientDet-Lite0 (.tflite) au lieu de YOLO.
-    """
+#class MediaPipeObjectDetector:
+ #   """
+ #   Détection d'objets ultra-légère pour Raspberry Pi.
+  #  Utilise EfficientDet-Lite0 (.tflite) au lieu de YOLO.
+  #  """
     
-    def __init__(self, model_path="models/efficientdet_lite0.tflite", confidence=0.5):
-        self.confidence = confidence
-        self.available = True
+  #  def __init__(self, model_path="models/efficientdet_lite0.tflite", confidence=0.5):
+  #      self.confidence = confidence
+  #      self.available = True
         
-        try:
-            import mediapipe as mp
-            from mediapipe.tasks import python
-            from mediapipe.tasks.python import vision
+   #     try:
+    #        import mediapipe as mp
+    #        from mediapipe.tasks import python
+    #        from mediapipe.tasks.python import vision
             
-            if os.path.exists(model_path):
-                logger.info(f"✅ Chargement MediaPipe Object Detector: {model_path}")
-                base_options = python.BaseOptions(model_asset_path=model_path)
+    #        if os.path.exists(model_path):
+    #            logger.info(f"✅ Chargement MediaPipe Object Detector: {model_path}")
+     #           base_options = python.BaseOptions(model_asset_path=model_path)
                 
                 # On utilise le mode IMAGE pour une intégration facile comme remplacement de YOLO
-                options = vision.ObjectDetectorOptions(
-                    base_options=base_options,
-                    score_threshold=self.confidence,
-                    running_mode=vision.RunningMode.IMAGE
-                )
-                self.detector = vision.ObjectDetector.create_from_options(options)
-            else:
-                logger.warning(f"⚠️ Modèle non trouvé: {model_path}")
-                self.available = False
+     #           options = vision.ObjectDetectorOptions(
+      #              base_options=base_options,
+      #              score_threshold=self.confidence,
+     #               running_mode=vision.RunningMode.IMAGE
+      #            )
+      #          self.detector = vision.ObjectDetector.create_from_options(options)
+   #         else:
+    #            logger.warning(f"⚠️ Modèle non trouvé: {model_path}")
+   #             self.available = False
                 
-        except ImportError:
-            logger.warning("⚠️ MediaPipe Tasks pas installé. Détection désactivée.")
-            self.available = False
+   #     except ImportError:
+   #         logger.warning("⚠️ MediaPipe Tasks pas installé. Détection désactivée.")
+   #         self.available = False
             
-    def detect(self, frame):
-        """
-        Détecte les objets avec la même structure de retour que l'ancien YOLO.
-        """
-        if not self.available or frame is None:
-            return frame, {"objects": [], "count": 0, "inference_time_ms": 0}
+  #  def detect(self, frame):
+   #     """
+   #     Détecte les objets avec la même structure de retour que l'ancien YOLO.
+  #      """
+   #     if not self.available or frame is None:
+         #     return frame, {"objects": [], "count": 0, "inference_time_ms": 0}
             
-        import mediapipe as mp
-        import time
-        import cv2
+   #     import mediapipe as mp
+  #      import time
+   #     import cv2
         
-        start_time = time.time()
+    #    start_time = time.time()
         
-        try:
+    #    try:
             # MediaPipe attend une image au format RGB
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+     #       rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+      #      mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
             
             # Inférence
-            detection_result = self.detector.detect(mp_image)
-            inference_time = (time.time() - start_time) * 1000
+     #       detection_result = self.detector.detect(mp_image)
+     #       inference_time = (time.time() - start_time) * 1000
             
-            detections = []
-            annotated_frame = frame.copy()
+      #      detections = []
+     #       annotated_frame = frame.copy()
             
-            for detection in detection_result.detections:
+      #      for detection in detection_result.detections:
                 # Extraction de la boîte
-                bbox = detection.bounding_box
-                x1 = int(bbox.origin_x)
-                y1 = int(bbox.origin_y)
-                x2 = x1 + int(bbox.width)
-                y2 = y1 + int(bbox.height)
+     #           bbox = detection.bounding_box
+      #          x1 = int(bbox.origin_x)
+     #           y1 = int(bbox.origin_y)
+     #           x2 = x1 + int(bbox.width)
+     #          y2 = y1 + int(bbox.height)
                 
                 # Extraction de la catégorie
-                category = detection.categories[0]
-                class_name = category.category_name
-                conf = float(category.score)
+     #           category = detection.categories[0]
+      #          class_name = category.category_name
+      #          conf = float(category.score)
                 
-                detections.append({
-                    "class": class_name,
-                    "confidence": round(conf, 3),
-                    "box": [x1, y1, x2, y2]
-                })
+       #         detections.append({
+       #             "class": class_name,
+       #             "confidence": round(conf, 3),
+       #             "box": [x1, y1, x2, y2]
+       #         })
                 
                 # Dessin sur l'image
-                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                label = f"{class_name} {conf:.2f}"
-                cv2.putText(annotated_frame, label, (x1, max(y1-10, 10)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+       #         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        #        label = f"{class_name} {conf:.2f}"
+        #        cv2.putText(annotated_frame, label, (x1, max(y1-10, 10)),
+       #                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                             
-            return annotated_frame, {
-                "objects": detections,
-                "count": len(detections),
-                "inference_time_ms": round(inference_time, 2)
-            }
+      #      return annotated_frame, {
+       #         "objects": detections,
+       #         "count": len(detections),
+       #         "inference_time_ms": round(inference_time, 2)
+       #    }
             
-        except Exception as e:
-            logger.error(f"❌ Erreur MediaPipe Detect: {e}")
-            return frame, {"objects": [], "count": 0, "inference_time_ms": 0, "error": str(e)}
+        #except Exception as e:
+       #     logger.error(f"❌ Erreur MediaPipe Detect: {e}")
+       #     return frame, {"objects": [], "count": 0, "inference_time_ms": 0, "error": str(e)}
 
 
 # ============================================================================
 # YOLOV8N - DÉTECTION D'OBJETS
 # ============================================================================
 #class YOLOv8nDetector:
-    """
-    Détection d'objets légère pour Raspberry Pi
-    Utilise le modèle YOLOv8n (nano = très rapide)
-    """
+   # """
+   # Détection d'objets légère pour Raspberry Pi
+   # Utilise le modèle YOLOv8n (nano = très rapide)
+   # """
     
  #   def __init__(self, model_path="models/yolov8n.pt", confidence=0.5):
     #     """
@@ -332,90 +332,90 @@ class MediaPipeObjectDetector:
 # ============================================================================
 # GESTURE RECOGNITION - DÉTECTION DE GESTES
 # ============================================================================
-class GestureDetector:
-    """Détecteur de gestes avec MediaPipe"""
+#class GestureDetector:
+   # """Détecteur de gestes avec MediaPipe"""
     
-    def __init__(self):
-        self.current_gesture = "NONE"
-        self.last_gesture = "NONE"
+   # def __init__(self):
+   #     self.current_gesture = "NONE"
+   #     self.last_gesture = "NONE"
         
-        try:
-            import mediapipe as mp
-            self.mp = mp
-            self.hands = mp.solutions.hands.Hands(
-                static_image_mode=False,
-                max_num_hands=1,
-                min_detection_confidence=0.7,
-                min_tracking_confidence=0.5
-            )
-            self.available = True
-            logger.info("✅ MediaPipe chargé")
-        except ImportError:
-            self.available = False
-            logger.warning("⚠️ MediaPipe non disponible - gestes désactivés")
+   #     try:
+   #         import mediapipe as mp
+  #          self.mp = mp
+   #         self.hands = mp.solutions.hands.Hands(
+   #             static_image_mode=False,
+    #            max_num_hands=1,
+    #            min_detection_confidence=0.7,
+    #            min_tracking_confidence=0.5
+   #         )
+    #        self.available = True
+    #        logger.info("✅ MediaPipe chargé")
+   #     except ImportError:
+   #         self.available = False
+   #         logger.warning("⚠️ MediaPipe non disponible - gestes désactivés")
     
-    def detect(self, frame):
-        """
-        Détecte un geste
+  #  def detect(self, frame):
+   #     """
+   #     Détecte un geste
         
-        Returns:
-            gesture_name (str): "NONE", "THUMBS_UP", "PEACE", "PALM", "FIST", etc.
-        """
-        if not self.available:
-            return "NONE", frame
+    #    Returns:
+   #         gesture_name (str): "NONE", "THUMBS_UP", "PEACE", "PALM", "FIST", etc.
+    #    """
+   #     if not self.available:
+  #          return "NONE", frame
         
-        try:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.hands.process(rgb_frame)
+   #     try:
+   #         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    #        results = self.hands.process(rgb_frame)
             
-            if results.multi_hand_landmarks and len(results.multi_hand_landmarks) > 0:
-                hand = results.multi_hand_landmarks[0]
-                gesture = self._classify_gesture(hand)
-                self.current_gesture = gesture
-                return gesture, frame
+   #         if results.multi_hand_landmarks and len(results.multi_hand_landmarks) > 0:
+   #             hand = results.multi_hand_landmarks[0]
+   #             gesture = self._classify_gesture(hand)
+  #              self.current_gesture = gesture
+  #              return gesture, frame
             
-            self.current_gesture = "NONE"
-            return "NONE", frame
+   #         self.current_gesture = "NONE"
+   #         return "NONE", frame
         
-        except Exception as e:
-            logger.error(f"❌ Erreur détection geste: {e}")
-            return "NONE", frame
+  #      except Exception as e:
+   #         logger.error(f"❌ Erreur détection geste: {e}")
+   #         return "NONE", frame
     
-    def _classify_gesture(self, hand):
-        """Classifie un geste basé sur les landmarks"""
+   # def _classify_gesture(self, hand):
+   #     """Classifie un geste basé sur les landmarks"""
         # Landmarks importants
-        thumb_tip = hand.landmark[4]
-        index_tip = hand.landmark[8]
-        middle_tip = hand.landmark[12]
-        ring_tip = hand.landmark[16]
-        pinky_tip = hand.landmark[20]
+  #      thumb_tip = hand.landmark[4]
+   #     index_tip = hand.landmark[8]
+  #      middle_tip = hand.landmark[12]
+  #      ring_tip = hand.landmark[16]
+  #      pinky_tip = hand.landmark[20]
         
-        palm = hand.landmark[0]
+  #      palm = hand.landmark[0]
         
         # Calcul distances
-        thumb_up = thumb_tip.y < palm.y
-        index_up = index_tip.y < palm.y
-        middle_up = middle_tip.y < palm.y
-        ring_up = ring_tip.y < palm.y
-        pinky_up = pinky_tip.y < palm.y
+ #       thumb_up = thumb_tip.y < palm.y
+ #       index_up = index_tip.y < palm.y
+  #      middle_up = middle_tip.y < palm.y
+   #     ring_up = ring_tip.y < palm.y
+  #      pinky_up = pinky_tip.y < palm.y
         
         # Détection simples
-        if thumb_up and not (index_up or middle_up or ring_up or pinky_up):
-            return "THUMBS_UP"
+    #    if thumb_up and not (index_up or middle_up or ring_up or pinky_up):
+    #        return "THUMBS_UP"
         
-        if index_up and middle_up and not (ring_up or pinky_up):
-            return "PEACE"
+    #    if index_up and middle_up and not (ring_up or pinky_up):
+    #        return "PEACE"
         
-        if index_up and not (middle_up or ring_up or pinky_up):
-            return "POINT"
+   #     if index_up and not (middle_up or ring_up or pinky_up):
+   #         return "POINT"
         
-        if thumb_up and index_up and middle_up and ring_up and pinky_up:
-            return "PALM"
+   #     if thumb_up and index_up and middle_up and ring_up and pinky_up:
+  #          return "PALM"
         
-        if not (thumb_up or index_up or middle_up or ring_up or pinky_up):
-            return "FIST"
+ #       if not (thumb_up or index_up or middle_up or ring_up or pinky_up):
+  #          return "FIST"
         
-        return "UNKNOWN"
+  #      return "UNKNOWN"
 
 
 # ============================================================================
@@ -513,9 +513,9 @@ logger.info("🚀 Initialisation S.H.O.S V3.0...")
 #pi_camera = LibCameraCapture(width=640, height=480, fps=30)
 #pi_camera.start()
 
-gesture_detector = GestureDetector()
+#gesture_detector = GestureDetector()
 
-object_detector = MediaPipeObjectDetector(model_path="models/efficientdet_lite0.tflite", confidence=0.5)
+#object_detector = MediaPipeObjectDetector(model_path="models/efficientdet_lite0.tflite", confidence=0.5)
 
 #yolo_detector = YOLOv8nDetector(model_path="models/yolov8n.pt", confidence=0.5)
 snapshot_manager = SnapshotManager()
@@ -534,12 +534,12 @@ class MQTTHandler:
     def __init__(self, host='localhost', port=1883):
         self.host = host
         self.port = port
-        self.active_modules = {} # Suivi des modules enregistrés en temps réel
+        self.active_modules = {}
 
         try:
-            # Support paho-mqtt 2.0 (CallbackAPIVersion) avec fallback 1.x
+            # Support paho-mqtt 2.0+
             from paho.mqtt.enums import CallbackAPIVersion
-            self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2, "NOVA_WEB_BRIDGE")
+            self.client = mqtt_client.Client(CallbackAPIVersion.VERSION2, "NOVA_WEB_BRIDGE")
         except:
             self.client = mqtt_client.Client("NOVA_WEB_BRIDGE")
             
@@ -552,64 +552,58 @@ class MQTTHandler:
             print("📡 [MQTT] Pont Dynamique N.O.V.A initialisé")
         except Exception as e:
             print(f"❌ [MQTT] Erreur de connexion : {e}")
-               
+            
     def _on_connect(self, client, userdata, flags, rc, properties=None):
-        # On s'abonne aux capteurs, à la vision, et surtout au flux vidéo avec squelette
+        print(f"✅ [MQTT] Connecté au Broker (Code: {rc})")
+        # On s'abonne à TOUT : Vidéo traitée + Capteurs
         client.subscribe([
             ("shos/sensors/normalized", 1),
-            ("shos/plugins/vision_objet/data", 1),
-            ("shos/plugins/hand_control/data", 1), # Données des gestes
-            ("shos/camera/processed", 1),           # FLUX VIDÉO AVEC SQUELETTE
-            ("shos/plugins/text_reader/data", 1),
-            ("shos/benchmark/ping", 1)
+            ("shos/sensors/raw", 1),
+            ("shos/camera/processed", 1),  # <--- CRUCIAL pour l'image
+            ("shos/benchmark/ping", 1),
+            ("shos/plugins/+/data", 1)     # Écoute tous les plugins d'un coup
         ])
-    print("📡 [MQTT] Backbone connecté : Écoute des capteurs, de l'IA et du flux Processed...")
-
+        print("📡 [MQTT] Écoute active : Vidéo IA + Capteurs")
+        
     def _on_message(self, client, userdata, msg):
-        """Aiguillage des messages MQTT vers l'interface Web et gestion du flux vidéo"""
         global global_frame
+        topic = msg.topic
+        
         try:
-            topic = msg.topic
-
-            # --- GESTION DU FLUX VIDÉO (Squelette MediaPipe) ---
+            # 1. TRAITEMENT DE L'IMAGE (BINAIRE)
             if topic == "shos/camera/processed":
-                # On décode l'image reçue du plugin Hand Control
+                # On transforme le buffer binaire en image OpenCV
                 nparr = np.frombuffer(msg.payload, np.uint8)
                 frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 if frame is not None:
                     with frame_lock:
-                        global_frame = frame # On remplace l'image brute par l'image avec squelette
-                return
+                        global_frame = frame
+                return # On sort pour ne pas tenter de décoder en UTF-8
 
-            # --- LOGIQUE DE BENCHMARK ---
+            # 2. TRAITEMENT DU TEXTE (JSON)
+            payload_raw = msg.payload.decode('utf-8')
+            
             if topic == "shos/benchmark/ping":
-                payload_raw = msg.payload.decode('utf-8')
                 self.client.publish("shos/benchmark/pong", payload_raw)
                 return 
 
-            # Décodage JSON pour le reste
-            payload_raw = msg.payload.decode('utf-8')
             payload = json.loads(payload_raw)
 
-            # --- DONNÉES DES PLUGINS (Vision, Gestes, etc.) ---
-            if "/data" in topic:
-                parts = topic.split('/')
-                mod_name = parts[2] if parts[1] == "plugins" else parts[1]
-                
-                # Envoi vers le JavaScript (SocketIO)
-                socketio.emit('plugin_data', payload) 
-                socketio.emit('module_update', {'module': mod_name, 'data': payload})
-
-            # --- DONNÉES CAPTEURS ---
-            elif topic == "shos/sensors/normalized":
+            # Envoi vers l'interface Web via SocketIO
+            if topic == "shos/sensors/normalized" or topic == "shos/sensors/raw":
                 socketio.emit('sensor_update', payload)
             
-        except Exception as e:
-            # Optionnel : décommenter pour voir les erreurs de décodage
-            # print(f"❌ [MQTT] Erreur routing sur {topic}: {e}")
-            pass
+            elif "plugins" in topic:
+                parts = topic.split('/')
+                mod_name = parts[2]
+                socketio.emit('module_update', {'module': mod_name, 'data': payload})
+                socketio.emit('plugin_data', payload)
 
-# --- INSTANCIATION DU PONT ---
+        except Exception as e:
+            if topic != "shos/camera/processed":
+                print(f"❌ [MQTT] Erreur routing sur {topic}: {e}")
+
+# L'instance doit être créée ici
 mqtt_bridge = MQTTHandler()
 
 # ============================================================================
@@ -791,14 +785,13 @@ def handle_camera_status():
 
 @socketio.on('request_snapshot')
 def handle_snapshot_request():
-    """Demande de snapshot manuel utilisant le flux partagé"""
     global global_frame
     if global_frame is not None:
         with frame_lock:
-            # On utilise directement l'image stockée dans le tiroir global
+            # On capture juste l'image reçue par MQTT
             filepath = snapshot_manager.capture(
                 global_frame.copy(),
-                gesture="MANUAL",
+                gesture="MQTT_STREAM", # Indique que ça vient du flux distant
                 metadata={"triggered_by": "user"}
             )
         
@@ -844,60 +837,29 @@ def background_monitoring():
             logger.error(f"❌ Erreur monitoring: {e}")
             time.sleep(5)
 
-# --- LOGIQUE DE STREAMING VIDÉO ---
-# def generate_frames():
-#     """Génère le flux vidéo et l'envoie simultanément à l'interface et au module IA"""
- #    global global_frame
-#     import time
-    
-#     last_processed_time = 0
-#     fps_limit = 15  # Limite à 15 FPS pour économiser les ressources du Pi
-    
-#     while True:
- #        current_time = time.time()
+# --- LOGIQUE DE STREAMING VIDÉO (DÉCOMMENTÉE ET FIXÉE) ---
+def generate_frames():
+    """Récupère les frames reçues via MQTT et les sert au Web"""
+    global global_frame
+    while True:
+        if global_frame is None:
+            time.sleep(0.1)
+            continue
         
-        # Contrôle du débit d'images (FPS)
- #        if current_time - last_processed_time < (1.0 / fps_limit):
-#             time.sleep(0.01)
- #            continue
-
- #        if global_frame is None:
- #            time.sleep(0.1)
- #            continue
-        
- #        try:
-            # Protection de l'accès à la frame globale
- #            with frame_lock:
- #                if global_frame.size == 0: 
- #                    continue
-                # Redimensionnement pour fluidifier l'analyse et l'affichage
-  #               temp_frame = cv2.resize(global_frame, (480, 360)) 
-
-            # Encodage en JPEG (qualité 35 pour un bon compromis poids/visibilité)
- #            success, buffer = cv2.imencode('.jpg', temp_frame, [cv2.IMWRITE_JPEG_QUALITY, 35])
-            
- #            if success:
-                # --- LIAISON MQTT : Envoi de l'image au plugin main.py ---
- #                mqtt_bridge.client.publish("shos/camera/raw", buffer.tobytes())
-
-#                 last_processed_time = current_time
+        with frame_lock:
+            # On encode l'image stockée dans le tiroir global par le MQTTHandler
+            success, buffer = cv2.imencode('.jpg', global_frame)
+            if not success:
+                continue
                 
-                # Envoi au navigateur (Streaming HTTP)
- #                yield (b'--frame\r\n'
-  #                      b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
-                       
-  #       except Exception as e:
-            # En cas d'erreur, pause de sécurité pour éviter une boucle infinie de crash
-  #           time.sleep(0.2)
-            
-  #       time.sleep(0.01)
-        
-# @app.route('/video_feed')
-# def video_feed():
- #    """Route Flask distribuant le flux vidéo au HUD (interface HTML)"""
-  #   return Response(generate_frames(),
-       #              mimetype='multipart/x-mixed-replace; boundary=frame')
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
+@app.route('/video_feed')
+def video_feed():
+    """Route Flask distribuant le flux vidéo au HUD"""
+    return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 # --- GESTION DES SERVICES NOVA ---
