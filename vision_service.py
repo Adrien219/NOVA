@@ -21,7 +21,7 @@ import paho.mqtt.client as mqtt
 # ============================================================================
 # CONFIG
 # ============================================================================
-PORT_WEB = 5050
+PORT_WEB = 5051   # 5050 = réservé au service principal SHOS
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 MQTT_TOPIC = "shos/camera/vision"
@@ -60,32 +60,39 @@ class NovaVision:
         logger.info("✅ MediaPipe initialisé")
         
         # === PICAMERA2 (NATIF LIBCAMERA) ===
+        # Pré-initialisation — évite AttributeError si toutes les tentatives échouent
+        self.picam2 = None
+        self.cap = None
+        self.use_picamera2 = False
+
         try:
             from picamera2 import Picamera2, Preview
-            
+
             self.picam2 = Picamera2()
-            
-            # Configuration optimisée pour IA
             config = self.picam2.create_preview_configuration(
                 main={"format": 'BGR888', "size": (640, 480)},
                 lores={"format": 'YUV420', "size": (320, 240)}
             )
-            
             self.picam2.configure(config)
             self.picam2.start()
-            
+
             logger.info("✅ Picamera2 initialisée (libcamera natif)")
             self.use_picamera2 = True
-            
+
         except ImportError:
             logger.warning("⚠️ Picamera2 indisponible, fallback cv2.VideoCapture(0)")
-            self.cap = cv2.VideoCapture(0)
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-            self.use_picamera2 = False
+            self._init_opencv_fallback()
+
         except Exception as e:
-            logger.error(f"❌ Erreur Picamera2: {e}")
-            self.use_picamera2 = False
+            # Cas fréquent : "Pipeline handler in use by another process"
+            # = ce service tourne déjà dans un autre terminal
+            logger.error(f"❌ Erreur Picamera2 : {e}")
+            if "use by another process" in str(e):
+                logger.warning("💡 La caméra est déjà utilisée par un autre process.")
+                logger.warning("   Ne pas lancer vision_service deux fois en parallèle.")
+                logger.warning("   Vérifier : ps aux | grep vision_service")
+            logger.warning("⚠️ Tentative fallback cv2.VideoCapture(0)...")
+            self._init_opencv_fallback()
         
         # === STATE ===
         self.output_frame = None
@@ -98,6 +105,23 @@ class NovaVision:
         # === MQTT ===
         self.mqtt_client = self._init_mqtt()
     
+    def _init_opencv_fallback(self):
+        """Initialise OpenCV comme source caméra de secours."""
+        try:
+            self.cap = cv2.VideoCapture(0)
+            if self.cap.isOpened():
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                self.use_picamera2 = False
+                logger.info("✅ Fallback OpenCV initialisé (index=0)")
+            else:
+                self.cap = None
+                logger.error("❌ OpenCV : aucune caméra disponible (index=0)")
+                logger.error("   Le service continuera sans flux vidéo.")
+        except Exception as e:
+            self.cap = None
+            logger.error(f"❌ Fallback OpenCV échoué : {e}")
+
     def _init_mqtt(self):
         """Initialise client MQTT"""
         try:
@@ -118,19 +142,33 @@ class NovaVision:
     def process_vision(self):
         """Boucle principale de traitement vidéo"""
         logger.info("🚀 Traitement vision démarré...")
-        
+
+        # Vérification caméra disponible
+        if not self.use_picamera2 and self.cap is None:
+            logger.error("❌ Aucune caméra disponible — boucle vision annulée.")
+            logger.error("   Causes possibles :")
+            logger.error("   1. vision_service tourne déjà dans un autre process")
+            logger.error("   2. Nappe caméra mal connectée")
+            logger.error("   3. Picamera2 pas installée et webcam USB absente")
+            return
+
         # Warm-up (laisser la caméra se stabiliser)
         for _ in range(10):
             if self.use_picamera2:
                 try:
-                    _ = self.picam2.capture_array()
-                except:
+                    self.picam2.capture_array()
+                except Exception:
                     pass
-            else:
+            elif self.cap is not None:
                 self.cap.read()
             time.sleep(0.05)
-        
+
         logger.info("👁️ Analyse MediaPipe active")
+
+        # Variables pour calcul FPS réel
+        fps_counter = 0
+        fps_timer = time.time()
+        current_fps = 0.0
         
         # === BOUCLE PRINCIPALE ===
         while self.is_running:
@@ -143,11 +181,15 @@ class NovaVision:
                         logger.warning(f"⚠️ Picamera2 read error: {e}")
                         time.sleep(0.1)
                         continue
-                else:
+                elif self.cap is not None:
                     success, frame = self.cap.read()
                     if not success or frame is None:
                         time.sleep(0.1)
                         continue
+                else:
+                    # Aucune caméra — on sort proprement
+                    logger.error("❌ Aucune source vidéo, arrêt de la boucle.")
+                    break
                 
                 # --- VALIDATION FRAME ---
                 if frame is None or frame.size == 0:
@@ -202,7 +244,7 @@ class NovaVision:
                     # Ajouter info texte
                     cv2.putText(frame, f"Hands: {len(hand_results.multi_hand_landmarks or [])}", 
                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                    cv2.putText(frame, f"FPS: {self.frame_count}", 
+                    cv2.putText(frame, f"FPS: {current_fps:.1f}", 
                                (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                     
                 except cv2.error as e:
@@ -229,22 +271,33 @@ class NovaVision:
                     with self.frame_lock:
                         self.output_frame = frame_bytes
                         self.frame_count += 1
-                    
-                    # Publish MQTT (métadonnées uniquement, pas la frame)
+
+                    # Calcul FPS réel sur fenêtre 1 seconde
+                    fps_counter += 1
+                    now = time.time()
+                    if now - fps_timer >= 1.0:
+                        current_fps = round(fps_counter / (now - fps_timer), 1)
+                        fps_counter = 0
+                        fps_timer = now
+
+                    # Publish MQTT — payload enrichi pour le benchmark
+                    # Le champ "timestamp" est obligatoire pour mesurer la latence E2E
                     if self.mqtt_client:
                         try:
                             metadata = {
-                                "timestamp": time.time(),
+                                "timestamp": time.time(),        # ← latence E2E benchmark
+                                "frame_id": self.frame_count,
+                                "fps": current_fps,              # ← FPS réel pipeline
                                 "hands_detected": len(hand_results.multi_hand_landmarks or []),
                                 "pose_detected": bool(pose_results.pose_landmarks),
-                                "frame_id": self.frame_count
+                                "camera": "picamera2" if self.use_picamera2 else "opencv",
                             }
                             self.mqtt_client.publish(
                                 MQTT_TOPIC,
                                 json.dumps(metadata),
                                 qos=0
                             )
-                        except:
+                        except Exception:
                             pass
                 
                 except Exception as e:

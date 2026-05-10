@@ -1,0 +1,35 @@
+======================================================================
+SHOS — RAPPORT DE BENCHMARK
+Date       : 2026-05-10 22:14:41
+Plateforme : Raspberry Pi 4 Model B Rev 1.5
+OS         : Linux-6.12.75+rpt-rpi-v8-aarch64-with-glibc2.36
+Python     : 3.11.2
+Durée test : 60 secondes
+======================================================================
+
+── 1. PERFORMANCES VIDÉO / DÉTECTION ──────────────────────────────
+  [Non mesuré — no_frames_received]
+
+── 2. RESSOURCES SYSTÈME ──────────────────────────────────────────
+  CPU moyen               : 3.21 %
+  CPU max (pic)           : 5.6 %
+  CPU min                 : 0.0 %
+  RAM utilisée (moy)      : 30.6 %
+  RAM utilisée (max)      : 30.6 %
+  Température CPU (moy)   : 42.9 °C
+  Température CPU (max)   : 45.2 °C
+
+── 3. LATENCE MQTT ────────────────────────────────────────────────
+  Messages envoyés        : 100
+  Messages reçus          : 100
+  Perte paquets           : 0.0 %
+  Latence moyenne         : 0.679 ms
+  Latence médiane         : 0.613 ms
+  Latence min             : 0.394 ms
+  Latence max             : 1.927 ms
+  Latence P95             : 1.191 ms
+  Latence P99             : 1.927 ms
+
+======================================================================
+FIN DU RAPPORT — Fichiers CSV détaillés dans le dossier results/
+======================================================================

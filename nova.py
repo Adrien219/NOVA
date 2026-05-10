@@ -560,6 +560,9 @@ def index():
 @app.route('/dashboard')
 def dashboard(): return render_template('dashboard.html')
 
+@app.route('/benchmark')
+def benchmark_ui(): return render_template('benchmark.html')
+
 @app.route('/diagnostic')
 def diagnostic(): return render_template('diagnostic.html')
 

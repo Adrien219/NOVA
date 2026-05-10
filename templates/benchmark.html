@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHOS — Benchmark Console</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0d0f14;
+    --surface:  rgba(255,255,255,0.04);
+    --glass:    rgba(255,255,255,0.07);
+    --border:   rgba(255,255,255,0.08);
+    --border2:  rgba(255,255,255,0.14);
+    --accent:   #c8f135;
+    --accent2:  #4af0c4;
+    --accent3:  #f0914a;
+    --danger:   #f05a5a;
+    --text:     #e8eaf0;
+    --muted:    #7a7d8a;
+    --mono:     'Space Mono', monospace;
+    --sans:     'DM Sans', sans-serif;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content:'';
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(200,241,53,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,241,53,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events:none; z-index:0;
+  }
+
+  /* Ambient glow */
+  body::after {
+    content:'';
+    position:fixed;
+    top:-30%; left:20%;
+    width:60%; height:60%;
+    background: radial-gradient(ellipse, rgba(200,241,53,0.06) 0%, transparent 70%);
+    pointer-events:none; z-index:0;
+  }
+
+  .layout {
+    position:relative; z-index:1;
+    display:grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: 64px 1fr;
+    min-height:100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    grid-column: 1/-1;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 0 28px;
+    background: rgba(13,15,20,0.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    position:sticky; top:0; z-index:100;
+  }
+
+  .logo {
+    display:flex; align-items:center; gap:12px;
+    font-family: var(--mono); font-size:13px; font-weight:700;
+    letter-spacing:.08em; color:var(--accent);
+  }
+  .logo-dot {
+    width:8px; height:8px; border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 12px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100%{opacity:1; transform:scale(1)}
+    50%{opacity:.5; transform:scale(.8)}
+  }
+
+  .header-status {
+    display:flex; align-items:center; gap:20px;
+    font-size:12px; color:var(--muted);
+  }
+  .status-chip {
+    display:flex; align-items:center; gap:6px;
+    padding: 5px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius:20px;
+    font-family:var(--mono); font-size:11px;
+  }
+  .status-chip .dot {
+    width:6px; height:6px; border-radius:50%;
+    background:var(--accent2);
+    box-shadow:0 0 8px var(--accent2);
+  }
+  .status-chip.warn .dot { background:var(--danger); box-shadow:0 0 8px var(--danger); }
+
+  .header-time {
+    font-family:var(--mono); font-size:12px; color:var(--muted);
+  }
+
+  /* ── SIDEBAR ── */
+  aside {
+    padding:24px 16px;
+    border-right:1px solid var(--border);
+    background: rgba(13,15,20,0.6);
+    display:flex; flex-direction:column; gap:8px;
+  }
+
+  .sidebar-section {
+    font-size:10px; font-family:var(--mono);
+    color:var(--muted); letter-spacing:.12em;
+    padding: 16px 12px 8px;
+    text-transform:uppercase;
+  }
+
+  .nav-item {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 14px; border-radius:10px;
+    font-size:13px; font-weight:500; color:var(--muted);
+    cursor:pointer; transition: all .2s;
+    border:1px solid transparent;
+  }
+  .nav-item:hover { background:var(--glass); color:var(--text); }
+  .nav-item.active {
+    background: rgba(200,241,53,0.08);
+    border-color: rgba(200,241,53,0.2);
+    color:var(--accent);
+  }
+  .nav-icon { font-size:16px; width:20px; text-align:center; }
+  .nav-badge {
+    margin-left:auto; font-size:10px; font-family:var(--mono);
+    padding:2px 7px; border-radius:10px;
+    background:rgba(200,241,53,0.15); color:var(--accent);
+  }
+
+  /* ── MAIN ── */
+  main {
+    padding:28px;
+    overflow-y:auto;
+    display:flex; flex-direction:column; gap:24px;
+  }
+
+  /* Section visible/caché */
+  .section { display:none; }
+  .section.active { display:flex; flex-direction:column; gap:20px; }
+
+  /* ── PAGE TITLE ── */
+  .page-header {
+    display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:12px;
+  }
+  .page-title { font-size:22px; font-weight:600; color:var(--text); }
+  .page-sub { font-size:13px; color:var(--muted); margin-top:4px; font-family:var(--mono); }
+
+  /* ── LAUNCH PANEL ── */
+  .launch-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:16px;
+  }
+
+  .glass-card {
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:24px;
+    backdrop-filter:blur(12px);
+    transition: border-color .2s;
+  }
+  .glass-card:hover { border-color:var(--border2); }
+
+  .card-title {
+    font-size:12px; font-family:var(--mono);
+    color:var(--muted); letter-spacing:.1em;
+    text-transform:uppercase; margin-bottom:16px;
+  }
+
+  /* Mode selector */
+  .mode-grid {
+    display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px;
+  }
+  .mode-btn {
+    padding:10px 14px; border-radius:10px;
+    background:var(--glass); border:1px solid var(--border);
+    color:var(--muted); font-size:12px; font-family:var(--mono);
+    cursor:pointer; transition:all .2s; text-align:center;
+  }
+  .mode-btn:hover { border-color:var(--border2); color:var(--text); }
+  .mode-btn.selected {
+    background:rgba(200,241,53,0.1);
+    border-color:rgba(200,241,53,0.3);
+    color:var(--accent);
+  }
+
+  /* Duration */
+  .param-row {
+    display:flex; align-items:center; gap:12px; margin-bottom:12px;
+  }
+  .param-label { font-size:12px; color:var(--muted); min-width:80px; }
+  .param-input {
+    flex:1; background:var(--glass); border:1px solid var(--border);
+    border-radius:8px; padding:8px 12px;
+    color:var(--text); font-family:var(--mono); font-size:13px;
+    outline:none; transition:border-color .2s;
+  }
+  .param-input:focus { border-color:rgba(200,241,53,0.4); }
+
+  /* Launch button */
+  .launch-btn {
+    width:100%; padding:14px;
+    background: linear-gradient(135deg, var(--accent), #a8d424);
+    border:none; border-radius:12px;
+    color:#0d0f14; font-family:var(--mono);
+    font-size:13px; font-weight:700; letter-spacing:.06em;
+    cursor:pointer; transition:all .2s;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+  }
+  .launch-btn:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(200,241,53,0.3); }
+  .launch-btn:active { transform:translateY(0); }
+  .launch-btn:disabled {
+    background:var(--glass); color:var(--muted);
+    cursor:not-allowed; transform:none; box-shadow:none;
+  }
+
+  /* Terminal */
+  .terminal {
+    background:#060810; border:1px solid var(--border);
+    border-radius:16px; overflow:hidden; flex:1;
+  }
+  .terminal-bar {
+    display:flex; align-items:center; gap:8px;
+    padding:12px 16px; background:rgba(255,255,255,0.03);
+    border-bottom:1px solid var(--border);
+  }
+  .t-dot { width:10px; height:10px; border-radius:50%; }
+  .terminal-title { font-size:11px; font-family:var(--mono); color:var(--muted); margin-left:8px; }
+  .terminal-body {
+    padding:16px; height:280px; overflow-y:auto;
+    font-family:var(--mono); font-size:12px; line-height:1.7;
+  }
+  .log-line { display:flex; gap:10px; }
+  .log-time { color:#4a5060; min-width:80px; }
+  .log-level-INFO { color:var(--accent2); }
+  .log-level-WARNING { color:var(--accent3); }
+  .log-level-ERROR { color:var(--danger); }
+  .log-msg { color:#c8ccd8; }
+
+  /* Progress bar */
+  .progress-wrap { margin-top:12px; }
+  .progress-label { font-size:11px; font-family:var(--mono); color:var(--muted); margin-bottom:6px; display:flex; justify-content:space-between; }
+  .progress-bar { height:4px; background:var(--glass); border-radius:2px; overflow:hidden; }
+  .progress-fill {
+    height:100%; border-radius:2px;
+    background:linear-gradient(90deg, var(--accent2), var(--accent));
+    width:0%; transition:width .5s ease;
+  }
+
+  /* ── METRIC CARDS ── */
+  .metrics-hero {
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+  }
+  .metric-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:20px 18px;
+    position:relative; overflow:hidden;
+    transition:border-color .2s, transform .2s;
+  }
+  .metric-card:hover { border-color:var(--border2); transform:translateY(-2px); }
+  .metric-card::before {
+    content:''; position:absolute;
+    top:0; left:0; right:0; height:2px;
+    background:var(--card-accent, var(--accent));
+    opacity:.6;
+  }
+  .metric-label { font-size:11px; font-family:var(--mono); color:var(--muted); letter-spacing:.08em; margin-bottom:10px; }
+  .metric-value { font-size:28px; font-weight:600; color:var(--text); line-height:1; }
+  .metric-unit { font-size:13px; color:var(--muted); margin-left:4px; }
+  .metric-sub { font-size:11px; color:var(--muted); margin-top:6px; }
+  .metric-badge {
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:11px; font-family:var(--mono);
+    padding:3px 8px; border-radius:6px; margin-top:8px;
+  }
+  .badge-ok { background:rgba(74,240,196,0.12); color:var(--accent2); }
+  .badge-warn { background:rgba(240,145,74,0.12); color:var(--accent3); }
+  .badge-danger { background:rgba(240,90,90,0.12); color:var(--danger); }
+
+  /* ── RESULTS TABLE ── */
+  .results-grid {
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;
+  }
+
+  .data-table { width:100%; border-collapse:collapse; }
+  .data-table tr { border-bottom:1px solid var(--border); }
+  .data-table tr:last-child { border-bottom:none; }
+  .data-table td { padding:9px 0; font-size:13px; }
+  .data-table td:first-child { color:var(--muted); }
+  .data-table td:last-child { text-align:right; font-family:var(--mono); color:var(--text); }
+
+  /* ── HISTORY ── */
+  .history-list { display:flex; flex-direction:column; gap:10px; }
+  .history-item {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:16px 20px;
+    display:flex; align-items:center; gap:16px;
+    cursor:pointer; transition:all .2s;
+  }
+  .history-item:hover { border-color:var(--border2); background:var(--glass); }
+  .history-icon {
+    width:40px; height:40px; border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px; flex-shrink:0;
+  }
+  .history-info { flex:1; }
+  .history-name { font-size:14px; font-weight:500; color:var(--text); }
+  .history-meta { font-size:12px; color:var(--muted); font-family:var(--mono); margin-top:2px; }
+  .history-chips { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .chip {
+    font-size:10px; font-family:var(--mono); padding:2px 8px;
+    border-radius:6px; border:1px solid var(--border);
+  }
+  .chip-fps { color:var(--accent); border-color:rgba(200,241,53,0.2); background:rgba(200,241,53,0.06); }
+  .chip-mqtt { color:var(--accent2); border-color:rgba(74,240,196,0.2); background:rgba(74,240,196,0.06); }
+  .chip-cpu { color:var(--accent3); border-color:rgba(240,145,74,0.2); background:rgba(240,145,74,0.06); }
+  .chip-temp { color:#b8a0f0; border-color:rgba(184,160,240,0.2); background:rgba(184,160,240,0.06); }
+
+  .history-action {
+    padding:8px 16px; border-radius:8px;
+    background:var(--glass); border:1px solid var(--border);
+    color:var(--muted); font-size:12px; font-family:var(--mono);
+    cursor:pointer; transition:all .2s;
+  }
+  .history-action:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* ── FILE UPLOAD ── */
+  .upload-zone {
+    border:2px dashed var(--border2); border-radius:16px;
+    padding:40px; text-align:center; cursor:pointer;
+    transition:all .2s;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color:rgba(200,241,53,0.4);
+    background:rgba(200,241,53,0.03);
+  }
+  .upload-icon { font-size:40px; margin-bottom:12px; }
+  .upload-text { font-size:14px; color:var(--muted); }
+  .upload-sub { font-size:12px; color:var(--muted); opacity:.6; margin-top:6px; font-family:var(--mono); }
+
+  /* ── MINI CHARTS (pure CSS sparklines) ── */
+  .sparkline { display:flex; align-items:flex-end; gap:3px; height:40px; }
+  .spark-bar {
+    flex:1; border-radius:3px 3px 0 0;
+    background:var(--bar-color, var(--accent));
+    opacity:.7; min-height:4px;
+    transition:opacity .2s;
+  }
+  .spark-bar:hover { opacity:1; }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:3px; }
+
+  /* ── DIVIDER ── */
+  .divider {
+    height:1px; background:var(--border); margin:4px 0;
+  }
+
+  /* File input hidden */
+  #fileInput { display:none; }
+
+  /* Empty state */
+  .empty-state {
+    text-align:center; padding:40px;
+    color:var(--muted); font-size:13px;
+  }
+  .empty-icon { font-size:48px; margin-bottom:12px; opacity:.4; }
+
+  /* Running indicator */
+  .running-badge {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 14px; border-radius:20px;
+    background:rgba(200,241,53,0.1); border:1px solid rgba(200,241,53,0.3);
+    color:var(--accent); font-size:12px; font-family:var(--mono);
+    animation:fadeIn .3s ease;
+  }
+  .spin {
+    width:8px; height:8px; border:1.5px solid rgba(200,241,53,0.3);
+    border-top-color:var(--accent); border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Summary display area */
+  .summary-pre {
+    background:#060810; border:1px solid var(--border);
+    border-radius:12px; padding:20px;
+    font-family:var(--mono); font-size:12px; line-height:1.8;
+    color:#c8ccd8; white-space:pre-wrap; overflow-x:auto;
+    max-height:400px; overflow-y:auto;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="logo">
+      <div class="logo-dot"></div>
+      SHOS · BENCHMARK CONSOLE
+    </div>
+    <div class="header-status">
+      <div class="status-chip" id="mqttChip">
+        <div class="dot"></div>
+        MQTT localhost:1883
+      </div>
+      <div class="status-chip" id="piChip">
+        <div class="dot"></div>
+        Raspberry Pi 4B
+      </div>
+      <div class="header-time" id="clock">--:--:--</div>
+    </div>
+  </header>
+
+  <!-- ── SIDEBAR ── -->
+  <aside>
+    <div class="sidebar-section">Navigation</div>
+
+    <div class="nav-item active" onclick="showSection('launch')">
+      <span class="nav-icon">⚡</span> Lancer
+    </div>
+    <div class="nav-item" onclick="showSection('results')">
+      <span class="nav-icon">📊</span> Résultats
+      <span class="nav-badge" id="resultCount">0</span>
+    </div>
+    <div class="nav-item" onclick="showSection('history')">
+      <span class="nav-icon">🗂</span> Historique
+    </div>
+    <div class="nav-item" onclick="showSection('import')">
+      <span class="nav-icon">📁</span> Importer CSV
+    </div>
+
+    <div class="divider" style="margin:16px 0;"></div>
+    <div class="sidebar-section">Dernière mesure</div>
+
+    <div style="padding:0 4px;">
+      <div style="font-size:11px; color:var(--muted); font-family:var(--mono); line-height:1.9;" id="sidebar-summary">
+        Aucune mesure chargée.<br>Lancez un benchmark ou importez des fichiers CSV.
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <main>
+
+    <!-- ══ SECTION LAUNCH ══ -->
+    <div class="section active" id="sec-launch">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Lancer un benchmark</div>
+          <div class="page-sub">// Raspberry Pi 4 Model B Rev 1.5 · Python 3.11.2</div>
+        </div>
+        <div id="runningBadge" style="display:none">
+          <div class="running-badge">
+            <div class="spin"></div>
+            Benchmark en cours...
+          </div>
+        </div>
+      </div>
+
+      <div class="launch-grid">
+        <!-- Config panel -->
+        <div class="glass-card">
+          <div class="card-title">Configuration</div>
+
+          <div class="card-title" style="margin-bottom:8px;">Mode</div>
+          <div class="mode-grid">
+            <div class="mode-btn selected" data-mode="full" onclick="selectMode(this)">full</div>
+            <div class="mode-btn" data-mode="fps" onclick="selectMode(this)">fps</div>
+            <div class="mode-btn" data-mode="system" onclick="selectMode(this)">system</div>
+            <div class="mode-btn" data-mode="mqtt" onclick="selectMode(this)">mqtt</div>
+          </div>
+
+          <div class="param-row">
+            <span class="param-label">Durée</span>
+            <input class="param-input" type="number" id="param-duration" value="60" min="10" max="300">
+            <span style="font-size:12px;color:var(--muted);font-family:var(--mono);">s</span>
+          </div>
+          <div class="param-row">
+            <span class="param-label">Préfixe</span>
+            <input class="param-input" type="text" id="param-output" value="chapitre4" placeholder="nom fichier">
+          </div>
+          <div class="param-row">
+            <span class="param-label">MQTT msgs</span>
+            <input class="param-input" type="number" id="param-mqtt" value="100" min="10" max="1000">
+          </div>
+          <div class="param-row">
+            <span class="param-label">Topic vision</span>
+            <input class="param-input" type="text" id="param-topic" value="shos/camera/vision">
+          </div>
+
+          <div class="card-title" style="margin-top:16px; margin-bottom:8px;">Commande générée</div>
+          <div style="background:#060810;border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-family:var(--mono);font-size:11px;color:var(--accent);word-break:break-all;" id="cmdPreview">
+            python3 benchmark.py --mode full --duration 60 --output chapitre4
+          </div>
+        </div>
+
+        <!-- Terminal -->
+        <div class="glass-card" style="display:flex;flex-direction:column;gap:12px;">
+          <div class="card-title">Terminal de sortie</div>
+          <div class="terminal">
+            <div class="terminal-bar">
+              <div class="t-dot" style="background:#f05a5a;"></div>
+              <div class="t-dot" style="background:#f0b04a;"></div>
+              <div class="t-dot" style="background:#c8f135;"></div>
+              <span class="terminal-title">jmk@raspberrypi:~/memoir/NOVA</span>
+            </div>
+            <div class="terminal-body" id="termBody">
+              <div class="log-line">
+                <span class="log-time">--:--:--</span>
+                <span class="log-level-INFO">[INFO]</span>
+                <span class="log-msg">Prêt. Configurez les paramètres et lancez le benchmark.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="progress-wrap" id="progressWrap" style="display:none;">
+            <div class="progress-label">
+              <span id="progressLabel">En cours...</span>
+              <span id="progressPct">0%</span>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+          </div>
+
+          <button class="launch-btn" id="launchBtn" onclick="runBenchmark()">
+            ▶ &nbsp;LANCER LE BENCHMARK
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION RESULTS ══ -->
+    <div class="section" id="sec-results">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Résultats</div>
+          <div class="page-sub" id="results-meta">// Aucune donnée chargée</div>
+        </div>
+      </div>
+
+      <!-- Hero metrics -->
+      <div class="metrics-hero" id="heroMetrics">
+        <div class="metric-card" style="--card-accent:var(--accent);">
+          <div class="metric-label">FPS PIPELINE</div>
+          <div class="metric-value" id="m-fps">—</div>
+          <div class="metric-sub">frames / seconde (E2E)</div>
+          <div class="metric-badge badge-warn" id="m-fps-badge"></div>
+        </div>
+        <div class="metric-card" style="--card-accent:var(--accent2);">
+          <div class="metric-label">LATENCE MQTT</div>
+          <div class="metric-value" id="m-mqtt"><span class="metric-unit">—</span></div>
+          <div class="metric-sub">round-trip moyenne</div>
+          <div class="metric-badge badge-ok" id="m-mqtt-badge"></div>
+        </div>
+        <div class="metric-card" style="--card-accent:var(--accent3);">
+          <div class="metric-label">CPU MOYEN</div>
+          <div class="metric-value" id="m-cpu">—</div>
+          <div class="metric-sub">% pendant le test</div>
+          <div class="metric-badge" id="m-cpu-badge"></div>
+        </div>
+        <div class="metric-card" style="--card-accent:#b8a0f0;">
+          <div class="metric-label">TEMPÉRATURE</div>
+          <div class="metric-value" id="m-temp">—</div>
+          <div class="metric-sub">CPU max mesurée</div>
+          <div class="metric-badge" id="m-temp-badge"></div>
+        </div>
+      </div>
+
+      <!-- Detail tables -->
+      <div class="results-grid">
+        <!-- Vision / FPS -->
+        <div class="glass-card">
+          <div class="card-title">Vision / FPS</div>
+          <table class="data-table" id="tbl-fps">
+            <tr><td>FPS observé</td><td id="d-fps-val">—</td></tr>
+            <tr><td>Frames reçues</td><td id="d-fps-frames">—</td></tr>
+            <tr><td>Intervalle moy.</td><td id="d-fps-interval">—</td></tr>
+            <tr><td>Jitter</td><td id="d-fps-jitter">—</td></tr>
+            <tr><td>Latence E2E moy.</td><td id="d-e2e-mean">—</td></tr>
+            <tr><td>Latence E2E min</td><td id="d-e2e-min">—</td></tr>
+            <tr><td>Latence E2E max</td><td id="d-e2e-max">—</td></tr>
+            <tr><td>Latence E2E P95</td><td id="d-e2e-p95">—</td></tr>
+          </table>
+        </div>
+
+        <!-- MQTT -->
+        <div class="glass-card">
+          <div class="card-title">Latence MQTT</div>
+          <table class="data-table" id="tbl-mqtt">
+            <tr><td>Envoyés / Reçus</td><td id="d-mqtt-ratio">—</td></tr>
+            <tr><td>Perte paquets</td><td id="d-mqtt-loss">—</td></tr>
+            <tr><td>Latence min</td><td id="d-mqtt-min">—</td></tr>
+            <tr><td>Latence moy.</td><td id="d-mqtt-mean">—</td></tr>
+            <tr><td>Latence médiane</td><td id="d-mqtt-median">—</td></tr>
+            <tr><td>Latence max</td><td id="d-mqtt-max">—</td></tr>
+            <tr><td>P95</td><td id="d-mqtt-p95">—</td></tr>
+            <tr><td>P99</td><td id="d-mqtt-p99">—</td></tr>
+          </table>
+          <!-- Sparkline latence -->
+          <div style="margin-top:16px;">
+            <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:8px;">DISTRIBUTION LATENCE (simulée)</div>
+            <div class="sparkline" id="mqttSparkline"></div>
+          </div>
+        </div>
+
+        <!-- System -->
+        <div class="glass-card">
+          <div class="card-title">Ressources système</div>
+          <table class="data-table" id="tbl-sys">
+            <tr><td>CPU moyen</td><td id="d-cpu-mean">—</td></tr>
+            <tr><td>CPU max</td><td id="d-cpu-max">—</td></tr>
+            <tr><td>CPU min</td><td id="d-cpu-min">—</td></tr>
+            <tr><td>RAM moy.</td><td id="d-ram-mean">—</td></tr>
+            <tr><td>RAM max</td><td id="d-ram-max">—</td></tr>
+            <tr><td>Temp. moy.</td><td id="d-temp-mean">—</td></tr>
+            <tr><td>Temp. max</td><td id="d-temp-max">—</td></tr>
+          </table>
+          <!-- CPU sparkline -->
+          <div style="margin-top:16px;">
+            <div style="font-size:10px;color:var(--muted);font-family:var(--mono);margin-bottom:8px;">CPU % (tendance)</div>
+            <div class="sparkline" id="cpuSparkline"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary txt -->
+      <div class="glass-card">
+        <div class="card-title">Rapport complet (summary.txt)</div>
+        <div class="summary-pre" id="summaryContent">Aucun rapport chargé. Importez des fichiers CSV ou lancez un benchmark.</div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION HISTORY ══ -->
+    <div class="section" id="sec-history">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Historique des benchmarks</div>
+          <div class="page-sub">// Sessions importées depuis results/</div>
+        </div>
+      </div>
+      <div class="history-list" id="historyList">
+        <div class="empty-state">
+          <div class="empty-icon">📂</div>
+          Aucun historique. Importez vos fichiers CSV depuis l'onglet "Importer CSV".
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SECTION IMPORT ══ -->
+    <div class="section" id="sec-import">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Importer des fichiers CSV</div>
+          <div class="page-sub">// Sélectionner les fichiers générés par benchmark.py dans results/</div>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <div class="card-title">Glisser-déposer ou sélectionner</div>
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()"
+             ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragleave="onDragLeave(event)">
+          <div class="upload-icon">📂</div>
+          <div class="upload-text">Déposez vos fichiers ici ou cliquez pour parcourir</div>
+          <div class="upload-sub">_fps.csv · _mqtt.csv · _system.csv · _summary.txt</div>
+        </div>
+        <input type="file" id="fileInput" multiple accept=".csv,.txt" onchange="onFilesSelected(event)">
+      </div>
+
+      <div class="glass-card" id="importedFilesCard" style="display:none;">
+        <div class="card-title">Fichiers chargés</div>
+        <div id="importedFilesList"></div>
+        <div style="margin-top:16px;">
+          <button class="launch-btn" onclick="applyImported()" style="max-width:260px;">
+            ✓ &nbsp;Afficher les résultats
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+const state = {
+  mode: 'full',
+  sessions: [],           // historique des sessions importées
+  currentData: null,      // données parsées de la session active
+  benchmarkRunning: false,
+  benchmarkTimer: null,
+  importedFiles: {},      // { fps, mqtt, system, summary }
+};
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════════════════════════════════════
+// MODE SELECTOR
+// ═══════════════════════════════════════════════
+function selectMode(el) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  state.mode = el.dataset.mode;
+  updateCmdPreview();
+}
+
+function updateCmdPreview() {
+  const d = document.getElementById('param-duration').value;
+  const o = document.getElementById('param-output').value || 'benchmark';
+  const n = document.getElementById('param-mqtt').value;
+  const t = document.getElementById('param-topic').value;
+  let cmd = `python3 benchmark.py --mode ${state.mode} --duration ${d} --output ${o}`;
+  if (state.mode === 'mqtt' || state.mode === 'full') cmd += ` --mqtt-messages ${n}`;
+  if (state.mode === 'fps' || state.mode === 'full') cmd += ` --vision-topic ${t}`;
+  document.getElementById('cmdPreview').textContent = cmd;
+}
+
+['param-duration','param-output','param-mqtt','param-topic'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateCmdPreview);
+});
+
+// ═══════════════════════════════════════════════
+// TERMINAL
+// ═══════════════════════════════════════════════
+function logLine(level, msg) {
+  const body = document.getElementById('termBody');
+  const now = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = `<span class="log-time">${now}</span><span class="log-level-${level}">[${level}]</span><span class="log-msg">&nbsp;${msg}</span>`;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════
+// BENCHMARK SIMULATION
+// (En production : remplacer par appel à l'API Flask de l'app.py)
+// ═══════════════════════════════════════════════
+function runBenchmark() {
+  if (state.benchmarkRunning) return;
+  state.benchmarkRunning = true;
+
+  const duration = parseInt(document.getElementById('param-duration').value) || 60;
+  const mode = state.mode;
+  const output = document.getElementById('param-output').value || 'benchmark';
+
+  document.getElementById('launchBtn').disabled = true;
+  document.getElementById('runningBadge').style.display = 'block';
+  document.getElementById('progressWrap').style.display = 'block';
+
+  // Séquence de logs réaliste basée sur les vrais logs du Pi
+  const logs = [
+    [0,    'INFO',    '╔══ SHOS BENCHMARK démarré ══╗'],
+    [200,  'INFO',    '  Plateforme : Raspberry Pi 4 Model B Rev 1.5'],
+    [400,  'INFO',    `  Mode       : ${mode}`],
+    [600,  'INFO',    `  Durée      : ${duration}s`],
+    [900,  'INFO',    'Picamera2 disponible — mode caméra natif libcamera activé'],
+    [1200, 'INFO',    'SystemMonitor démarré (intervalle=1.0s)'],
+    [1500, 'INFO',    `VisionMQTTObserver — écoute shos/camera/vision pendant ${duration}s`],
+    [1800, 'INFO',    'Abonné à shos/camera/vision (broker=localhost:1883)'],
+    [Math.floor(duration*1000*0.16), 'INFO', `${Math.round(duration*0.16)}s écoulées — 2.5 FPS observés`],
+    [Math.floor(duration*1000*0.33), 'INFO', `${Math.round(duration*0.33)}s écoulées — 2.6 FPS observés`],
+    [Math.floor(duration*1000*0.5),  'INFO', `${Math.round(duration*0.5)}s écoulées — 2.4 FPS observés`],
+    [Math.floor(duration*1000*0.66), 'INFO', `${Math.round(duration*0.66)}s écoulées — 2.3 FPS observés`],
+    [Math.floor(duration*1000*0.83), 'INFO', `${Math.round(duration*0.83)}s écoulées — 1.9 FPS observés`],
+    [Math.floor(duration*1000*0.96), 'WARNING', 'MQTT déconnecté pendant l\'observation.'],
+    [Math.floor(duration*1000*0.97), 'INFO', `CSV FPS/Vision exporté : results/${output}_fps.csv`],
+    [Math.floor(duration*1000*0.975),'INFO', 'Lancement MQTT benchmark (100 messages)...'],
+    [Math.floor(duration*1000*0.98), 'INFO', 'MQTT connecté à localhost:1883 — abonné à shos/benchmark/echo'],
+    [Math.floor(duration*1000*0.985),'INFO', 'Benchmark MQTT round-trip : 100 messages → shos/benchmark/echo'],
+    [Math.floor(duration*1000*0.99), 'INFO', `CSV MQTT exporté : results/${output}_mqtt.csv`],
+    [Math.floor(duration*1000*0.995),'INFO', 'SystemMonitor arrêté — 65 échantillons collectés'],
+    [Math.floor(duration*1000),      'INFO', `╚══ Benchmark terminé. Résumé : results/${output}_summary.txt ══╝`],
+  ];
+
+  const startTime = Date.now();
+  const totalMs = duration * 1000;
+
+  // Progress bar animation
+  const progressInterval = setInterval(() => {
+    const pct = Math.min(100, Math.round(((Date.now() - startTime) / totalMs) * 100));
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('progressLabel').textContent =
+      pct < 90 ? 'Observation vision en cours...' : 'Finalisation...';
+    if (pct >= 100) clearInterval(progressInterval);
+  }, 500);
+
+  // Log scheduling
+  logs.forEach(([delay, level, msg]) => {
+    setTimeout(() => logLine(level, msg), Math.min(delay, totalMs));
+  });
+
+  // Finish
+  setTimeout(() => {
+    state.benchmarkRunning = false;
+    document.getElementById('launchBtn').disabled = false;
+    document.getElementById('runningBadge').style.display = 'none';
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('progressLabel').textContent = 'Terminé';
+    logLine('INFO', '✅ Fichiers CSV disponibles dans results/');
+    logLine('INFO', '→ Importez-les dans l\'onglet "Importer CSV" pour voir les résultats.');
+    clearInterval(progressInterval);
+  }, totalMs);
+}
+
+// ═══════════════════════════════════════════════
+// CSV PARSER
+// ═══════════════════════════════════════════════
+function parseCSV(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  const result = {};
+  lines.slice(1).forEach(line => {  // skip header
+    const parts = line.split(',');
+    if (parts.length >= 2) {
+      const key = parts[0].trim().replace(/"/g,'');
+      const val = parts[1].trim().replace(/"/g,'');
+      result[key] = isNaN(val) ? val : parseFloat(val);
+    }
+  });
+  return result;
+}
+
+function parseSummaryTxt(text) {
+  // Extract key numbers from summary.txt format
+  const lines = text.split('\n');
+  const data = {};
+  lines.forEach(line => {
+    const m = line.match(/^\s+(.+?)\s*:\s*(.+)$/);
+    if (m) data[m[1].trim()] = m[2].trim();
+  });
+  return data;
+}
+
+// ═══════════════════════════════════════════════
+// FILE IMPORT
+// ═══════════════════════════════════════════════
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.add('drag-over');
+}
+function onDragLeave(e) {
+  document.getElementById('uploadZone').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadZone').classList.remove('drag-over');
+  handleFiles(Array.from(e.dataTransfer.files));
+}
+function onFilesSelected(e) {
+  handleFiles(Array.from(e.target.files));
+}
+
+function handleFiles(files) {
+  const card = document.getElementById('importedFilesCard');
+  const list = document.getElementById('importedFilesList');
+  list.innerHTML = '';
+  state.importedFiles = {};
+
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target.result;
+
+      // Identifier le type par le nom
+      if (file.name.includes('_fps')) state.importedFiles.fps = text;
+      else if (file.name.includes('_mqtt')) state.importedFiles.mqtt = text;
+      else if (file.name.includes('_system')) state.importedFiles.system = text;
+      else if (file.name.includes('_summary')) state.importedFiles.summary = text;
+
+      // Afficher dans la liste
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;';
+      const typeEmoji = file.name.includes('fps') ? '📹' : file.name.includes('mqtt') ? '📡' :
+                        file.name.includes('system') ? '💻' : '📄';
+      row.innerHTML = `<span style="font-size:20px;">${typeEmoji}</span>
+        <span style="color:var(--text);font-family:var(--mono);">${file.name}</span>
+        <span style="margin-left:auto;color:var(--muted);font-size:11px;">${(file.size/1024).toFixed(1)} KB</span>
+        <span class="metric-badge badge-ok">✓ chargé</span>`;
+      list.appendChild(row);
+    };
+    reader.readAsText(file);
+  });
+
+  card.style.display = 'block';
+}
+
+function applyImported() {
+  const { fps, mqtt, system, summary } = state.importedFiles;
+
+  // Extraire le préfixe de session depuis les noms
+  const sessionName = document.getElementById('importedFilesList').querySelector('[style*="monospace"]')?.textContent || 'session_' + Date.now();
+  const prefix = sessionName.replace(/_fps\.csv|_mqtt\.csv|_system\.csv|_summary\.txt/,'').replace(/chapitre4_final_|benchmark_/,'');
+
+  const sessionData = { name: prefix, ts: new Date().toLocaleString('fr-FR'), fps: {}, mqtt: {}, sys: {}, summary: '' };
+
+  if (fps) sessionData.fps = parseCSV(fps);
+  if (mqtt) sessionData.mqtt = parseCSV(mqtt);
+  if (system) {
+    // system.csv = multi-ligne, on calcule les stats côté client
+    const lines = system.trim().split('\n').slice(1);
+    const cpus = [], rams = [], temps = [];
+    lines.forEach(l => {
+      const p = l.split(',');
+      if (p[1]) cpus.push(parseFloat(p[1]));
+      if (p[2]) rams.push(parseFloat(p[2]));
+      if (p[3] && p[3].trim() !== 'None') temps.push(parseFloat(p[3]));
+    });
+    const avg = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : null;
+    const max = arr => arr.length ? Math.max(...arr).toFixed(2) : null;
+    const min = arr => arr.length ? Math.min(...arr).toFixed(2) : null;
+    sessionData.sys = { cpuMean: avg(cpus), cpuMax: max(cpus), cpuMin: min(cpus), ramMean: avg(rams), ramMax: max(rams), tempMean: avg(temps), tempMax: max(temps), cpuSeries: cpus };
+    sessionData.mqttSeries = [];  // pas dans system.csv
+  }
+  if (summary) sessionData.summary = summary;
+
+  state.currentData = sessionData;
+  state.sessions.unshift(sessionData);
+  document.getElementById('resultCount').textContent = state.sessions.length;
+
+  renderResults(sessionData);
+  renderHistory();
+  updateSidebarSummary(sessionData);
+
+  // Naviguer vers Résultats
+  showSection('results');
+  document.querySelector('[onclick="showSection(\'results\')"]').classList.add('active');
+  document.querySelector('[onclick="showSection(\'import\')"]').classList.remove('active');
+}
+
+// ═══════════════════════════════════════════════
+// RENDER RESULTS
+// ═══════════════════════════════════════════════
+function renderResults(d) {
+  // Meta
+  document.getElementById('results-meta').textContent = `// Session : ${d.name} · ${d.ts}`;
+
+  // FPS
+  const fps = d.fps;
+  const fpsVal = fps['FPS observé'] || fps['FPS pipeline'] || null;
+  document.getElementById('m-fps').innerHTML = fpsVal ? `${fpsVal}<span class="metric-unit">fps</span>` : '—';
+  document.getElementById('m-fps-badge').textContent = fpsVal < 5 ? '⚠ Goulot IA' : fpsVal < 15 ? '~ Acceptable' : '✓ Nominal';
+  document.getElementById('m-fps-badge').className = 'metric-badge ' + (fpsVal < 5 ? 'badge-warn' : fpsVal < 15 ? 'badge-warn' : 'badge-ok');
+
+  setCell('d-fps-val', fps['FPS observé'], 'fps');
+  setCell('d-fps-frames', fps['Frames reçues']);
+  setCell('d-fps-interval', fps['Intervalle inter-frame'], 'ms');
+  setCell('d-fps-jitter', fps['Jitter'], 'ms');
+  setCell('d-e2e-mean', fps['Latence E2E moyenne'], 'ms');
+  setCell('d-e2e-min', fps['Latence E2E min'], 'ms');
+  setCell('d-e2e-max', fps['Latence E2E max'], 'ms');
+  setCell('d-e2e-p95', fps['Latence E2E P95'], 'ms');
+
+  // MQTT
+  const mqtt = d.mqtt;
+  const mqttMean = mqtt['Latence moyenne'] || null;
+  document.getElementById('m-mqtt').innerHTML = mqttMean ? `${mqttMean}<span class="metric-unit">ms</span>` : '—';
+  document.getElementById('m-mqtt-badge').textContent = mqttMean < 1 ? '✓ Excellent' : mqttMean < 5 ? '✓ Bon' : '~ Acceptable';
+  document.getElementById('m-mqtt-badge').className = 'metric-badge ' + (mqttMean < 5 ? 'badge-ok' : 'badge-warn');
+
+  setCell('d-mqtt-ratio', (mqtt['Messages envoyés'] && mqtt['Messages reçus']) ? `${mqtt['Messages envoyés']} / ${mqtt['Messages reçus']}` : '—');
+  setCell('d-mqtt-loss', mqtt['Perte paquets'], '%');
+  setCell('d-mqtt-min', mqtt['Latence min'], 'ms');
+  setCell('d-mqtt-mean', mqtt['Latence moyenne'], 'ms');
+  setCell('d-mqtt-median', mqtt['Latence médiane'], 'ms');
+  setCell('d-mqtt-max', mqtt['Latence max'], 'ms');
+  setCell('d-mqtt-p95', mqtt['Latence P95'], 'ms');
+  setCell('d-mqtt-p99', mqtt['Latence P99'], 'ms');
+
+  // System
+  const sys = d.sys;
+  const cpuMean = sys.cpuMean;
+  const tempMax = sys.tempMax;
+
+  document.getElementById('m-cpu').innerHTML = cpuMean ? `${cpuMean}<span class="metric-unit">%</span>` : '—';
+  document.getElementById('m-cpu-badge').textContent = cpuMean < 50 ? '✓ Nominal' : cpuMean < 80 ? '~ Chargé' : '⚠ Saturé';
+  document.getElementById('m-cpu-badge').className = 'metric-badge ' + (cpuMean < 50 ? 'badge-ok' : cpuMean < 80 ? 'badge-warn' : 'badge-danger');
+
+  document.getElementById('m-temp').innerHTML = tempMax ? `${tempMax}<span class="metric-unit">°C</span>` : '—';
+  document.getElementById('m-temp-badge').textContent = tempMax < 60 ? '✓ Stable' : tempMax < 75 ? '~ Chaud' : '⚠ Critique';
+  document.getElementById('m-temp-badge').className = 'metric-badge ' + (tempMax < 60 ? 'badge-ok' : tempMax < 75 ? 'badge-warn' : 'badge-danger');
+
+  setCell('d-cpu-mean', sys.cpuMean, '%');
+  setCell('d-cpu-max', sys.cpuMax, '%');
+  setCell('d-cpu-min', sys.cpuMin, '%');
+  setCell('d-ram-mean', sys.ramMean, '%');
+  setCell('d-ram-max', sys.ramMax, '%');
+  setCell('d-temp-mean', sys.tempMean, '°C');
+  setCell('d-temp-max', sys.tempMax, '°C');
+
+  // Sparklines
+  renderSparkline('cpuSparkline', sys.cpuSeries || [], 'var(--accent3)', 100);
+  renderMQTTSparkline(mqtt);
+
+  // Summary
+  if (d.summary) {
+    document.getElementById('summaryContent').textContent = d.summary;
+  }
+}
+
+function setCell(id, val, unit) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (val === null || val === undefined || val === '' || isNaN(parseFloat(val))) {
+    el.textContent = '—';
+  } else {
+    el.textContent = unit ? `${val} ${unit}` : val;
+  }
+}
+
+function renderSparkline(containerId, data, color, maxVal) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+  if (!data.length) return;
+  const sample = data.length > 20 ? data.filter((_,i) => i % Math.ceil(data.length/20) === 0) : data;
+  sample.forEach(v => {
+    const bar = document.createElement('div');
+    bar.className = 'spark-bar';
+    bar.style.setProperty('--bar-color', color);
+    bar.style.height = Math.max(4, (v / maxVal) * 100) + '%';
+    bar.title = v + (maxVal === 100 ? '%' : '');
+    container.appendChild(bar);
+  });
+}
+
+function renderMQTTSparkline(mqtt) {
+  // On simule la distribution depuis min/moy/max/p95
+  const min = parseFloat(mqtt['Latence min']) || 0.3;
+  const mean = parseFloat(mqtt['Latence moyenne']) || 0.6;
+  const max = parseFloat(mqtt['Latence max']) || 3;
+  const p95 = parseFloat(mqtt['Latence P95']) || 0.8;
+  const vals = [min, min*1.2, mean*0.8, mean, mean, mean*1.1, mean*1.2, p95, p95*1.1, max];
+  renderSparkline('mqttSparkline', vals, 'var(--accent2)', max * 1.2);
+}
+
+// ═══════════════════════════════════════════════
+// HISTORY
+// ═══════════════════════════════════════════════
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (!state.sessions.length) {
+    list.innerHTML = '<div class="empty-state"><div class="empty-icon">📂</div>Aucun historique disponible.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  state.sessions.forEach((s, i) => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    const fpsVal = s.fps['FPS observé'];
+    const mqttVal = s.mqtt['Latence moyenne'];
+    const cpuVal = s.sys.cpuMean;
+    const tempVal = s.sys.tempMax;
+    div.innerHTML = `
+      <div class="history-icon" style="background:rgba(200,241,53,0.08);">📊</div>
+      <div class="history-info">
+        <div class="history-name">${s.name || 'Session ' + (i+1)}</div>
+        <div class="history-meta">${s.ts}</div>
+        <div class="history-chips">
+          ${fpsVal ? `<span class="chip chip-fps">FPS ${fpsVal}</span>` : ''}
+          ${mqttVal ? `<span class="chip chip-mqtt">MQTT ${mqttVal}ms</span>` : ''}
+          ${cpuVal ? `<span class="chip chip-cpu">CPU ${cpuVal}%</span>` : ''}
+          ${tempVal ? `<span class="chip chip-temp">${tempVal}°C</span>` : ''}
+        </div>
+      </div>
+      <button class="history-action" onclick="loadSession(${i})">Charger</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function loadSession(i) {
+  state.currentData = state.sessions[i];
+  renderResults(state.currentData);
+  showSection('results');
+  document.querySelector('[onclick="showSection(\'results\')"]').classList.add('active');
+  document.querySelector('[onclick="showSection(\'history\')"]').classList.remove('active');
+}
+
+// ═══════════════════════════════════════════════
+// SIDEBAR SUMMARY
+// ═══════════════════════════════════════════════
+function updateSidebarSummary(d) {
+  const el = document.getElementById('sidebar-summary');
+  const fpsVal = d.fps['FPS observé'];
+  const mqttVal = d.mqtt['Latence moyenne'];
+  const cpuVal = d.sys.cpuMean;
+  const tempVal = d.sys.tempMax;
+  el.innerHTML = `
+    FPS pipeline&nbsp;&nbsp;: <span style="color:var(--accent)">${fpsVal || '—'} fps</span><br>
+    MQTT latence : <span style="color:var(--accent2)">${mqttVal || '—'} ms</span><br>
+    CPU moyen&nbsp;&nbsp;&nbsp;: <span style="color:var(--accent3)">${cpuVal || '—'} %</span><br>
+    Temp. max&nbsp;&nbsp;&nbsp;: <span style="color:#b8a0f0">${tempVal || '—'} °C</span><br>
+    <span style="opacity:.5;font-size:10px;">${d.ts}</span>
+  `;
+}
+
+// ═══════════════════════════════════════════════
+// DONNÉES PRÉCÉDENTES — pré-charger la session du 10/05
+// (Vrais chiffres issus des benchmarks effectués)
+// ═══════════════════════════════════════════════
+const previousSession = {
+  name: 'chapitre4_final_20260510_220424',
+  ts: '10/05/2026, 22:05:30',
+  fps: {
+    'FPS observé': 1.92,
+    'Frames reçues': 115,
+    'Intervalle inter-frame': 383.06,
+    'Jitter': 56.03,
+    'Latence E2E moyenne': 0.81,
+    'Latence E2E min': 0.62,
+    'Latence E2E max': 3.28,
+    'Latence E2E P95': 1.11,
+  },
+  mqtt: {
+    'Messages envoyés': 100,
+    'Messages reçus': 100,
+    'Perte paquets': 0.0,
+    'Latence min': 0.341,
+    'Latence moyenne': 0.586,
+    'Latence médiane': 0.522,
+    'Latence max': 2.905,
+    'Latence P95': 0.745,
+    'Latence P99': 2.905,
+  },
+  sys: {
+    cpuMean: 24.31, cpuMax: 53.4, cpuMin: 0.0,
+    ramMean: 30.52, ramMax: 30.9,
+    tempMean: 50.48, tempMax: 53.5,
+    cpuSeries: [0,12,24,35,48,53,45,32,20,18,24,30,40,28,22,26,31,27,24,19],
+  },
+  summary: `======================================================================
+SHOS — RAPPORT DE BENCHMARK
+Date       : 2026-05-10 22:05:30
+Plateforme : Raspberry Pi 4 Model B Rev 1.5
+OS         : Linux-6.12.75+rpt-rpi-v8-aarch64-with-glibc2.36
+Python     : 3.11.2
+Durée test : 60 secondes
+======================================================================
+
+── 1. PERFORMANCES VIDÉO / DÉTECTION ──────────────────────────────
+  FPS observé (pipeline)  : 1.92 fps
+  Frames reçues           : 115
+  Topic MQTT observé      : shos/camera/vision
+  Intervalle inter-frame  : 383.06 ms (moy)
+  Jitter inter-frame      : 56.03 ms (écart-type)
+  Latence E2E (moy)       : 0.81 ms
+  Latence E2E (min)       : 0.62 ms
+  Latence E2E (max)       : 3.28 ms
+  Latence E2E (P95)       : 1.11 ms
+  Frames avec timestamp   : 115
+
+── 2. RESSOURCES SYSTÈME ──────────────────────────────────────────
+  CPU moyen               : 24.31 %
+  CPU max (pic)           : 53.4 %
+  CPU min                 : 0.0 %
+  RAM utilisée (moy)      : 30.52 %
+  RAM utilisée (max)      : 30.9 %
+  Température CPU (moy)   : 50.48 °C
+  Température CPU (max)   : 53.5 °C
+
+── 3. LATENCE MQTT ────────────────────────────────────────────────
+  Messages envoyés        : 100
+  Messages reçus          : 100
+  Perte paquets           : 0.0 %
+  Latence moyenne         : 0.586 ms
+  Latence médiane         : 0.522 ms
+  Latence min             : 0.341 ms
+  Latence max             : 2.905 ms
+  Latence P95             : 0.745 ms
+  Latence P99             : 2.905 ms
+
+======================================================================
+FIN DU RAPPORT — Fichiers CSV détaillés dans le dossier results/
+======================================================================`,
+};
+
+// Charger la session précédente au démarrage
+state.sessions.push(previousSession);
+state.currentData = previousSession;
+document.getElementById('resultCount').textContent = 1;
+renderResults(previousSession);
+renderHistory();
+updateSidebarSummary(previousSession);
+</script>
+</body>
+</html>
