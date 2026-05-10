@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.O.S — ESP32-CAM</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
+    <style>
+    /* ═══════════════════════════════════════════════════════
+       S.H.O.S  ·  ESP32-CAM  ·  Apple Vision Pro Style
+       Glassmorphism warm-grey · Bento grid · Floating panels
+    ═══════════════════════════════════════════════════════ */
+    :root {
+        --glass:      rgba(255,255,255,0.10);
+        --glass-card: rgba(255,255,255,0.13);
+        --glass-hi:   rgba(255,255,255,0.18);
+        --glass-btn:  rgba(255,255,255,0.12);
+        --border:     rgba(255,255,255,0.18);
+        --border-s:   rgba(255,255,255,0.10);
+        --blur:       blur(28px) saturate(160%);
+        --blur-sm:    blur(16px) saturate(140%);
+        --blue:       #4da6ff;
+        --blue-dim:   rgba(77,166,255,0.16);
+        --teal:       #30d5c8;
+        --green:      #34c759;
+        --red:        #ff453a;
+        --amber:      #ffa340;
+        --t1: rgba(255,255,255,0.94);
+        --t2: rgba(255,255,255,0.55);
+        --t3: rgba(255,255,255,0.28);
+        --font: 'DM Sans', -apple-system, sans-serif;
+        --mono: 'DM Mono', monospace;
+        --r:    16px;
+        --r-sm:  9px;
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html, body { height:100%; font-family:var(--font); overflow:hidden; }
+
+    body {
+        background:
+            radial-gradient(ellipse 80% 60% at 20% 25%, rgba(160,150,130,0.30) 0%, transparent 60%),
+            radial-gradient(ellipse 70% 80% at 80% 75%, rgba(100,110,140,0.20) 0%, transparent 55%),
+            radial-gradient(ellipse 120% 120% at 50% 50%, #22201c 0%, #131210 100%);
+        color: var(--t1);
+    }
+
+    /* ── CHROME ──────────────────────────────── */
+    .chrome {
+        position:fixed; inset:0; z-index:1;
+        display:flex; align-items:center; justify-content:center;
+        padding:16px;
+    }
+
+    /* ── MAIN PANEL ──────────────────────────── */
+    .panel {
+        position:relative;
+        width:100%; max-width:1060px;
+        height:calc(100vh - 32px); max-height:680px;
+        background:var(--glass);
+        backdrop-filter:var(--blur);
+        -webkit-backdrop-filter:var(--blur);
+        border:1px solid var(--border);
+        border-radius:22px; overflow:hidden;
+        display:flex; flex-direction:column;
+        box-shadow:
+            0 40px 100px rgba(0,0,0,0.50),
+            0 0 0 0.5px rgba(255,255,255,0.07) inset,
+            0 1.5px 0 rgba(255,255,255,0.20) inset;
+        animation:panelIn .5s cubic-bezier(.34,1.3,.64,1) both;
+    }
+    @keyframes panelIn { from{opacity:0;transform:scale(.95) translateY(16px)} to{opacity:1;transform:none} }
+
+    .panel::after {
+        content:''; position:absolute; top:0; left:12%; right:12%; height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
+        pointer-events:none; z-index:10;
+    }
+
+    /* ── TOPBAR ──────────────────────────────── */
+    .topbar {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:14px 20px 12px;
+        border-bottom:1px solid var(--border-s);
+        flex-shrink:0; gap:10px;
+    }
+    .tb-left { display:flex; align-items:center; gap:10px; }
+    .logo-gem {
+        width:30px; height:30px; border-radius:9px;
+        background:rgba(255,255,255,.13); border:1px solid rgba(255,255,255,.22);
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .logo-gem svg { width:14px; height:14px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .brand   { font-size:14px; font-weight:600; color:var(--t1); letter-spacing:.05em; }
+    .sub-lbl { font-size:11px; color:var(--t3); font-weight:400; }
+
+    .tb-right { display:flex; align-items:center; gap:8px; }
+
+    .status-pill {
+        display:flex; align-items:center; gap:5px;
+        padding:5px 12px; border-radius:16px;
+        background:rgba(255,255,255,.08); border:1px solid var(--border-s);
+        font-size:11px; font-weight:500; color:var(--t2);
+    }
+    .s-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .s-on  { background:var(--green); box-shadow:0 0 6px var(--green); animation:pg 2s ease-in-out infinite; }
+    .s-off { background:var(--red);   animation:blink 1s ease-in-out infinite; }
+    .s-wait{ background:var(--amber); }
+    @keyframes pg    { 0%,100%{opacity:1} 50%{opacity:.4} }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .btn-back {
+        display:flex; align-items:center; gap:5px;
+        padding:5px 12px; border-radius:14px;
+        background:rgba(255,255,255,.08); border:1px solid var(--border-s);
+        font-size:11px; font-weight:500; color:var(--t2);
+        text-decoration:none; transition:all .18s;
+    }
+    .btn-back:hover { background:rgba(255,255,255,.14); color:var(--t1); border-color:var(--border); }
+
+    /* ── CONFIG STRIP ────────────────────────── */
+    .config-strip {
+        display:flex; align-items:center; gap:8px;
+        padding:9px 18px;
+        border-bottom:1px solid var(--border-s);
+        flex-shrink:0;
+    }
+    .cfg-lbl { font-size:11px; color:var(--t3); font-weight:500; letter-spacing:.05em; white-space:nowrap; }
+    .cfg-input {
+        flex:1; max-width:220px;
+        padding:7px 12px;
+        background:rgba(255,255,255,.08); border:1px solid var(--border-s);
+        border-radius:var(--r-sm); color:var(--t1);
+        font-size:12px; font-family:var(--mono); outline:none;
+        transition:border-color .18s, background .18s;
+    }
+    .cfg-input:focus { border-color:rgba(77,166,255,.45); background:rgba(77,166,255,.07); }
+    .cfg-input::placeholder { color:var(--t3); }
+    .btn-connect {
+        display:flex; align-items:center; gap:6px;
+        padding:7px 16px; border-radius:var(--r-sm);
+        background:linear-gradient(135deg,var(--blue),var(--teal));
+        border:none; color:#000; font-size:12px; font-weight:600;
+        font-family:var(--font); cursor:pointer;
+        transition:all .2s cubic-bezier(.34,1.3,.64,1);
+        box-shadow:0 3px 14px rgba(77,166,255,.28);
+    }
+    .btn-connect:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(77,166,255,.38); }
+    .btn-connect svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+
+    .resolution-chips { display:flex; gap:5px; margin-left:auto; }
+    .res-chip {
+        padding:4px 10px; border-radius:10px; font-size:10px; font-weight:500;
+        background:rgba(255,255,255,.08); border:1px solid var(--border-s);
+        color:var(--t2); cursor:pointer; transition:all .16s;
+    }
+    .res-chip.active { background:var(--blue-dim); border-color:rgba(77,166,255,.4); color:var(--blue); }
+
+    /* ── BENTO GRID ──────────────────────────── */
+    .bento {
+        flex:1; min-height:0;
+        display:grid;
+        grid-template-columns: 1fr 260px;
+        grid-template-rows: 1fr 140px;
+        gap:10px; padding:10px 14px 12px;
+    }
+
+    /* ── GLASS CARD ──────────────────────────── */
+    .card {
+        background:var(--glass-card);
+        backdrop-filter:var(--blur-sm);
+        -webkit-backdrop-filter:var(--blur-sm);
+        border:1px solid var(--border);
+        border-radius:var(--r); overflow:hidden;
+        position:relative;
+        box-shadow:0 6px 24px rgba(0,0,0,.26), 0 1px 0 rgba(255,255,255,.10) inset;
+        animation:cardIn .4s cubic-bezier(.34,1.2,.64,1) both;
+    }
+    @keyframes cardIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+    .card:nth-child(1){animation-delay:.06s}
+    .card:nth-child(2){animation-delay:.10s}
+    .card:nth-child(3){animation-delay:.14s}
+
+    .card::after {
+        content:''; position:absolute; top:0; left:10%; right:10%; height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
+        pointer-events:none;
+    }
+
+    .card-head {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:10px 14px 8px;
+        border-bottom:1px solid rgba(255,255,255,.06);
+        flex-shrink:0;
+    }
+    .card-head-left { display:flex; align-items:center; gap:7px; }
+    .card-ico {
+        width:22px; height:22px; border-radius:6px;
+        display:flex; align-items:center; justify-content:center;
+    }
+    .card-ico svg { width:12px; height:12px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .ic-red    { background:rgba(255,69,58,.22);  border:1px solid rgba(255,69,58,.35); }
+    .ic-red    svg { stroke:var(--red); }
+    .ic-blue   { background:rgba(77,166,255,.20);  border:1px solid rgba(77,166,255,.30); }
+    .ic-blue   svg { stroke:var(--blue); }
+    .ic-green  { background:rgba(52,199,89,.18);   border:1px solid rgba(52,199,89,.28); }
+    .ic-green  svg { stroke:var(--green); }
+    .ic-amber  { background:rgba(255,163,64,.18);  border:1px solid rgba(255,163,64,.28); }
+    .ic-amber  svg { stroke:var(--amber); }
+    .ic-grey   { background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.16); }
+    .ic-grey   svg { stroke:var(--t2); }
+
+    .card-lbl { font-size:10px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--t3); }
+
+    /* ── VIDEO FEED ──────────────────────────── */
+    .c-video { grid-column:1; grid-row:1; display:flex; flex-direction:column; }
+    .vid-area {
+        flex:1; min-height:0; position:relative;
+        background:#080808;
+        overflow:hidden;
+        border-radius:0 0 var(--r) var(--r);
+    }
+    #stream-video {
+        width:100%; height:100%; object-fit:cover;
+        display:block;
+        transition:opacity .3s ease;
+    }
+    .vid-placeholder {
+        position:absolute; inset:0;
+        display:flex; flex-direction:column;
+        align-items:center; justify-content:center;
+        gap:10px; color:var(--t3);
+    }
+    .vid-placeholder svg { width:40px; height:40px; fill:none; stroke:currentColor; stroke-width:1.2; opacity:.4; }
+    .vid-placeholder p { font-size:12px; }
+    .vid-overlay-tl, .vid-overlay-tr {
+        position:absolute; top:8px;
+        display:flex; gap:5px; align-items:center;
+    }
+    .vid-overlay-tl { left:8px; }
+    .vid-overlay-tr { right:8px; }
+    .vid-badge {
+        display:flex; align-items:center; gap:4px;
+        padding:3px 8px; border-radius:8px; font-size:10px; font-weight:500;
+        backdrop-filter:blur(12px); font-family:var(--mono);
+    }
+    .vb-live  { background:rgba(255,69,58,.72); color:#fff; }
+    .vb-res   { background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.15); color:var(--t2); }
+    .vb-fps   { background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.12); color:var(--teal); }
+
+    /* ── RIGHT COLUMN ────────────────────────── */
+    .c-telemetry { grid-column:2; grid-row:1; display:flex; flex-direction:column; }
+    .tele-body { flex:1; overflow-y:auto; padding:8px 12px 10px; scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.08) transparent; }
+
+    /* Stats tiles 2×3 */
+    .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:10px; }
+    .stat-tile {
+        padding:9px 10px;
+        background:rgba(255,255,255,.05);
+        border:1px solid rgba(255,255,255,.08);
+        border-radius:var(--r-sm);
+    }
+    .st-key { font-size:9px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; }
+    .st-val { font-size:16px; font-weight:300; color:var(--t1); margin-top:2px; font-variant-numeric:tabular-nums; }
+    .st-val.red   { color:var(--red); }
+    .st-val.green { color:var(--green); }
+    .st-val.amber { color:var(--amber); }
+
+    /* Face counter */
+    .face-row {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:8px 10px;
+        background:rgba(77,166,255,.08); border:1px solid rgba(77,166,255,.22);
+        border-radius:var(--r-sm); margin-bottom:8px;
+    }
+    .face-lbl { font-size:11px; color:var(--blue); display:flex; align-items:center; gap:6px; }
+    .face-lbl svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+    .face-count { font-size:22px; font-weight:300; color:var(--blue); font-family:var(--mono); }
+
+    /* WiFi bar */
+    .wifi-bar-wrap { margin-bottom:6px; }
+    .wifi-lbl-row { display:flex; justify-content:space-between; margin-bottom:4px; }
+    .wifi-lbl { font-size:9px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; }
+    .wifi-val { font-size:9px; color:var(--t2); font-family:var(--mono); }
+    .bar-track { height:4px; background:rgba(255,255,255,.08); border-radius:2px; overflow:hidden; }
+    .bar-fill  { height:100%; border-radius:2px; transition:width .5s ease; }
+    .bar-fill.wifi  { background:linear-gradient(90deg,var(--blue),var(--teal)); }
+    .bar-fill.mem   { background:linear-gradient(90deg,var(--green),rgba(52,199,89,.5)); }
+
+    /* ── CONSOLE ─────────────────────────────── */
+    .c-console { grid-column:1; grid-row:2; display:flex; flex-direction:column; }
+    .log-body {
+        flex:1; overflow-y:auto; padding:6px 12px 8px;
+        scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.06) transparent;
+    }
+    .log-line {
+        font-size:10px; font-family:var(--mono); color:var(--t2);
+        line-height:1.6; border-bottom:1px solid rgba(255,255,255,.04); padding:1px 0;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .log-time { color:var(--blue); margin-right:6px; }
+    .log-sys  { color:var(--teal); }
+    .log-warn { color:var(--amber); }
+    .log-err  { color:var(--red); }
+
+    /* ── MINI CHART — SIGNAL ─────────────────── */
+    .c-signal { grid-column:2; grid-row:2; }
+    .signal-body { padding:8px 12px 10px; display:flex; flex-direction:column; gap:6px; height:calc(100% - 40px); }
+    .sig-bars { display:flex; align-items:flex-end; gap:3px; flex:1; }
+    .sig-bars span {
+        flex:1; border-radius:2px 2px 0 0; min-height:4px;
+        background:linear-gradient(180deg,var(--blue),rgba(77,166,255,.25));
+        transition:height .25s ease;
+        box-shadow:0 0 6px rgba(77,166,255,.25);
+    }
+    .sig-footer { display:flex; justify-content:space-between; }
+    .sig-min, .sig-max { font-size:9px; color:var(--t3); font-family:var(--mono); }
+
+    /* ── TOAST ───────────────────────────────── */
+    .toast {
+        position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(70px);
+        padding:9px 18px; border-radius:14px; font-size:12px; font-weight:500;
+        backdrop-filter:blur(20px); z-index:100; opacity:0; pointer-events:none;
+        display:flex; align-items:center; gap:7px;
+        transition:transform .3s cubic-bezier(.34,1.4,.64,1), opacity .25s;
+        white-space:nowrap;
+    }
+    .toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+    .toast.ok  { background:rgba(52,199,89,.18); border:1px solid rgba(52,199,89,.35); color:var(--green); }
+    .toast.err { background:rgba(255,69,58,.18);  border:1px solid rgba(255,69,58,.35);  color:var(--red); }
+    .toast svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+
+    /* ── RESPONSIVE ──────────────────────────── */
+    @media(max-width:780px) {
+        .bento { grid-template-columns:1fr; grid-template-rows:280px 1fr 120px; }
+        .c-video { grid-column:1; grid-row:1; }
+        .c-telemetry { grid-column:1; grid-row:2; }
+        .c-console { grid-column:1; grid-row:3; }
+        .c-signal { display:none; }
+        html, body { overflow:auto; }
+        .panel { max-height:none; height:auto; }
+        .chrome { align-items:flex-start; }
+    }
+    </style>
+</head>
+<body>
+
+<div class="chrome">
+<main class="panel" aria-label="ESP32-CAM Interface S.H.O.S">
+
+    <!-- ── TOPBAR ─────────────────────────── -->
+    <header class="topbar">
+        <div class="tb-left">
+            <div class="logo-gem" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/><line x1="7" y1="7" x2="7" y2="4"/><line x1="17" y1="7" x2="17" y2="4"/></svg>
+            </div>
+            <div>
+                <div class="brand">ESP32-CAM</div>
+            </div>
+            <span class="sub-lbl">/ Streaming · S.H.O.S</span>
+        </div>
+        <div class="tb-right">
+            <div class="status-pill" role="status" aria-live="polite">
+                <span class="s-dot s-wait" id="s-dot" aria-hidden="true"></span>
+                <span id="s-txt">En attente</span>
+            </div>
+            <a href="/" class="btn-back" aria-label="Retour accueil">← Accueil</a>
+        </div>
+    </header>
+
+    <!-- ── CONFIG STRIP ───────────────────── -->
+    <div class="config-strip">
+        <span class="cfg-lbl">IP ESP32</span>
+        <input
+            type="text"
+            class="cfg-input"
+            id="esp32-ip"
+            placeholder="192.168.1.100"
+            aria-label="Adresse IP de l'ESP32"
+            autocomplete="off"
+            spellcheck="false"
+        >
+        <button class="btn-connect" onclick="connectESP32()" aria-label="Connecter au flux ESP32">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><circle cx="12" cy="20" r="1"/></svg>
+            Connecter
+        </button>
+
+        <div class="resolution-chips" role="group" aria-label="Résolution du flux">
+            <button class="res-chip" data-res="QVGA" onclick="setRes(this)"  aria-pressed="false">QVGA</button>
+            <button class="res-chip active" data-res="VGA" onclick="setRes(this)" aria-pressed="true">VGA</button>
+            <button class="res-chip" data-res="FHD" onclick="setRes(this)"  aria-pressed="false">FHD</button>
+        </div>
+    </div>
+
+    <!-- ── BENTO ──────────────────────────── -->
+    <div class="bento">
+
+        <!-- VIDEO -->
+        <div class="card c-video" role="region" aria-label="Flux vidéo ESP32">
+            <div class="card-head">
+                <div class="card-head-left">
+                    <div class="card-ico ic-red" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/></svg>
+                    </div>
+                    <span class="card-lbl">Flux Vidéo</span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <span class="vid-badge vb-fps" id="badge-fps">— FPS</span>
+                    <span id="badge-res-lbl" class="vid-badge vb-res">VGA</span>
+                </div>
+            </div>
+
+            <div class="vid-area" id="vid-area">
+                <!-- Placeholder -->
+                <div class="vid-placeholder" id="vid-ph">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/><line x1="7" y1="7" x2="7" y2="4"/><line x1="17" y1="7" x2="17" y2="4"/></svg>
+                    <p>Entrez l'IP et connectez-vous</p>
+                </div>
+
+                <!-- Flux MJPEG -->
+                <img id="stream-video"
+                     alt="Flux vidéo ESP32-CAM"
+                     style="display:none;width:100%;height:100%;object-fit:cover;"
+                     onload="onVideoLoad()"
+                     onerror="onVideoError()">
+
+                <!-- Overlays -->
+                <div class="vid-overlay-tl">
+                    <span class="vid-badge vb-live" id="badge-live" style="display:none">● LIVE</span>
+                </div>
+                <div class="vid-overlay-tr">
+                    <span id="badge-time" class="vid-badge vb-res" style="display:none">--:--:--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- TÉLÉMÉTRIE -->
+        <div class="card c-telemetry" role="region" aria-label="Télémétrie ESP32">
+            <div class="card-head">
+                <div class="card-head-left">
+                    <div class="card-ico ic-blue" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </div>
+                    <span class="card-lbl">Télémétrie</span>
+                </div>
+            </div>
+            <div class="tele-body">
+
+                <!-- Détection visages -->
+                <div class="face-row" role="status" aria-live="polite" aria-label="Visages détectés">
+                    <div class="face-lbl">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                        Visages détectés
+                    </div>
+                    <span class="face-count" id="face-count">0</span>
+                </div>
+
+                <!-- Stats grid -->
+                <div class="stats-grid">
+                    <div class="stat-tile">
+                        <div class="st-key">Statut</div>
+                        <div class="st-val" id="v-status">—</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="st-key">FPS</div>
+                        <div class="st-val" id="v-fps">—</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="st-key">Temp. ESP</div>
+                        <div class="st-val" id="v-temp">—</div>
+                    </div>
+                    <div class="stat-tile">
+                        <div class="st-key">Uptime</div>
+                        <div class="st-val" id="v-uptime">—</div>
+                    </div>
+                    <div class="stat-tile" style="grid-column:1/-1">
+                        <div class="st-key">Mémoire libre</div>
+                        <div class="st-val" id="v-memory">—</div>
+                    </div>
+                </div>
+
+                <!-- WiFi RSSI -->
+                <div class="wifi-bar-wrap">
+                    <div class="wifi-lbl-row">
+                        <span class="wifi-lbl">Signal WiFi</span>
+                        <span class="wifi-val" id="v-wifi">— dBm</span>
+                    </div>
+                    <div class="bar-track">
+                        <div class="bar-fill wifi" id="bar-wifi" style="width:0%"></div>
+                    </div>
+                </div>
+
+                <!-- Mémoire -->
+                <div class="wifi-bar-wrap">
+                    <div class="wifi-lbl-row">
+                        <span class="wifi-lbl">Mémoire</span>
+                        <span class="wifi-val" id="v-mem-pct">—</span>
+                    </div>
+                    <div class="bar-track">
+                        <div class="bar-fill mem" id="bar-mem" style="width:0%"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- CONSOLE -->
+        <div class="card c-console" role="region" aria-label="Console système ESP32">
+            <div class="card-head">
+                <div class="card-head-left">
+                    <div class="card-ico ic-grey" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><polyline points="4,17 10,11 4,5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                    </div>
+                    <span class="card-lbl">Console Système</span>
+                </div>
+                <button onclick="clearLog()" style="font-size:9px;color:var(--t3);background:none;border:none;cursor:pointer;font-family:var(--mono);letter-spacing:.08em;" aria-label="Effacer les logs">CLEAR</button>
+            </div>
+            <div class="log-body" id="log-body" role="log" aria-live="polite"></div>
+        </div>
+
+        <!-- SIGNAL CHART -->
+        <div class="card c-signal" role="region" aria-label="Historique signal WiFi">
+            <div class="card-head">
+                <div class="card-head-left">
+                    <div class="card-ico ic-blue" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><circle cx="12" cy="20" r="1"/></svg>
+                    </div>
+                    <span class="card-lbl">Signal WiFi</span>
+                </div>
+                <span id="sig-cur" style="font-size:10px;color:var(--blue);font-family:var(--mono)">— dBm</span>
+            </div>
+            <div class="signal-body">
+                <div class="sig-bars" id="sig-bars" aria-hidden="true">
+                    <!-- barres injectées dynamiquement -->
+                </div>
+                <div class="sig-footer">
+                    <span class="sig-min" id="sig-min">—</span>
+                    <span class="sig-max" id="sig-max">—</span>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /.bento -->
+
+</main>
+</div><!-- /.chrome -->
+
+<!-- Toast -->
+<div class="toast" id="toast" role="alert" aria-live="assertive">
+    <svg id="toast-ico" viewBox="0 0 24 24"></svg>
+    <span id="toast-msg"></span>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   S.H.O.S ESP32-CAM — JavaScript
+   Socket events : esp32_update · esp32_log
+   Emit : request_esp32_data
+═══════════════════════════════════════════════════════ */
+
+const socket = io();
+
+/* ── TOAST ─────────────────────────────────────────── */
+let _tt = null;
+function showToast(msg, type = 'ok') {
+    const t   = document.getElementById('toast');
+    const ico = document.getElementById('toast-ico');
+    const txt = document.getElementById('toast-msg');
+    ico.innerHTML = type === 'ok'
+        ? '<polyline points="20,6 9,17 4,12"/>'
+        : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>';
+    t.className  = 'toast ' + type;
+    txt.textContent = msg;
+    t.classList.add('show');
+    if (_tt) clearTimeout(_tt);
+    _tt = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ── HELPERS ────────────────────────────────────────── */
+function setTxt(id, v) {
+    const el = document.getElementById(id);
+    if (el && el.textContent !== String(v)) el.textContent = v;
+}
+function setDot(on) {
+    const d = document.getElementById('s-dot');
+    const t = document.getElementById('s-txt');
+    if (d) d.className = 's-dot ' + (on === true ? 's-on' : on === false ? 's-off' : 's-wait');
+    if (t) t.textContent = on === true ? 'Connecté' : on === false ? 'Hors ligne' : 'En attente';
+}
+
+/* ── CLOCK ──────────────────────────────────────────── */
+setInterval(() => {
+    const el = document.getElementById('badge-time');
+    if (el && el.style.display !== 'none') {
+        const n = new Date();
+        el.textContent = n.toLocaleTimeString('fr-FR');
+    }
+}, 1000);
+
+/* ── VIDEO ──────────────────────────────────────────── */
+function onVideoLoad() {
+    document.getElementById('vid-ph').style.display    = 'none';
+    document.getElementById('stream-video').style.display = 'block';
+    document.getElementById('badge-live').style.display   = 'flex';
+    document.getElementById('badge-time').style.display   = 'flex';
+    setDot(true);
+    setTxt('v-status', 'ONLINE');
+    document.getElementById('v-status').className = 'st-val green';
+    showToast('Flux ESP32-CAM connecté.', 'ok');
+}
+function onVideoError() {
+    document.getElementById('vid-ph').style.display    = 'flex';
+    document.getElementById('stream-video').style.display = 'none';
+    document.getElementById('badge-live').style.display   = 'none';
+    document.getElementById('badge-time').style.display   = 'none';
+    setDot(false);
+    setTxt('v-status', 'OFFLINE');
+    document.getElementById('v-status').className = 'st-val red';
+}
+
+/* ── CONNECT ─────────────────────────────────────────── */
+function connectESP32() {
+    const ip = document.getElementById('esp32-ip').value.trim();
+    if (!ip) { showToast('Entrez une adresse IP valide.', 'err'); return; }
+
+    localStorage.setItem('esp32-ip', ip);
+    const url = 'http://' + ip + ':81/stream';
+    const img = document.getElementById('stream-video');
+    img.src   = '';            /* reset pour forcer un nouvel onload/onerror */
+    setTimeout(() => { img.src = url; }, 50);
+
+    socket.emit('request_esp32_data', { ip });
+    showToast('Connexion à ' + ip + '…', 'ok');
+    setDot(null);
+    addLog('SYS', 'Connexion initiée → ' + url);
+}
+
+/* ── RÉSOLUTION ─────────────────────────────────────── */
+function setRes(btn) {
+    document.querySelectorAll('.res-chip').forEach(c => {
+        c.classList.remove('active');
+        c.setAttribute('aria-pressed', 'false');
+    });
+    btn.classList.add('active');
+    btn.setAttribute('aria-pressed', 'true');
+    const res = btn.dataset.res;
+    setTxt('badge-res-lbl', res);
+    /* Émettre la résolution à l'ESP32 via Flask si l'endpoint existe */
+    socket.emit('esp32_set_resolution', { resolution: res });
+    addLog('SYS', 'Résolution → ' + res);
+}
+
+/* ── SIGNAL HISTORY ─────────────────────────────────── */
+const sigHist = [];
+const SIG_MAX = 16;
+function pushSignal(rssi) {
+    sigHist.push(rssi);
+    if (sigHist.length > SIG_MAX) sigHist.shift();
+    renderSignal();
+}
+function renderSignal() {
+    const container = document.getElementById('sig-bars');
+    if (!container || !sigHist.length) return;
+    const min = Math.min(...sigHist);
+    const max = Math.max(...sigHist);
+    const range = Math.max(1, max - min);
+
+    /* Synchroniser le nombre de barres */
+    while (container.children.length < sigHist.length) {
+        const s = document.createElement('span');
+        container.appendChild(s);
+    }
+    while (container.children.length > sigHist.length) {
+        container.removeChild(container.lastChild);
+    }
+    sigHist.forEach((v, i) => {
+        const pct = ((v - min) / range) * 90 + 10;
+        container.children[i].style.height = pct.toFixed(1) + '%';
+    });
+
+    setTxt('sig-cur', sigHist[sigHist.length - 1] + ' dBm');
+    setTxt('sig-min', min + ' dBm');
+    setTxt('sig-max', max + ' dBm');
+}
+
+/* ── CONSOLE LOG ─────────────────────────────────────── */
+const MAX_LOGS = 80;
+let logLines   = 0;
+function addLog(type, msg, ts) {
+    const body = document.getElementById('log-body');
+    if (!body) return;
+    const time = ts ? ts + 's' : new Date().toLocaleTimeString('fr-FR');
+    const line = document.createElement('div');
+    line.className = 'log-line ' + (type === 'ERR' ? 'log-err' : type === 'WARN' ? 'log-warn' : type === 'SYS' ? 'log-sys' : '');
+    line.innerHTML = `<span class="log-time">[${time}]</span><span>[${type}]</span> ${escHtml(msg)}`;
+    body.insertBefore(line, body.firstChild);
+    logLines++;
+    if (logLines > MAX_LOGS) { body.lastChild && body.lastChild.remove(); logLines--; }
+}
+function clearLog() {
+    const body = document.getElementById('log-body');
+    if (body) { body.innerHTML = ''; logLines = 0; }
+}
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── SOCKET.IO ───────────────────────────────────────── */
+socket.on('connect',    () => { addLog('SYS', 'Socket.IO connecté au serveur Flask'); });
+socket.on('disconnect', () => { addLog('ERR', 'Déconnexion Socket.IO'); setDot(false); });
+
+/* esp32_update : données télémétrie ESP32 */
+socket.on('esp32_update', (d) => {
+    if (!d) return;
+
+    setDot(true);
+
+    /* FPS */
+    if (d.fps !== undefined) {
+        setTxt('v-fps', d.fps);
+        setTxt('badge-fps', d.fps + ' FPS');
+    }
+    /* Température ESP32 */
+    if (d.temperature !== undefined) {
+        const t = parseFloat(d.temperature).toFixed(1);
+        setTxt('v-temp', t + ' °C');
+        document.getElementById('v-temp').className = 'st-val' + (t > 70 ? ' red' : t > 55 ? ' amber' : '');
+    }
+    /* WiFi RSSI */
+    if (d.wifi_rssi !== undefined) {
+        const rssi = parseInt(d.wifi_rssi);
+        setTxt('v-wifi', rssi + ' dBm');
+        /* Convertir dBm en % : -30 = 100%, -90 = 0% */
+        const pct = Math.min(100, Math.max(0, ((rssi + 90) / 60) * 100));
+        document.getElementById('bar-wifi').style.width = pct.toFixed(0) + '%';
+        pushSignal(rssi);
+    }
+    /* Mémoire */
+    if (d.memory !== undefined) {
+        const mb  = parseFloat(d.memory).toFixed(1);
+        const pct = Math.min(100, Math.max(0, (d.memory / 4) * 100));  /* sur 4 MB max estimé */
+        setTxt('v-memory', mb + ' MB');
+        setTxt('v-mem-pct', pct.toFixed(0) + '%');
+        document.getElementById('bar-mem').style.width = pct.toFixed(0) + '%';
+    }
+    /* Uptime */
+    if (d.uptime !== undefined) {
+        const s = Math.floor(d.uptime);
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        setTxt('v-uptime', h > 0 ? h + 'h ' + m + 'm' : m + 'm ' + (s % 60) + 's');
+    }
+    /* Visages détectés */
+    if (d.faces !== undefined)      setTxt('face-count', d.faces);
+    if (d.face_count !== undefined) setTxt('face-count', d.face_count);
+
+    addLog('ESP', 'Update · FPS=' + (d.fps ?? '?') + ' T=' + (d.temperature ?? '?') + '°C WiFi=' + (d.wifi_rssi ?? '?') + 'dBm');
+});
+
+/* esp32_log : logs bruts de l'ESP32 */
+socket.on('esp32_log', (d) => {
+    if (!d) return;
+    const type = (d.log || '').toLowerCase().includes('err') ? 'ERR'
+               : (d.log || '').toLowerCase().includes('warn') ? 'WARN' : 'ESP';
+    addLog(type, d.log || JSON.stringify(d), d.time);
+});
+
+/* ── INIT ────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+    /* Restaurer l'IP sauvegardée */
+    const savedIp = localStorage.getItem('esp32-ip');
+    if (savedIp) {
+        document.getElementById('esp32-ip').value = savedIp;
+        connectESP32();
+    }
+
+    /* Sauvegarder l'IP à chaque modification */
+    document.getElementById('esp32-ip').addEventListener('change', e => {
+        localStorage.setItem('esp32-ip', e.target.value.trim());
+    });
+    /* Connexion rapide avec Entrée */
+    document.getElementById('esp32-ip').addEventListener('keydown', e => {
+        if (e.key === 'Enter') connectESP32();
+    });
+
+    addLog('SYS', 'Interface ESP32-CAM initialisée');
+    socket.emit('request_status');
+});
+</script>
+</body>
+</html>

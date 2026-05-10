@@ -3,343 +3,647 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.H.O.S FINAL - Accueil</title>
+    <title>S.H.O.S — Accueil</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+        --glass:        rgba(255,255,255,0.13);
+        --glass-card:   rgba(255,255,255,0.17);
+        --glass-deep:   rgba(255,255,255,0.07);
+        --border:       rgba(255,255,255,0.26);
+        --border-s:     rgba(255,255,255,0.13);
+        --blur:         blur(32px) saturate(180%);
+        --blur-sm:      blur(18px) saturate(160%);
+        --t1: rgba(255,255,255,0.95);
+        --t2: rgba(255,255,255,0.55);
+        --t3: rgba(255,255,255,0.32);
+        --blue:  #4da6ff;
+        --teal:  #30d5c8;
+        --green: #34c759;
+        --amber: #ffa340;
+        --red:   #ff453a;
+        --r-xl: 22px; --r-lg: 16px; --r-md: 12px; --r-sm: 8px;
+        --font: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        --mono: 'DM Mono', monospace;
+    }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; font-family:var(--font); overflow:hidden; }
 
-        body {
-            font-family: 'Courier New', monospace;
-            background: linear-gradient(135deg, #0a0e27 0%, #16213e 50%, #0a0e27 100%);
-            color: #00ff88;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
+    /* ── BACKGROUND ─── */
+    body {
+        background:
+            radial-gradient(ellipse 90% 70% at 20% 25%, rgba(100,145,210,0.4) 0%, transparent 65%),
+            radial-gradient(ellipse 70% 90% at 80% 75%, rgba(70,110,180,0.3) 0%, transparent 65%),
+            radial-gradient(ellipse 120% 120% at 50% 50%, #1c2540 0%, #0e1525 100%);
+    }
 
-        .container { max-width: 1200px; width: 100%; text-align: center; }
+    /* ── CHROME ─── */
+    .chrome {
+        position: fixed; inset: 0; z-index: 1;
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+    }
 
-        .header { margin-bottom: 40px; }
+    /* ── MAIN PANEL ─── */
+    .panel {
+        position: relative;
+        width: 100%; max-width: 940px;
+        height: calc(100vh - 40px); max-height: 650px;
+        background: var(--glass);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border: 1px solid var(--border);
+        border-radius: var(--r-xl);
+        overflow: hidden;
+        display: flex; flex-direction: column;
+        box-shadow:
+            0 40px 100px rgba(0,0,0,0.5),
+            0 0 0 0.5px rgba(255,255,255,0.08) inset,
+            0 1.5px 0 rgba(255,255,255,0.22) inset;
+        animation: panelIn .55s cubic-bezier(.34,1.4,.64,1) both;
+    }
+    @keyframes panelIn { from{opacity:0;transform:scale(.94) translateY(20px)} to{opacity:1;transform:none} }
 
-        .logo {
-            font-size: 80px;
-            margin-bottom: 20px;
-            animation: float 3s infinite ease-in-out;
-        }
+    /* top specular */
+    .panel::after {
+        content:''; position:absolute; top:0; left:12%; right:12%; height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);
+        pointer-events:none; z-index:10;
+    }
 
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-20px); }
-        }
+    /* ── TOP BAR ─── */
+    .topbar {
+        display:flex; align-items:center; justify-content:space-between;
+        padding: 16px 22px 13px;
+        border-bottom: 1px solid var(--border-s);
+        flex-shrink: 0; gap: 12px;
+    }
+    .topbar-left { display:flex; align-items:center; gap:10px; }
+    .logo-gem {
+        width:32px; height:32px; border-radius:10px;
+        background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,.24);
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .logo-gem svg { width:16px; height:16px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .brand { font-size:15px; font-weight:600; color:var(--t1); letter-spacing:.05em; }
+    .brand-tag { font-size:10px; color:var(--t3); font-weight:400; font-family:var(--mono); }
 
-        h1 {
-            font-size: 3.5rem;
-            background: linear-gradient(135deg, #00ff88 0%, #00b4ff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-            text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
-        }
+    .topbar-right { display:flex; align-items:center; gap:7px; }
+    .pill {
+        display:flex; align-items:center; gap:5px;
+        padding:5px 11px; border-radius:20px;
+        background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.13);
+        font-size:11px; font-weight:500; color:var(--t2);
+        cursor:pointer; transition:background .18s, border-color .18s, color .18s;
+        white-space:nowrap;
+    }
+    .pill:hover { background:rgba(255,255,255,.16); border-color:rgba(255,255,255,.24); color:var(--t1); }
+    .dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+    .dot-on  { background:var(--green); box-shadow:0 0 7px var(--green); }
+    .dot-off { background:var(--red);   animation:blink 1s ease-in-out infinite; }
+    .dot-wait{ background:var(--amber); box-shadow:0 0 5px var(--amber); animation:blink 1.8s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-        .subtitle { color: #00b4ff; font-size: 1.2rem; margin-bottom: 30px; opacity: 0.9; }
+    .avatar {
+        width:32px; height:32px; border-radius:50%;
+        background:linear-gradient(135deg,var(--blue),var(--teal));
+        border:1.5px solid rgba(255,255,255,.35);
+        display:flex; align-items:center; justify-content:center;
+        font-size:11px; font-weight:600; color:#fff; flex-shrink:0; cursor:pointer;
+    }
 
-        .status-line {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-bottom: 40px;
-            font-size: 0.9rem;
-            flex-wrap: wrap;
-        }
+    /* ── PROFILE STRIP ─── */
+    .profile-strip {
+        display:flex; align-items:center; gap:6px;
+        padding:9px 22px; border-bottom:1px solid var(--border-s);
+        overflow-x:auto; scrollbar-width:none; flex-shrink:0;
+    }
+    .profile-strip::-webkit-scrollbar { display:none; }
+    .p-label { font-size:10px; color:var(--t3); font-weight:400; flex-shrink:0; margin-right:2px; text-transform:uppercase; letter-spacing:.08em; }
+    .p-chip {
+        padding:4px 13px; border-radius:20px;
+        font-size:11px; font-weight:500;
+        background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.11);
+        color:var(--t2); cursor:pointer; white-space:nowrap; flex-shrink:0;
+        transition:all .18s;
+    }
+    .p-chip:hover { background:rgba(255,255,255,.14); color:var(--t1); border-color:rgba(255,255,255,.22); }
+    .p-chip.active {
+        background:rgba(77,166,255,.2); border-color:rgba(77,166,255,.45);
+        color:var(--blue); box-shadow:0 0 10px rgba(77,166,255,.15);
+    }
+    .p-loading { font-size:11px; color:var(--t3); font-family:var(--mono); }
 
-        .status-item {
-            display: flex; align-items: center; gap: 8px;
-            background: rgba(0, 255, 136, 0.1);
-            border: 1px solid rgba(0, 255, 136, 0.3);
-            padding: 10px 20px; border-radius: 8px;
-        }
+    /* ── BENTO ─── */
+    .bento {
+        flex:1; min-height:0;
+        display:grid;
+        grid-template-columns: 190px 1fr 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+        gap:11px; padding:13px 18px 52px;
+    }
 
-        .status-dot {
-            width: 10px; height: 10px; border-radius: 50%;
-            background: #ff6666; animation: blink 1s infinite;
-        }
+    /* ── CARD BASE ─── */
+    .card {
+        background:var(--glass-card);
+        backdrop-filter:var(--blur-sm);
+        -webkit-backdrop-filter:var(--blur-sm);
+        border:1px solid var(--border);
+        border-radius:var(--r-lg);
+        padding:15px;
+        position:relative; overflow:hidden;
+        display:flex; flex-direction:column; gap:7px;
+        box-shadow:
+            0 8px 30px rgba(0,0,0,.22),
+            0 0 0 .5px rgba(255,255,255,.07) inset,
+            0 1px 0 rgba(255,255,255,.17) inset;
+        transition:transform .22s cubic-bezier(.34,1.4,.64,1), box-shadow .22s ease, border-color .18s;
+        animation:cardIn .45s cubic-bezier(.34,1.2,.64,1) both;
+        text-decoration:none; color:inherit;
+    }
+    @keyframes cardIn { from{opacity:0;transform:translateY(8px) scale(.97)} to{opacity:1;transform:none} }
+    .card:nth-child(1){animation-delay:.07s} .card:nth-child(2){animation-delay:.12s}
+    .card:nth-child(3){animation-delay:.17s} .card:nth-child(4){animation-delay:.22s}
+    .card:nth-child(5){animation-delay:.27s} .card:nth-child(6){animation-delay:.32s}
+    .card:nth-child(7){animation-delay:.37s}
 
-        .status-dot.connected { background: #00ff88; animation: none; }
+    a.card:hover {
+        transform:translateY(-4px) scale(1.015);
+        border-color:rgba(255,255,255,.36);
+        box-shadow:0 18px 50px rgba(0,0,0,.35),0 0 0 .5px rgba(255,255,255,.11) inset,0 1px 0 rgba(255,255,255,.24) inset;
+    }
+    a.card:active { transform:translateY(-1px) scale(1.005); }
 
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    /* grid placements */
+    .c-status    { grid-column:1; grid-row:1/3; }
+    .c-interface { grid-column:2; grid-row:1; }
+    .c-dashboard { grid-column:3; grid-row:1; }
+    .c-time      { grid-column:4; grid-row:1; }
+    .c-diag      { grid-column:2; grid-row:2; }
+    .c-quick     { grid-column:3; grid-row:2; }
+    .c-settings  { grid-column:4; grid-row:2; }
 
-        /* --- NOUVELLE SECTION PROFILES --- */
-        .section-title {
-            color: #00b4ff; font-size: 1.1rem; margin-bottom: 20px;
-            text-transform: uppercase; letter-spacing: 3px;
-            border-bottom: 1px solid rgba(0, 180, 255, 0.3);
-            display: inline-block; padding-bottom: 5px;
-        }
+    /* ── CARD ELEMENTS ─── */
+    .c-lbl { font-size:10px; font-weight:500; letter-spacing:.1em; text-transform:uppercase; color:var(--t3); flex-shrink:0; }
+    .c-title { font-size:14px; font-weight:600; color:var(--t1); line-height:1.25; }
+    .c-desc { font-size:11px; color:var(--t2); line-height:1.5; flex:1; }
+    .c-arrow {
+        position:absolute; top:13px; right:13px;
+        font-size:15px; color:rgba(255,255,255,.3);
+        opacity:0; transition:opacity .18s, transform .18s;
+    }
+    a.card:hover .c-arrow { opacity:1; transform:translate(2px,-2px); }
 
-        .profiles-grid {
-            display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;
-            margin-bottom: 50px;
-            min-height: 50px;
-        }
+    .c-row { display:flex; align-items:flex-start; gap:10px; }
+    .c-ico {
+        width:36px; height:36px; border-radius:10px; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center;
+    }
+    .c-ico svg { width:18px; height:18px; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .ico-blue  { background:rgba(77,166,255,.18);  border:1px solid rgba(77,166,255,.28); }
+    .ico-blue  svg { stroke:var(--blue); }
+    .ico-teal  { background:rgba(48,213,200,.18);  border:1px solid rgba(48,213,200,.28); }
+    .ico-teal  svg { stroke:var(--teal); }
+    .ico-amber { background:rgba(255,163,64,.18);  border:1px solid rgba(255,163,64,.28); }
+    .ico-amber svg { stroke:var(--amber); }
+    .ico-white { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); }
+    .ico-white svg { stroke:rgba(255,255,255,.8); }
+    .ico-green { background:rgba(52,199,89,.18);   border:1px solid rgba(52,199,89,.28); }
+    .ico-green svg { stroke:var(--green); }
 
-        .btn-profile {
-            background: rgba(0, 180, 255, 0.1);
-            border: 1px solid #00b4ff;
-            color: #00b4ff;
-            padding: 12px 25px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-family: inherit; font-weight: bold;
-            transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
+    /* ── STATUS CARD ─── */
+    .s-welcome { font-size:19px; font-weight:600; color:var(--t1); line-height:1.2; }
+    .s-tag     { font-size:11px; color:var(--t2); }
+    .s-list    { display:flex; flex-direction:column; gap:7px; flex:1; }
+    .s-row     {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:7px 9px; background:rgba(255,255,255,.07);
+        border:1px solid rgba(255,255,255,.09); border-radius:var(--r-sm);
+        font-size:11px;
+    }
+    .s-row-l { display:flex; align-items:center; gap:7px; color:var(--t2); }
+    .s-row-l svg { width:11px; height:11px; fill:none; stroke:currentColor; stroke-width:2; flex-shrink:0; }
+    .s-name  { font-weight:500; }
+    .badge {
+        font-size:10px; font-weight:500; padding:2px 7px; border-radius:10px;
+        font-family:var(--mono);
+    }
+    .b-ok   { background:rgba(52,199,89,.18);  color:var(--green); border:1px solid rgba(52,199,89,.3); }
+    .b-err  { background:rgba(255,69,58,.18);  color:var(--red);   border:1px solid rgba(255,69,58,.3); animation:blink 1s ease-in-out infinite; }
+    .b-wait { background:rgba(255,163,64,.18); color:var(--amber); border:1px solid rgba(255,163,64,.3); animation:blink 1.8s ease-in-out infinite; }
+    .s-foot { padding-top:10px; border-top:1px solid rgba(255,255,255,.07); }
+    .s-foot-lbl { font-size:10px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; margin-bottom:5px; }
+    .s-foot-val { font-size:11px; color:var(--t2); font-family:var(--mono); }
+    .cpu-bar { display:flex; align-items:center; gap:6px; margin-top:5px; }
+    .cpu-track { flex:1; height:3px; background:rgba(255,255,255,.1); border-radius:2px; overflow:hidden; }
+    .cpu-fill  { height:100%; background:linear-gradient(90deg,var(--teal),var(--blue)); border-radius:2px; }
+    .cpu-pct   { font-size:10px; color:var(--t3); font-family:var(--mono); }
 
-        .btn-profile:hover {
-            background: #00b4ff; color: #000;
-            box-shadow: 0 0 15px rgba(0, 180, 255, 0.5);
-            transform: translateY(-3px);
-        }
-        /* ---------------------------------- */
+    /* ── TIME CARD ─── */
+    .time-big { font-size:36px; font-weight:200; color:var(--t1); line-height:1; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+    .time-date { font-size:11px; color:var(--t2); margin-top:4px; }
 
-        .menu {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 25px; margin-bottom: 40px;
-        }
+    /* ── QUICK ACCESS ─── */
+    .mini-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; flex:1; }
+    .mini-item {
+        background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
+        border-radius:var(--r-sm); padding:7px 9px;
+        display:flex; align-items:center; gap:6px;
+        font-size:10px; font-weight:500; color:var(--t2);
+        text-decoration:none; transition:all .17s; cursor:pointer;
+    }
+    .mini-item:hover { background:rgba(255,255,255,.13); color:var(--t1); border-color:rgba(255,255,255,.2); }
+    .mini-item svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
 
-        .menu-item {
-            background: rgba(20, 50, 80, 0.4); backdrop-filter: blur(20px);
-            border: 2px solid #00ff88; border-radius: 15px;
-            padding: 30px 20px; text-decoration: none; color: #00ff88;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            cursor: pointer; display: flex; flex-direction: column;
-            align-items: center; gap: 15px;
-        }
-
-        .menu-item:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.3);
-            border-color: #00b4ff; background: rgba(20, 50, 80, 0.6);
-        }
-
-        .menu-item-icon { font-size: 3rem; display: block; }
-        .menu-item-title { font-size: 1.3rem; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
-        .menu-item-desc { font-size: 0.85rem; color: #00b4ff; opacity: 0.8; }
-
-        @media (max-width: 768px) {
-            h1 { font-size: 2rem; } .logo { font-size: 50px; } .menu { grid-template-columns: 1fr; }
-        }
+    /* ── BOTTOM NAV ─── */
+    .bnav {
+        position:absolute; bottom:13px; left:50%; transform:translateX(-50%);
+        display:flex; align-items:center; gap:5px;
+        background:rgba(255,255,255,.11); border:1px solid rgba(255,255,255,.19);
+        border-radius:30px; padding:6px 14px;
+        backdrop-filter:blur(22px); -webkit-backdrop-filter:blur(22px);
+        box-shadow:0 4px 20px rgba(0,0,0,.3),0 1px 0 rgba(255,255,255,.16) inset;
+        z-index:5;
+    }
+    .nb {
+        width:30px; height:30px; border-radius:50%;
+        display:flex; align-items:center; justify-content:center;
+        background:none; border:none; cursor:pointer;
+        transition:background .18s; position:relative;
+    }
+    .nb svg { width:15px; height:15px; fill:none; stroke:rgba(255,255,255,.45); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:stroke .18s; }
+    .nb:hover { background:rgba(255,255,255,.13); }
+    .nb:hover svg { stroke:rgba(255,255,255,.88); }
+    .nb.on { background:rgba(77,166,255,.22); }
+    .nb.on svg { stroke:var(--blue); }
+    .nb.on::after { content:''; position:absolute; bottom:-5px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--blue); }
+    .nsep { width:1px; height:18px; background:rgba(255,255,255,.14); margin:0 2px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">⚡</div>
-            <h1>S.H.O.S FINAL</h1>
-            <p class="subtitle">Système de Surveillance Intelligent Complet</p>
-            
-            <div class="status-line">
-                <div class="status-item">
-                    <span class="status-dot connected" id="mqtt-status"></span>
-                    <span id="mqtt-text">MQTT: Vérification...</span>
+
+<div class="chrome">
+<main class="panel">
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <div class="logo-gem">
+                <svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/><line x1="2" y1="12" x2=".5" y2="14"/><line x1="22" y1="12" x2="23.5" y2="14"/></svg>
+            </div>
+            <div>
+                <div class="brand">S.H.O.S</div>
+                <div class="brand-tag">Smart Headset OS · v2.0</div>
+            </div>
+        </div>
+        <div class="topbar-right" role="status" aria-label="Statuts système">
+            <div class="pill">
+                <span class="dot dot-wait" id="flask-dot"></span>
+                <span id="flask-txt">Flask</span>
+            </div>
+            <div class="pill">
+                <span class="dot dot-wait" id="mqtt-dot"></span>
+                <span id="mqtt-txt">MQTT</span>
+            </div>
+            <div class="pill">
+                <span class="dot dot-wait" id="ard-dot"></span>
+                <span id="ard-txt">Arduino</span>
+            </div>
+            <div class="avatar" aria-label="Utilisateur">SH</div>
+        </div>
+    </div>
+
+    <!-- PROFILES -->
+    <div class="profile-strip" role="navigation" aria-label="Profils">
+        <span class="p-label">Profil</span>
+        <span class="p-loading" id="profiles-wrap">Chargement…</span>
+    </div>
+
+    <!-- BENTO GRID -->
+    <div class="bento">
+
+        <!-- STATUS — tall left -->
+        <div class="card c-status" role="region" aria-label="Statut système">
+            <div class="c-lbl">Système</div>
+            <div class="s-welcome" id="welcome">Bienvenue</div>
+            <div class="s-tag">Plateforme modulaire active</div>
+
+            <div class="s-list">
+                <div class="s-row">
+                    <div class="s-row-l"><svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><circle cx="12" cy="20" r="1"/></svg><span class="s-name">MQTT</span></div>
+                    <span class="badge b-wait" id="mqtt-bdg">—</span>
                 </div>
-                <div class="status-item">
-                    <span class="status-dot connected" id="flask-status"></span>
-                    <span id="flask-text">Flask: En ligne</span>
+                <div class="s-row">
+                    <div class="s-row-l"><svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg><span class="s-name">Flask</span></div>
+                    <span class="badge b-wait" id="flask-bdg">—</span>
                 </div>
-                <div class="status-item">
-                    <span class="status-dot" id="arduino-status"></span>
-                    <span id="arduino-text">Arduino: Vérification...</span>
+                <div class="s-row">
+                    <div class="s-row-l"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg><span class="s-name">Arduino</span></div>
+                    <span class="badge b-wait" id="ard-bdg">—</span>
+                </div>
+                <div class="s-row">
+                    <div class="s-row-l"><svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg><span class="s-name">ESP32</span></div>
+                    <span class="badge b-wait" id="esp32-bdg">—</span>
+                </div>
+                <div class="s-row">
+                    <div class="s-row-l"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span class="s-name">MediaPipe</span></div>
+                    <span class="badge b-wait" id="mediapipe-bdg">—</span>
+                </div>
+            </div>
+
+            <div class="s-foot">
+                <div class="s-foot-lbl">Processeur</div>
+                <div class="s-foot-val">Raspberry Pi 4B</div>
+                <div class="cpu-bar">
+                    <div class="cpu-track"><div class="cpu-fill" id="cpu-fill" style="width:0%"></div></div>
+                    <span class="cpu-pct" id="cpu-pct">—</span>
                 </div>
             </div>
         </div>
 
-        <div>
-            <h2 class="section-title">DÉPLOIEMENT TACTIQUE (PROFILS)</h2>
-            <div class="profiles-grid" id="dynamic-profiles">
-                <span style="color: gray; font-size: 0.9em;">Chargement des profils...</span>
+        <!-- INTERFACE UTILISATEUR -->
+        <a href="/user_interface" class="card c-interface" aria-label="Interface Utilisateur">
+            <span class="c-arrow">↗</span>
+            <div class="c-row">
+                <div class="c-ico ico-blue"><svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/></svg></div>
+                <div>
+                    <div class="c-title">Interface Utilisateur</div>
+                    <div class="c-desc">Contrôle et configuration du casque</div>
+                </div>
+            </div>
+        </a>
+
+        <!-- DASHBOARD -->
+        <a href="/dashboard" class="card c-dashboard" aria-label="Dashboard">
+            <span class="c-arrow">↗</span>
+            <div class="c-row">
+                <div class="c-ico ico-teal"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
+                <div>
+                    <div class="c-title">Dashboard</div>
+                    <div class="c-desc">Capteurs temps réel · DHT11 · IMU</div>
+                </div>
+            </div>
+        </a>
+
+        <!-- DATE/TIME -->
+        <div class="card c-time" role="timer" aria-label="Horloge système">
+            <div class="c-lbl">Heure locale</div>
+            <div class="time-big" id="clock">--:--</div>
+            <div class="time-date" id="datestr">—</div>
+        </div>
+
+        <!-- DIAGNOSTIC -->
+        <a href="/diagnostic_ultimate" class="card c-diag" aria-label="Diagnostic IA">
+            <span class="c-arrow">↗</span>
+            <div class="c-row">
+                <div class="c-ico ico-amber"><svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div>
+                <div>
+                    <div class="c-title">Diagnostic Pro</div>
+                    <div class="c-desc">Analyse IA · Latence · FPS · Mémoire</div>
+                </div>
+            </div>
+        </a>
+
+        <!-- QUICK ACCESS -->
+        <div class="card c-quick" role="navigation" aria-label="Accès rapide">
+            <div class="c-lbl">Accès rapide</div>
+            <div class="mini-grid">
+                <a href="/hud" class="mini-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8c-2 5-5.6 8-10 8s-8-3-10-8z"/></svg>HUD</a>
+                <a href="/ESP32" class="mini-item"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/><line x1="7" y1="7" x2="7" y2="4"/><line x1="17" y1="7" x2="17" y2="4"/></svg>ESP32 Cam</a>
+                <a href="/mobile" class="mini-item"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>Mobile</a>
+                <a href="/profile_manager" class="mini-item"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Profils</a>
+                <a href="/diagnostic" class="mini-item"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Diagnostic</a>
+                <a href="/profiles" class="mini-item"><svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Équipe</a>
             </div>
         </div>
 
-        <div class="menu">
-            {% for id, mod in modules.items() %}
-            <a href="/module/{{ id }}" class="menu-item module-dynamic">
-                <span class="menu-item-icon">
-                    {% if mod.icon %}<i class="fas fa-{{ mod.icon }}"></i>{% else %}🧩{% endif %}
-                </span>
-                <span class="menu-item-title">{{ mod.name }}</span>
-                <span class="menu-item-desc">{{ mod.description }}</span>
-            </a>
-            {% endfor %}
+        <!-- SETTINGS -->
+        <a href="/settings" class="card c-settings" aria-label="Paramètres">
+            <span class="c-arrow">↗</span>
+            <div class="c-row">
+                <div class="c-ico ico-white"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+                <div>
+                    <div class="c-title">Paramètres</div>
+                    <div class="c-desc">MQTT · Modules · Réseau · OTA</div>
+                </div>
+            </div>
+        </a>
 
-            <hr style="grid-column: 1/-1; border: 1px dashed rgba(0,255,136,0.2); margin: 10px 0;">
+    </div><!-- /.bento -->
 
-              <a href="/user_interface" class="menu-item">
-                <span class="menu-item-icon">👓</span>
-                <span class="menu-item-title">Interface Utilisateur</span>
-                <span class="menu-item-desc">Contrôle et configuration</span>
-            </a>
+    <!-- BOTTOM NAV -->
+    <nav class="bnav" aria-label="Navigation">
+        <button class="nb on" onclick="location.href='/'" aria-label="Accueil" aria-current="page">
+            <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+        </button>
+        <button class="nb" onclick="location.href='/dashboard'" aria-label="Dashboard">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </button>
+        <div class="nsep"></div>
+        <button class="nb" onclick="location.href='/user_interface'" aria-label="Interface">
+            <svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        </button>
+        <button class="nb" onclick="location.href='/hud'" aria-label="HUD">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8-5.6 8-10 8S2 17 2 12z"/></svg>
+        </button>
+        <div class="nsep"></div>
+        <button class="nb" onclick="location.href='/diagnostic_ultimate'" aria-label="Diagnostic">
+            <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </button>
+        <button class="nb" onclick="location.href='/settings'" aria-label="Paramètres">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+    </nav>
 
-            <a href="/dashboard" class="menu-item">
-                <span class="menu-item-icon">📊</span>
-                <span class="menu-item-title">Dashboard</span>
-                <span class="menu-item-desc">Capteurs temps réel</span>
-            </a>
+</main>
+</div>
 
-            <a href="/profile_manager" class="menu-item">
-                <span class="menu-item-icon">🆔</span>
-                <span class="menu-item-title">Gestionnaire</span>
-                <span class="menu-item-desc">Admin des profils</span>
-            </a>
+<script>
+/* ── CLOCK ───────────────────────────────────────── */
+const DAYS   = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août',
+                'septembre','octobre','novembre','décembre'];
+function tick() {
+    const n = new Date();
+    document.getElementById('clock').textContent =
+        String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+    document.getElementById('datestr').textContent =
+        DAYS[n.getDay()] + ' ' + n.getDate() + ' ' + MONTHS[n.getMonth()] + ' ' + n.getFullYear();
+}
+setInterval(tick, 10000); tick();
 
-            <a href="/mobile" class="menu-item">
-                <span class="menu-item-icon">📱</span>
-                <span class="menu-item-title">Mobile</span>
-                <span class="menu-item-desc">Capteurs du téléphone</span>
-            </a>
+/* ── HELPERS ─────────────────────────────────────── */
+/**
+ * Met à jour un dot (topbar) + badge (card status) + texte (topbar).
+ * @param {string} dotId    - id du dot dans la topbar
+ * @param {string} bdgId    - id du badge dans la card status
+ * @param {string} txtId    - id du label texte dans la topbar
+ * @param {boolean|null} on - true=connecté, false=hors ligne, null=inconnu
+ * @param {string} label    - label affiché dans la topbar
+ */
+function setStatus(dotId, bdgId, txtId, on, label) {
+    const dot = document.getElementById(dotId);
+    const bdg = document.getElementById(bdgId);
+    const txt = document.getElementById(txtId);
 
-            <a href="/diagnostic_ultimate" class="menu-item">
-                <span class="menu-item-icon">🚀</span>
-                <span class="menu-item-title">Diagnostic Pro</span>
-                <span class="menu-item-desc">Analyse profonde IA</span>
-            </a>
-
-            <a href="/hud" class="menu-item">
-                <span class="menu-item-icon">👓</span>
-                <span class="menu-item-title">Mode HUD</span>
-                <span class="menu-item-desc">Affichage tête haute</span>
-            </a>
-
-              <a href="/ESP32" class="menu-item">
-                <span class="menu-item-icon">📷</span>
-                <span class="menu-item-title">Esp32 Cam</span>
-                <span class="menu-item-desc">Caméra ESP32</span>
-            </a>
-
-               <a href="/diagnostic" class="menu-item">
-                <span class="menu-item-icon">🚀</span>
-                <span class="menu-item-title">Diagnostic pro </span>
-                 <span class="menu-item-desc">Analyse profonde IA</span>
-                </span>
-                <span class="menu-item-desc">Capteurs temps réel</span>
-            </a>
-
-            <a href="/settings" class="menu-item">
-                <span class="menu-item-icon">⚙️</span>
-                <span class="menu-item-title">Paramètres</span>
-                <span class="menu-item-desc">Configuration</span>
-            </a>
-        </div>
-
-    <script>
-    const socket = io();
-
-    // --- GESTION DES STATUTS (UNIFIÉE) ---
-    const updateStatus = (id, textId, isConnected, label) => {
-        const elem = document.getElementById(id);
-        const text = document.getElementById(textId);
-        if (!elem || !text) return;
-
-        if (isConnected) {
-            elem.classList.add('connected');
-            text.textContent = `${label}: Connecté`;
-        } else {
-            elem.classList.remove('connected');
-            text.textContent = `${label}: Déconnecté`;
-        }
-    };
-
-    socket.on('connect', () => updateStatus('flask-status', 'flask-text', true, 'Flask'));
-    socket.on('disconnect', () => updateStatus('flask-status', 'flask-text', false, 'Flask'));
-    
-    socket.on('mqtt_status', (data) => updateStatus('mqtt-status', 'mqtt-text', data.connected, 'MQTT'));
-    socket.on('arduino_status', (data) => updateStatus('arduino-status', 'arduino-text', data.connected, 'Arduino'));
-
-    // Demande initiale du statut
-    socket.emit('request_status');
-
-
-    // --- GESTION DYNAMIQUE DES PROFILS ---
-
-    /**
-     * Charge les profils depuis l'API et construit les boutons
-     */
-    async function loadProfiles() {
-        const container = document.getElementById('dynamic-profiles');
-        if (!container) return;
-
-        try {
-            const response = await fetch('/api/get_profiles');
-            const data = await response.json();
-
-            container.innerHTML = ''; // Nettoyage du conteneur
-
-            if (!data.profiles || Object.keys(data.profiles).length === 0) {
-                container.innerHTML = '<span style="color: #666; font-style: italic;">Aucun profil configuré.</span>';
-                return;
-            }
-
-            // Création des boutons
-            Object.entries(data.profiles).forEach(([prof_id, prof_data]) => {
-                const btn = document.createElement('button');
-                btn.className = 'btn-profile';
-                btn.innerText = prof_data.name || prof_id;
-                
-                // État actif : on utilise une classe CSS ou un style inline propre
-                if (data.current === prof_id) {
-                    btn.classList.add('active-profile'); // Ajoute une classe pour ton CSS
-                    btn.style.border = "2px solid #00ff88";
-                    btn.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.4)";
-                    btn.style.background = "rgba(0, 255, 136, 0.2)";
-                }
-
-                btn.onclick = () => activateProfile(prof_id, btn);
-                container.appendChild(btn);
-            });
-
-        } catch (err) {
-            console.error("Erreur S.H.O.S (Load):", err);
-            container.innerHTML = '<span style="color: #ff6666;">Erreur de liaison API.</span>';
-        }
+    if (dot) {
+        dot.className = 'dot ' + (on === true ? 'dot-on' : on === false ? 'dot-off' : 'dot-wait');
     }
-
-    /**
-     * Envoie l'ordre d'activation au serveur
-     */
-    async function activateProfile(profileId, btnElement) {
-        // Petit effet visuel immédiat (feedback)
-        const originalText = btnElement.innerText;
-        btnElement.innerText = "CHARGEMENT...";
-        btnElement.style.opacity = "0.7";
-
-        try {
-            const response = await fetch('/api/activate_profile', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profile_id: profileId })
-            });
-            
-            const data = await response.json();
-
-            if (data.status === "success") {
-                // On rafraîchit tout pour mettre à jour les bordures vertes
-                await loadProfiles();
-            } else {
-                throw new Error("Echec serveur");
-            }
-        } catch (err) {
-            console.error("Erreur S.H.O.S (Activation):", err);
-            alert("ERREUR : Impossible de déployer le profil " + profileId);
-            btnElement.innerText = originalText;
-            btnElement.style.opacity = "1";
-        }
+    if (bdg) {
+        bdg.className  = 'badge ' + (on === true ? 'b-ok' : on === false ? 'b-err' : 'b-wait');
+        bdg.textContent = on === true ? 'EN LIGNE' : on === false ? 'OFFLINE' : '—';
     }
+    if (txt) txt.textContent = label;
+}
 
-    // Initialisation au chargement de la fenêtre
-    window.addEventListener('DOMContentLoaded', loadProfiles);
+/** Met à jour la barre CPU avec une valeur réelle (0-100). */
+function setCpu(pct) {
+    const fill = document.getElementById('cpu-fill');
+    const lbl  = document.getElementById('cpu-pct');
+    if (!fill || !lbl) return;
+    const val = Math.min(100, Math.max(0, Math.round(pct)));
+    fill.style.width   = val + '%';
+    /* Couleur selon charge : vert < 60, amber 60-85, rouge > 85 */
+    fill.style.background = val > 85
+        ? 'linear-gradient(90deg,#ff453a,#ff6b6b)'
+        : val > 60
+            ? 'linear-gradient(90deg,var(--amber),#ffc46b)'
+            : 'linear-gradient(90deg,var(--teal),var(--blue))';
+    lbl.textContent = val + '%';
+}
+
+/* ── SOCKET.IO ───────────────────────────────────── */
+const io_s = io();
+
+/* Flask (connexion socket = Flask en ligne) */
+io_s.on('connect',    () => setStatus('flask-dot', 'flask-bdg', 'flask-txt', true,  'Flask'));
+io_s.on('disconnect', () => setStatus('flask-dot', 'flask-bdg', 'flask-txt', false, 'Flask'));
+
+/* MQTT */
+io_s.on('mqtt_status', d => {
+    setStatus('mqtt-dot', 'mqtt-bdg', 'mqtt-txt', d.connected, 'MQTT');
+});
+
+/* Arduino */
+io_s.on('arduino_status', d => {
+    setStatus('ard-dot', 'ard-bdg', 'ard-txt', d.connected, 'Arduino');
+});
+
+/* ESP32 — écoute un event dédié si disponible */
+io_s.on('esp32_status', d => {
+    setStatus(null, 'esp32-bdg', null, d.connected, '');
+});
+
+/* MediaPipe — écoute un event dédié si disponible */
+io_s.on('mediapipe_status', d => {
+    const bdg = document.getElementById('mediapipe-bdg');
+    if (!bdg) return;
+    bdg.className   = 'badge ' + (d.active ? 'b-ok' : 'b-err');
+    bdg.textContent = d.active ? 'ACTIF' : 'INACTIF';
+});
+
+/* Métriques système (CPU, mémoire, FPS) */
+io_s.on('system_metrics', d => {
+    if (d.cpu !== undefined) setCpu(d.cpu);
+});
+
+/* Fallback : poll REST /api/system_status toutes les 5 s */
+async function pollSystemStatus() {
+    try {
+        const r    = await fetch('/api/system_status');
+        if (!r.ok) return;
+        const data = await r.json();
+
+        if (data.cpu   !== undefined) setCpu(data.cpu);
+        if (data.esp32 !== undefined) {
+            const bdg = document.getElementById('esp32-bdg');
+            if (bdg) {
+                bdg.className   = 'badge ' + (data.esp32 ? 'b-ok' : 'b-err');
+                bdg.textContent = data.esp32 ? 'EN LIGNE' : 'OFFLINE';
+            }
+        }
+        if (data.mediapipe !== undefined) {
+            const bdg = document.getElementById('mediapipe-bdg');
+            if (bdg) {
+                bdg.className   = 'badge ' + (data.mediapipe ? 'b-ok' : 'b-err');
+                bdg.textContent = data.mediapipe ? 'ACTIF' : 'INACTIF';
+            }
+        }
+    } catch (e) {
+        /* API non disponible — on garde l'état Socket.IO */
+        console.warn('[S.H.O.S] /api/system_status indisponible');
+    }
+}
+
+/* Demande initiale du statut dès la connexion */
+io_s.on('connect', () => {
+    io_s.emit('request_status');
+    pollSystemStatus();
+});
+
+/* Polling de secours toutes les 5 secondes */
+setInterval(pollSystemStatus, 5000);
+
+/* ── PROFILS ─────────────────────────────────────── */
+async function loadProfiles() {
+    const wrap = document.getElementById('profiles-wrap');
+    if (!wrap) return;
+    try {
+        const r    = await fetch('/api/get_profiles');
+        const data = await r.json();
+        wrap.innerHTML = '';
+
+        if (!data.profiles || !Object.keys(data.profiles).length) {
+            wrap.innerHTML = '<span class="p-loading">Aucun profil configuré.</span>';
+            return;
+        }
+
+        /* Nom du profil actif dans le greeting */
+        if (data.current && data.profiles[data.current]) {
+            const el = document.getElementById('welcome');
+            if (el) el.textContent = data.profiles[data.current].name || 'Bienvenue';
+        }
+
+        Object.entries(data.profiles).forEach(([id, p]) => {
+            const btn = document.createElement('button');
+            btn.className   = 'p-chip' + (data.current === id ? ' active' : '');
+            btn.textContent = p.name || id;
+            btn.setAttribute('aria-pressed', data.current === id ? 'true' : 'false');
+            btn.addEventListener('click', () => activateP(id, btn));
+            wrap.appendChild(btn);
+        });
+
+    } catch (e) {
+        console.error('[S.H.O.S] Erreur chargement profils:', e);
+        wrap.innerHTML = '<span class="p-loading" style="color:rgba(255,69,58,.8)">Erreur API</span>';
+    }
+}
+
+async function activateP(id, btn) {
+    const prev = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
+    try {
+        const r    = await fetch('/api/activate_profile', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile_id: id })
+        });
+        const data = await r.json();
+        if (data.status === 'success') await loadProfiles();
+        else throw new Error('Réponse serveur invalide');
+    } catch (e) {
+        console.error('[S.H.O.S] Erreur activation profil:', e);
+        btn.textContent = prev;
+        btn.disabled    = false;
+    }
+}
+
+window.addEventListener('DOMContentLoaded', loadProfiles);
 </script>
 </body>
 </html>

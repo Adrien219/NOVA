@@ -62,8 +62,8 @@ class ArduinoBridge:
         else:
             print(f"❌ [MQTT] Erreur connexion (code {rc})")
     
-    def _on_disconnect(self, client, userdata, rc, properties=None):
-        """Callback de déconnexion MQTT"""
+    def _on_disconnect(self, client, userdata, flags, rc, properties=None):
+        """Callback de déconnexion MQTT (compatible Paho v2)"""
         self.connected_mqtt = False
         print(f"⚠️  [MQTT] Déconnecté (code {rc})")
     
@@ -145,25 +145,45 @@ class ArduinoBridge:
         except KeyboardInterrupt:
             print("\n\n🛑 [BRIDGE] Arrêt du service...")
             self.stop()
-    
+        
     def _read_serial(self):
-        """Lire une ligne JSON depuis l'Arduino"""
+        """Décode le format MQ:494;JX:503; en dictionnaire compatible HUD"""
         try:
             if self.ser and self.ser.in_waiting > 0:
                 line = self.ser.readline().decode('utf-8').strip()
+                if not line: return None
                 
-                if line:
-                    # Valider que c'est du JSON
-                    data = json.loads(line)
-                    return data
-        
-        except json.JSONDecodeError as e:
-            print(f"⚠️  [SERIAL] JSON invalide : {e}")
-        except UnicodeDecodeError as e:
-            print(f"⚠️  [SERIAL] Erreur décodage : {e}")
+                if ':' in line and ';' in line:
+                    data_dict = {}
+                    # Dictionnaire de traduction (Format Arduino -> Format Interface)
+                    translation = {
+                        'MQ': 'gas',
+                        'DS': 'distance',
+                        'LD': 'light',       # LD (Logs) -> light (Interface)
+                        'MC': 'sound',       # MC (Logs) -> sound (Interface)
+                        'PT': 'potentiometer',
+                        'FL': 'flame',
+                        'IR': 'infrared',
+                        'TL': 'tilt',
+                        'JX': 'joy_x',
+                        'JY': 'joy_y'
+                    }
+                    
+                    pairs = line.split(';')
+                    for pair in pairs:
+                        if ':' in pair:
+                            key, value = pair.split(':')
+                            # On traduit la clé si elle existe dans notre dictionnaire
+                            web_key = translation.get(key, key) 
+                            try:
+                                data_dict[web_key] = float(value) if '.' in value else int(value)
+                            except:
+                                data_dict[web_key] = value
+                    
+                    if data_dict:
+                        return data_dict
         except Exception as e:
-            print(f"❌ [SERIAL] Erreur lecture : {e}")
-        
+            print(f"❌ [SERIAL] Erreur conversion : {e}")
         return None
     
     def _publish_mqtt(self, data):

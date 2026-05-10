@@ -28,7 +28,15 @@
             "secondary_modules": [
                 "text_reader"
             ]
+        },
+        "tprofil": {
+            "name": "tprofil",
+            "main_module": "vision_objet",
+            "secondary_modules": [
+                "danger_monitor",
+                "text_reader"
+            ]
         }
     },
-    "current_active_profile": "vision"
+    "current_active_profile": "tprofil"
 }

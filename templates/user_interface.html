@@ -3,488 +3,1257 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.H.O.S - HUD OPÉRATIONNEL</title>
+    <title>S.H.O.S — {{ profile.name if profile else 'Interface' }}</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        :root {
-            --main-cyan: #00d4ff;
-            --secondary-cyan: #00f9ff;
-            --danger-red: #ff3636;
-            --warning-orange: #ff9500;
-            --bg-dark: #0a0a0a;
-            --bg-semi: rgba(10, 10, 10, 0.9);
-            --border-dark: #1a1a1a;
-        }
-        
-        html, body {
-            width: 100%;
-            height: 100%;
-            background: var(--bg-dark);
-            color: var(--main-cyan);
-            font-family: 'Courier New', 'Courier', monospace;
-            overflow: hidden;
-        }
-        
-        /* === CONTENEUR PRINCIPAL === */
-        #hud-container {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            border: 2px solid var(--main-cyan);
-            background: var(--bg-dark);
-        }
-        
-        /* === ARRIÈRE-PLAN VIDÉO === */
-        #video-container {
-            position: relative;
-            flex: 1;
-            background: #000;
-            overflow: hidden;
-        }
-        
-        #video-bg {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            opacity: 0.7;
-        }
-        
-        .video-error {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: var(--danger-red);
-            font-size: 1.5em;
-            text-align: center;
-        }
-        
-        /* === WIDGETS === */
-        .widget {
-            position: absolute;
-            background: var(--bg-semi);
-            border: 1px solid var(--main-cyan);
-            border-radius: 3px;
-            padding: 12px;
-            font-size: 0.9em;
-            backdrop-filter: blur(5px);
-            z-index: 10;
-        }
-        
-        .widget.alert {
-            border-color: var(--danger-red);
-            background: rgba(255, 54, 54, 0.1);
-            animation: blink 0.5s infinite;
-        }
-        
-        .widget.warning {
-            border-color: var(--warning-orange);
-            background: rgba(255, 149, 0, 0.1);
-        }
-        
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-        
-        /* === LAYOUT DES WIDGETS === */
-        #telemetry {
-            top: 20px;
-            left: 20px;
-            width: 220px;
-            min-height: 180px;
-        }
-        
-        #system-info {
-            top: 20px;
-            right: 20px;
-            width: 200px;
-            text-align: right;
-        }
-        
-        #alerts {
-            bottom: 80px;
-            left: 20px;
-            width: 300px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        #console {
-            bottom: 80px;
-            right: 20px;
-            width: 400px;
-            max-height: 200px;
-            overflow-y: auto;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 8px;
-            font-size: 0.8em;
-        }
-        
-        .console-line {
-            margin: 2px 0;
-            color: var(--secondary-cyan);
-        }
-        
-        .console-error {
-            color: var(--danger-red);
-        }
-        
-        .console-warning {
-            color: var(--warning-orange);
-        }
-        
-        /* === BARRE DE STATUS === */
-        #status-bar {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            height: 40px;
-            background: var(--main-cyan);
-            color: #000;
-            padding: 8px 15px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            font-weight: bold;
-            font-size: 0.85em;
-            z-index: 20;
-        }
-        
-        #socket-status {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 2px;
-            font-weight: bold;
-            background: #000;
-            color: var(--danger-red);
-        }
-        
-        #socket-status.connected {
-            color: #00ff00;
-        }
-        
-        /* === VALEURS === */
-        .label {
-            font-size: 0.75em;
-            color: var(--secondary-cyan);
-            text-transform: uppercase;
-            opacity: 0.8;
-        }
-        
-        .value {
-            font-size: 1.8em;
-            font-weight: bold;
-            margin: 5px 0;
-            color: var(--main-cyan);
-        }
-        
-        .value.alert {
-            color: var(--danger-red);
-            animation: pulse 1s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        /* === GRILLE === */
-        hr { border: none; border-top: 1px solid var(--border-dark); margin: 8px 0; }
-        
-        /* === SCROLLBAR CUSTOM === */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: var(--border-dark);
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: var(--main-cyan);
-            border-radius: 3px;
-        }
+    /* ═══════════════════════════════════════════════════════
+       S.H.O.S USER INTERFACE — Profile-Driven Dynamic Layout
+       NestHome × Apple Vision Pro × Dark Glassmorphism
+    ═══════════════════════════════════════════════════════ */
+    :root {
+        --bg:          #0e1117;
+        --glass:       rgba(255,255,255,0.06);
+        --glass-card:  rgba(255,255,255,0.09);
+        --glass-hi:    rgba(255,255,255,0.14);
+        --border:      rgba(255,255,255,0.09);
+        --border-hi:   rgba(255,255,255,0.18);
+        --blur:        blur(24px) saturate(160%);
+        --blur-sm:     blur(14px) saturate(140%);
+        --blue:        #4da6ff;
+        --blue-dim:    rgba(77,166,255,0.14);
+        --teal:        #30d5c8;
+        --green:       #34c759;
+        --red:         #ff453a;
+        --amber:       #ffa340;
+        --yellow:      #e8d44d;
+        --purple:      #bf5af2;
+        --t1: rgba(255,255,255,0.93);
+        --t2: rgba(255,255,255,0.52);
+        --t3: rgba(255,255,255,0.28);
+        --font: 'DM Sans', -apple-system, sans-serif;
+        --mono: 'DM Mono', monospace;
+        --r:    14px;
+        --r-sm:  9px;
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html, body { height:100%; overflow:hidden; font-family:var(--font); background:var(--bg); color:var(--t1); }
+
+    /* ── ROOT GRID ───────────────────────────── */
+    .root {
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        grid-template-rows: 52px 1fr 44px;
+        height: 100vh;
+        background: var(--bg);
+    }
+
+    /* ── TOPBAR ──────────────────────────────── */
+    .topbar {
+        grid-column: 1 / 3;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 18px;
+        background: rgba(255,255,255,0.03);
+        border-bottom: 1px solid var(--border);
+        gap: 12px;
+    }
+    .tb-left { display:flex; align-items:center; gap:10px; }
+    .logo-gem {
+        width:30px; height:30px; border-radius:9px;
+        background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,.2);
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .logo-gem svg { width:14px; height:14px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .brand { font-size:14px; font-weight:600; color:var(--t1); letter-spacing:.05em; }
+
+    .greeting { font-size:13px; font-weight:500; color:var(--t1); }
+    .greeting span { color:var(--t2); font-weight:400; font-size:12px; margin-left:6px; }
+
+    .tb-right { display:flex; align-items:center; gap:8px; }
+
+    .tb-pill {
+        display:flex; align-items:center; gap:5px;
+        padding:5px 11px; border-radius:16px;
+        background:rgba(255,255,255,.07); border:1px solid var(--border);
+        font-size:11px; font-weight:500; color:var(--t2);
+    }
+    .dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+    .dot-on  { background:var(--green); box-shadow:0 0 5px var(--green); }
+    .dot-off { background:var(--red);   animation:blink 1s ease-in-out infinite; }
+    .dot-wait{ background:var(--amber); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .profile-badge {
+        display:flex; align-items:center; gap:7px;
+        padding:5px 12px; border-radius:16px;
+        background:var(--blue-dim); border:1px solid rgba(77,166,255,.3);
+        font-size:11px; font-weight:500; color:var(--blue);
+        font-family:var(--mono); cursor:pointer;
+        transition:all .18s;
+    }
+    .profile-badge:hover { background:rgba(77,166,255,.22); }
+    .profile-badge svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; }
+
+    .btn-home {
+        display:flex; align-items:center; gap:5px;
+        padding:5px 12px; border-radius:14px;
+        background:rgba(255,255,255,.07); border:1px solid var(--border);
+        font-size:11px; color:var(--t2); text-decoration:none;
+        transition:all .18s;
+    }
+    .btn-home:hover { background:rgba(255,255,255,.12); color:var(--t1); }
+
+    /* ── SIDEBAR ──────────────────────────────── */
+    .sidebar {
+        grid-column:1; grid-row:2;
+        display:flex; flex-direction:column; align-items:center;
+        padding:12px 0; gap:5px;
+        background:rgba(255,255,255,.025);
+        border-right:1px solid var(--border);
+    }
+    .sb {
+        width:34px; height:34px; border-radius:9px;
+        display:flex; align-items:center; justify-content:center;
+        background:none; border:none; cursor:pointer; transition:all .18s;
+        position:relative;
+    }
+    .sb svg { width:15px; height:15px; fill:none; stroke:var(--t3); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:stroke .18s; }
+    .sb:hover { background:rgba(255,255,255,.08); }
+    .sb:hover svg { stroke:var(--t1); }
+    .sb.active { background:var(--blue-dim); }
+    .sb.active svg { stroke:var(--blue); }
+    .sb.active::before {
+        content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
+        width:3px; height:14px; background:var(--blue); border-radius:0 3px 3px 0;
+    }
+    .sb-sep { width:20px; height:1px; background:var(--border); margin:3px 0; }
+
+    /* ── MAIN CONTENT ─────────────────────────── */
+    .main {
+        grid-column:2; grid-row:2;
+        overflow:hidden;
+        display:grid;
+        grid-template-columns: 1fr 300px;
+        grid-template-rows: 1fr;
+        gap:10px; padding:10px 12px 10px 10px;
+    }
+
+    /* ── LEFT COLUMN ──────────────────────────── */
+    .col-left {
+        display:flex; flex-direction:column; gap:10px; overflow:hidden; min-height:0;
+    }
+
+    /* ── RIGHT COLUMN ─────────────────────────── */
+    .col-right {
+        display:flex; flex-direction:column; gap:10px; overflow-y:auto; overflow-x:hidden;
+        scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.08) transparent;
+        min-height:0;
+    }
+    .col-right::-webkit-scrollbar { width:3px; }
+    .col-right::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); border-radius:2px; }
+
+    /* ── GLASS CARD ──────────────────────────── */
+    .card {
+        background:var(--glass-card);
+        backdrop-filter:var(--blur-sm);
+        -webkit-backdrop-filter:var(--blur-sm);
+        border:1px solid var(--border);
+        border-radius:var(--r);
+        position:relative; overflow:hidden;
+        box-shadow:0 4px 18px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.08) inset;
+        flex-shrink:0;
+    }
+    .card::after {
+        content:''; position:absolute; top:0; left:10%; right:10%; height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.10),transparent);
+        pointer-events:none;
+    }
+    .card-head {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:11px 14px 9px;
+        border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .card-head-left { display:flex; align-items:center; gap:8px; }
+    .card-lbl {
+        font-size:10px; font-weight:500; letter-spacing:.1em;
+        text-transform:uppercase; color:var(--t3);
+    }
+    .card-lbl-icon {
+        width:22px; height:22px; border-radius:6px;
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .card-lbl-icon svg { width:12px; height:12px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; }
+    .ic-blue   { background:rgba(77,166,255,.20);  border:1px solid rgba(77,166,255,.3); }
+    .ic-blue   svg { stroke:var(--blue); }
+    .ic-teal   { background:rgba(48,213,200,.18);  border:1px solid rgba(48,213,200,.3); }
+    .ic-teal   svg { stroke:var(--teal); }
+    .ic-green  { background:rgba(52,199,89,.18);   border:1px solid rgba(52,199,89,.3); }
+    .ic-green  svg { stroke:var(--green); }
+    .ic-red    { background:rgba(255,69,58,.18);   border:1px solid rgba(255,69,58,.3); }
+    .ic-red    svg { stroke:var(--red); }
+    .ic-amber  { background:rgba(255,163,64,.18);  border:1px solid rgba(255,163,64,.3); }
+    .ic-amber  svg { stroke:var(--amber); }
+    .ic-purple { background:rgba(191,90,242,.18);  border:1px solid rgba(191,90,242,.3); }
+    .ic-purple svg { stroke:var(--purple); }
+    .ic-grey   { background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); }
+    .ic-grey   svg { stroke:var(--t2); }
+
+    /* ── VIDEO CARD ──────────────────────────── */
+    .video-card {
+        flex:1; min-height:0;
+        display:flex; flex-direction:column;
+    }
+    .video-feed {
+        flex:1; min-height:0; position:relative;
+        background:#000;
+        overflow:hidden;
+        border-radius:0 0 var(--r) var(--r);
+    }
+    .video-feed img {
+        width:100%; height:100%; object-fit:cover;
+        display:block;
+    }
+    .video-overlay {
+        position:absolute; top:8px; left:8px;
+        display:flex; gap:5px;
+    }
+    .vid-badge {
+        display:flex; align-items:center; gap:4px;
+        padding:3px 8px; border-radius:8px;
+        font-size:10px; font-weight:500; font-family:var(--mono);
+        backdrop-filter:blur(12px);
+    }
+    .vid-live { background:rgba(255,69,58,.7); color:#fff; }
+    .vid-res  { background:rgba(0,0,0,.6); border:1px solid rgba(255,255,255,.15); color:var(--t2); }
+    .vid-placeholder {
+        position:absolute; inset:0; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; gap:10px; color:var(--t3);
+    }
+    .vid-placeholder svg { width:36px; height:36px; fill:none; stroke:currentColor; stroke-width:1.3; opacity:.5; }
+    .vid-placeholder span { font-size:12px; }
+
+    /* ── SENSOR GRID ─────────────────────────── */
+    .sensor-grid {
+        display:grid;
+        grid-template-columns:repeat(4,1fr);
+        gap:8px;
+        padding:10px 12px;
+    }
+    .sensor-cell {
+        padding:9px 10px;
+        background:rgba(255,255,255,.04);
+        border:1px solid var(--border);
+        border-radius:var(--r-sm);
+        display:flex; flex-direction:column; gap:3px;
+    }
+    .sc-lbl { font-size:9px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; }
+    .sc-val {
+        font-size:18px; font-weight:300; color:var(--t1);
+        font-variant-numeric:tabular-nums;
+        transition:color .3s ease;
+    }
+    .sc-val.alert { color:var(--red); animation:pulse-r 1s ease-in-out infinite; }
+    .sc-val.warn  { color:var(--amber); }
+    @keyframes pulse-r { 0%,100%{opacity:1} 50%{opacity:.5} }
+    .sc-unit { font-size:10px; color:var(--t3); font-family:var(--mono); }
+
+    /* ── CHART ───────────────────────────────── */
+    .chart-wrap { position:relative; height:110px; padding:0 12px 10px; }
+
+    /* ── MODULE WIDGETS (profile-driven) ─────── */
+    .module-widget {
+        padding:12px 14px;
+        display:none; /* caché par défaut — affiché par JS selon profil */
+        flex-direction:column; gap:8px;
+    }
+    .module-widget.visible { display:flex; }
+
+    .mod-row {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:7px 9px;
+        background:rgba(255,255,255,.04); border:1px solid var(--border);
+        border-radius:var(--r-sm);
+        font-size:12px;
+    }
+    .mod-row-left { display:flex; align-items:center; gap:7px; color:var(--t2); }
+    .mod-row-left svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; flex-shrink:0; }
+    .mod-val { font-size:12px; font-weight:500; color:var(--t1); font-family:var(--mono); }
+
+    /* ── STATUS PILL ──────────────────────────── */
+    .pill {
+        display:inline-flex; align-items:center; gap:5px;
+        padding:2px 8px; border-radius:8px;
+        font-size:10px; font-weight:500; font-family:var(--mono);
+    }
+    .pill .d { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+    .p-ok   { background:rgba(52,199,89,.14);  color:var(--green); border:1px solid rgba(52,199,89,.3); }
+    .p-ok   .d { background:var(--green); }
+    .p-err  { background:rgba(255,69,58,.14);  color:var(--red);   border:1px solid rgba(255,69,58,.3); animation:blink 1s infinite; }
+    .p-err  .d { background:var(--red); }
+    .p-wait { background:rgba(255,163,64,.12); color:var(--amber); border:1px solid rgba(255,163,64,.28); }
+    .p-wait .d { background:var(--amber); }
+
+    /* ── ALERTS PANEL ─────────────────────────── */
+    .alert-list { display:flex; flex-direction:column; gap:5px; padding:8px 12px; max-height:140px; overflow-y:auto; }
+    .alert-item {
+        display:flex; align-items:flex-start; gap:8px;
+        padding:7px 9px; border-radius:var(--r-sm);
+        font-size:11px; line-height:1.4;
+        animation:slideIn .25s ease;
+    }
+    @keyframes slideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+    .alert-item svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; flex-shrink:0; margin-top:1px; }
+    .a-crit { background:rgba(255,69,58,.12); border:1px solid rgba(255,69,58,.28); color:#ff7a72; }
+    .a-warn { background:rgba(255,163,64,.10); border:1px solid rgba(255,163,64,.26); color:var(--amber); }
+    .a-info { background:rgba(77,166,255,.08); border:1px solid rgba(77,166,255,.2); color:var(--blue); }
+    .alert-ts { margin-left:auto; font-size:9px; opacity:.6; white-space:nowrap; flex-shrink:0; font-family:var(--mono); }
+
+    /* ── LOGS / CONSOLE ──────────────────────── */
+    .log-list {
+        padding:8px 12px; display:flex; flex-direction:column; gap:2px;
+        max-height:140px; min-height:80px; overflow-y:auto;
+        scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.06) transparent;
+    }
+    .log-list::-webkit-scrollbar { width:2px; }
+    .log-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.06); }
+    .log-line { font-size:10px; font-family:var(--mono); color:var(--t2); line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .log-info    { color:rgba(77,166,255,.7); }
+    .log-warning { color:var(--amber); }
+    .log-error   { color:var(--red); }
+    .log-success { color:var(--green); }
+
+    /* ── SYS STATS ────────────────────────────── */
+    .sys-grid {
+        display:grid; grid-template-columns:1fr 1fr;
+        gap:6px; padding:10px 12px;
+    }
+    .sys-cell {
+        padding:8px 9px; background:rgba(255,255,255,.04);
+        border:1px solid var(--border); border-radius:var(--r-sm);
+    }
+    .sys-key { font-size:9px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; font-family:var(--mono); }
+    .sys-val { font-size:14px; font-weight:300; color:var(--t1); font-variant-numeric:tabular-nums; margin-top:2px; }
+
+    /* ── PROFILE SECTION HEADER ──────────────── */
+    .profile-section {
+        display:flex; align-items:center; gap:8px;
+        padding:8px 12px 4px;
+    }
+    .profile-section-line { flex:1; height:1px; background:var(--border); }
+    .profile-section-lbl { font-size:9px; color:var(--t3); text-transform:uppercase; letter-spacing:.1em; white-space:nowrap; }
+
+    /* ── WATCHDOG BAR ─────────────────────────── */
+    .watchdog-bar {
+        width:100%; height:2px; background:rgba(255,255,255,.06);
+        position:absolute; bottom:0; left:0;
+    }
+    .watchdog-fill {
+        height:100%; background:var(--green); width:100%;
+        transition:width 1s linear, background .5s ease;
+        border-radius:0 2px 2px 0;
+    }
+    .watchdog-fill.danger { background:var(--red); }
+    .watchdog-fill.warn   { background:var(--amber); }
+
+    /* ── STATUSBAR ────────────────────────────── */
+    .statusbar {
+        grid-column:1/3; grid-row:3;
+        display:flex; align-items:center; justify-content:space-between;
+        padding:0 16px;
+        background:rgba(255,255,255,.03);
+        border-top:1px solid var(--border);
+        font-size:11px; font-family:var(--mono);
+        gap:12px;
+    }
+    .sb-left  { display:flex; align-items:center; gap:10px; color:var(--t3); }
+    .sb-right { display:flex; align-items:center; gap:10px; color:var(--t3); }
+    .sb-val   { color:var(--t2); }
+    #sys-clock { font-weight:400; color:var(--t2); }
+    #hw-status { transition:color .3s; }
+    #hw-status.online  { color:var(--green); }
+    #hw-status.offline { color:var(--red); }
+
+    /* ── RESPONSIVE ───────────────────────────── */
+    @media(max-width:900px) {
+        .main { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
+        .col-right { grid-row:1; max-height:220px; }
+        .sensor-grid { grid-template-columns:repeat(2,1fr); }
+    }
+    @media(max-width:600px) {
+        .root { grid-template-columns:1fr; }
+        .sidebar { display:none; }
+        .sensor-grid { grid-template-columns:1fr 1fr; }
+    }
     </style>
 </head>
 <body>
+<div class="root">
 
-<div id="hud-container">
-    
-    <!-- VIDÉO -->
-    <div id="video-container">
-        <img src="/video_feed" style="width: 100%; border-radius: 10px;">
-    </div>
-    
-    <!-- WIDGET: TELEMETRIE CAPTEURS -->
-    <div id="telemetry" class="widget">
-        <div class="label">═══ CAPTEURS ═══</div>
-        <hr>
-        
-        <div class="label">Température</div>
-        <div class="value" id="val-temp">--°C</div>
-        
-        <div class="label">Humidité</div>
-        <div class="value" id="val-humidity">--%</div>
-        
-        <div class="label">Gaz (ppm)</div>
-        <div class="value" id="val-gas">--</div>
-        
-        <div class="label">Distance</div>
-        <div class="value" id="val-distance">-- cm</div>
-        
-        <div class="label" style="margin-top: 10px;">État</div>
-        <div class="value" id="val-flame">✓ NORMAL</div>
-    </div>
-    
-    <!-- WIDGET: SYSTÈME RASPBERRY PI -->
-    <div id="system-info" class="widget">
-        <div class="label">═══ SYSTÈME ═══</div>
-        <hr>
-        
-        <div><span class="label">CPU</span> <span id="val-cpu">--</span>%</div>
-        <div><span class="label">RAM</span> <span id="val-ram">--</span>%</div>
-        <div><span class="label">DISQUE</span> <span id="val-disk">--</span>%</div>
-        <div><span class="label">TEMP RPi</span> <span id="val-rpi-temp">--</span>°C</div>
-        
-        <hr>
-        <div><span class="label">Uptime</span> <span id="val-uptime">--</span></div>
-    </div>
-    
-    <!-- WIDGET: ALERTES -->
-    <div id="alerts" class="widget">
-        <div class="label">═══ ALERTES ═══</div>
-        <div id="alert-list" style="margin-top: 8px; max-height: 180px; overflow-y: auto;"></div>
-    </div>
-    
-    <!-- WIDGET: CONSOLE -->
-    <div id="console" class="widget">
-        <div class="label">═══ LOGS ═══</div>
-        <div id="console-output"></div>
-    </div>
-    
-    <!-- BARRE DE STATUS -->
-    <div id="status-bar">
-        <span>S.H.O.S HUD | Profil: <strong>{{ profile.name }}</strong></span>
-        <span>Socket.IO: <span id="socket-status">DÉCONNECTÉ</span> | Capteurs: <span id="hardware-status" style="color: #ff0000;">OFFLINE</span></span>
-    </div>
-    
-</div>
+    <!-- ── TOPBAR ────────────────────────────── -->
+    <header class="topbar">
+        <div class="tb-left">
+            <div class="logo-gem" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            </div>
+            <span class="brand">S.H.O.S</span>
+        </div>
 
-<!-- ============================================================ -->
-<!-- SCRIPT JAVASCRIPT                                            -->
-<!-- ============================================================ -->
-<script>
-    // === CONFIGURATION ===
-    const MAX_CONSOLE_LINES = 50;
-    const GAS_ALERT_THRESHOLD = 400;
-    const TEMP_ALERT_THRESHOLD = 50;
-    const DISTANCE_ALERT_THRESHOLD = 30;
-    
-    // === VARIABLES GLOBALES ===
-    let consoleLines = [];
-    let lastSensorUpdate = 0;
-    
-    // === LOGGING CUSTOM ===
-    function addLog(message, type = 'info') {
-        const now = new Date().toLocaleTimeString('fr-FR');
-        const line = `[${now}] ${message}`;
-        consoleLines.push({ text: line, type });
-        
-        if (consoleLines.length > MAX_CONSOLE_LINES) {
-            consoleLines.shift();
-        }
-        
-        updateConsoleDisplay();
-    }
-    
-    function updateConsoleDisplay() {
-        const output = document.getElementById('console-output');
-        output.innerHTML = consoleLines
-            .map(line => {
-                const className = `console-line console-${line.type}`;
-                return `<div class="${className}">${escapeHtml(line.text)}</div>`;
-            })
-            .join('');
-        output.scrollTop = output.scrollHeight;
-    }
-    
-    function escapeHtml(text) {
-        const map = {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#039;'
-        };
-        return text.replace(/[&<>"']/g, m => map[m]);
-    }
-    
-    // === CONNEXION SOCKET.IO ===
-    const socket = io();
-    const statusSpan = document.getElementById('socket-status');
-    const hardwareSpan = document.getElementById('hardware-status');
-    
-    socket.on('connect', () => {
-        statusSpan.textContent = '🔗 CONNECTÉ';
-        statusSpan.classList.add('connected');
-        addLog('✅ Connecté au serveur S.H.O.S', 'info');
-    });
-    
-    socket.on('disconnect', () => {
-        statusSpan.textContent = '✗ DÉCONNECTÉ';
-        statusSpan.classList.remove('connected');
-        addLog('❌ Perte de connexion avec le serveur', 'error');
-    });
-    
-    socket.on('connection_response', (data) => {
-        addLog(data.data, 'info');
-    });
-    
-    // === RÉCEPTION DES DONNÉES CAPTEURS ===
-    socket.on('sensor_update', (data) => {
-        lastSensorUpdate = Date.now();
-        hardwareSpan.textContent = '✓ ONLINE';
-        hardwareSpan.style.color = '#00ff00';
-        
-        addLog(`📡 Données reçues: T=${data.temperature}°C, H=${data.humidity}%, G=${data.gas}ppm`, 'info');
-        
-        // === AFFICHAGE TEMPÉRATURE ===
-        const tempElement = document.getElementById('val-temp');
-        tempElement.textContent = (data.temperature !== null && data.temperature !== undefined)
-            ? data.temperature.toFixed(1) + '°C'
-            : '--°C';
-        
-        if (data.temperature > TEMP_ALERT_THRESHOLD) {
-            tempElement.classList.add('alert');
-            addLog(`⚠️  Température élevée: ${data.temperature}°C`, 'warning');
-        } else {
-            tempElement.classList.remove('alert');
-        }
-        
-        // === AFFICHAGE HUMIDITÉ ===
-        const humidityElement = document.getElementById('val-humidity');
-        humidityElement.textContent = (data.humidity !== null && data.humidity !== undefined)
-            ? data.humidity.toFixed(0) + '%'
-            : '--%';
-        
-        // === AFFICHAGE GAZ ===
-        const gasElement = document.getElementById('val-gas');
-        gasElement.textContent = (data.gas !== null && data.gas !== undefined)
-            ? data.gas.toFixed(0)
-            : '--';
-        
-        const telemetryWidget = document.getElementById('telemetry');
-        if (data.gas > GAS_ALERT_THRESHOLD) {
-            gasElement.classList.add('alert');
-            telemetryWidget.classList.add('alert');
-            addLog(`🚨 ALERTE: Niveau de gaz critique (${data.gas} ppm)`, 'error');
-        } else {
-            gasElement.classList.remove('alert');
-            if (data.flame !== 1) telemetryWidget.classList.remove('alert');
-        }
-        
-        // === AFFICHAGE DISTANCE ===
-        const distanceElement = document.getElementById('val-distance');
-        if (data.distance !== null && data.distance !== undefined) {
-            distanceElement.textContent = data.distance.toFixed(0) + ' cm';
-            
-            if (data.distance < DISTANCE_ALERT_THRESHOLD) {
-                distanceElement.classList.add('alert');
-                addLog(`⚠️  Proximité détectée: ${data.distance} cm`, 'warning');
-            } else {
-                distanceElement.classList.remove('alert');
-            }
-        } else {
-            distanceElement.textContent = '-- cm';
-            distanceElement.classList.remove('alert');
-        }
-        
-        // === AFFICHAGE FLAMME/FUMÉE ===
-        const flameElement = document.getElementById('val-flame');
-        if (data.flame === 1) {
-            flameElement.textContent = '🔥 FLAMME !';
-            flameElement.classList.add('alert');
-            telemetryWidget.classList.add('alert');
-            addLog('🚨 ALERTE CRITIQUE: Flamme détectée !', 'error');
-        } else {
-            flameElement.textContent = '✓ NORMAL';
-            flameElement.classList.remove('alert');
-        }
-    });
-    
-    // === RÉCEPTION DES DONNÉES SYSTÈME ===
-    socket.on('sys_update', (data) => {
-        document.getElementById('val-cpu').textContent = data.cpu.toFixed(1);
-        document.getElementById('val-ram').textContent = data.ram.toFixed(1);
-        document.getElementById('val-disk').textContent = data.disk.toFixed(1);
-        document.getElementById('val-rpi-temp').textContent = data.temp.toFixed(1);
-        
-        // Uptime en format lisible
-        const uptime = Math.floor(data.uptime);
-        const hours = Math.floor(uptime / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        document.getElementById('val-uptime').textContent = `${hours}h ${minutes}m`;
-    });
-    
-    // === ALERTES ===
-    socket.on('alert_critical', (alert) => {
-        addLog(`🚨 CRITIQUE: ${alert.message}`, 'error');
-        showAlert(alert, 'critical');
-    });
-    
-    socket.on('alert_warning', (alert) => {
-        addLog(`⚠️  AVERTISSEMENT: ${alert.message}`, 'warning');
-        showAlert(alert, 'warning');
-    });
-    
-    function showAlert(alert, severity) {
-        const alertList = document.getElementById('alert-list');
-        const alertDiv = document.createElement('div');
-        alertDiv.className = `alert-item alert-${severity}`;
-        alertDiv.style.cssText = `
-            padding: 6px;
-            margin: 4px 0;
-            border: 1px solid ${severity === 'critical' ? '#ff3636' : '#ff9500'};
-            border-radius: 2px;
-            background: ${severity === 'critical' ? 'rgba(255,54,54,0.2)' : 'rgba(255,149,0,0.2)'};
-            color: ${severity === 'critical' ? '#ff3636' : '#ff9500'};
-            font-size: 0.85em;
-        `;
-        alertDiv.textContent = `[${new Date().toLocaleTimeString('fr-FR')}] ${alert.message}`;
-        
-        alertList.insertBefore(alertDiv, alertList.firstChild);
-        
-        // Supprimer après 10 secondes
-        setTimeout(() => alertDiv.remove(), 10000);
-    }
-    
-    socket.on('system_status', (data) => {
-        addLog(`📊 Status système: ${data.status}`, 'info');
-    });
-    
-    // === WATCHDOG: Détection de déconnexion hardware ===
-    setInterval(() => {
-        const timeSinceLastUpdate = Date.now() - lastSensorUpdate;
-        
-        if (timeSinceLastUpdate > 10000 && lastSensorUpdate > 0) {
-            hardwareSpan.textContent = '✗ OFFLINE';
-            hardwareSpan.style.color = '#ff3636';
-            addLog('❌ Perte de connexion avec l\'Arduino', 'error');
-        }
-    }, 5000);
-    
-    // === INITIALISATION ===
-    addLog('🚀 S.H.O.S HUD initialisé', 'info');
-    addLog('⏳ En attente des données...', 'info');
-    
-    // Logs de débogage
-    console.log('%c[S.H.O.S HUD]', 'color: #00d4ff; font-weight: bold; font-size: 14px;', 'Interface chargée et prête');
+        <div class="greeting">
+            Bonjour —
+            <span id="greeting-profile">{{ profile.name if profile else '—' }}</span>
+        </div>
+
+        <div class="tb-right" role="status" aria-label="Statuts connexion">
+            <div class="tb-pill">
+                <span class="dot dot-wait" id="dot-socket" aria-hidden="true"></span>
+                <span id="txt-socket">Socket</span>
+            </div>
+            <div class="tb-pill">
+                <span class="dot dot-wait" id="dot-mqtt" aria-hidden="true"></span>
+                <span id="txt-mqtt">MQTT</span>
+            </div>
+            <div class="tb-pill">
+                <span class="dot dot-wait" id="dot-arduino" aria-hidden="true"></span>
+                <span id="txt-arduino">Arduino</span>
+            </div>
+            <div class="profile-badge" onclick="location.href='/profile_manager'" aria-label="Changer de profil">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                {{ profile.name if profile else 'Aucun profil' }}
+            </div>
+            <a href="/" class="btn-home" aria-label="Accueil">← Accueil</a>
+        </div>
+    </header>
+
+    <!-- ── SIDEBAR ───────────────────────────── -->
+    <nav class="sidebar" aria-label="Navigation">
+        <button class="sb active" title="Interface" aria-label="Interface">
+            <svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+        </button>
+        <button class="sb" title="Dashboard" onclick="location.href='/dashboard'" aria-label="Dashboard">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </button>
+        <div class="sb-sep" aria-hidden="true"></div>
+        <button class="sb" title="HUD" onclick="location.href='/hud'" aria-label="Mode HUD">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8-5.6 8-10 8S2 17 2 12z"/></svg>
+        </button>
+        <button class="sb" title="Diagnostic" onclick="location.href='/diagnostic_ultimate'" aria-label="Diagnostic">
+            <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </button>
+        <div class="sb-sep" aria-hidden="true"></div>
+        <button class="sb" title="Paramètres" onclick="location.href='/settings'" aria-label="Paramètres">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+    </nav>
+
+    <!-- ── MAIN ──────────────────────────────── -->
+    <main class="main">
+
+        <!-- LEFT COLUMN -->
+        <div class="col-left">
+
+            <!-- ══ VIDÉO — TOUJOURS VISIBLE ════ -->
+            <div class="card video-card">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-red" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/></svg>
+                        </div>
+                        <span class="card-lbl">Flux Vidéo</span>
+                        <span class="pill p-wait" id="vid-status"><span class="d"></span>—</span>
+                    </div>
+                    <div style="font-size:10px;color:var(--t3);font-family:var(--mono)" id="vid-src-lbl">Port 5050</div>
+                </div>
+
+                <div class="video-feed" id="vid-feed">
+                    <div class="vid-placeholder" id="vid-placeholder">
+                        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/></svg>
+                        <span>En attente du flux caméra…</span>
+                    </div>
+                    <!-- Flux vidéo principal — Port 5050 comme dans l'ancien code -->
+                    <img id="video-stream" 
+                             src="http://{{ request.host.split(':')[0] }}:5050/video_feed" 
+                             alt="En attente du flux NOVA VISION..." 
+                             style="width: 100%; height: auto; display: block;"
+                             title="Flux IA en temps réel"
+                             onclick="this.src='http://{{ request.host.split(':')[0] }}:5050/video_feed?' + new Date().getTime();"
+                             onerror="handleVideoError(this)">
+                        
+                        <div id="camera-status-badge" style="position: absolute; top: 10px; left: 10px; background: rgba(0,255,0,0.7); color: black; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                        </div>
+                    <div class="video-overlay">
+                        <span class="vid-badge vid-live" id="vid-live-badge" style="display:none">● LIVE</span>
+                        <span class="vid-badge vid-res">{{ profile.name if profile else 'CAM' }}</span>
+                    </div>
+                    <!-- Watchdog bar -->
+                    <div class="watchdog-bar" aria-hidden="true">
+                        <div class="watchdog-fill" id="watchdog-fill"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ CAPTEURS — TOUJOURS VISIBLE ════ -->
+            <div class="card">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-teal" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        </div>
+                        <span class="card-lbl">Capteurs temps réel</span>
+                    </div>
+                    <span class="pill p-wait" id="sensor-status"><span class="d"></span>—</span>
+                </div>
+
+                <div class="sensor-grid" role="region" aria-label="Valeurs des capteurs">
+                    <div class="sensor-cell">
+                        <span class="sc-lbl">Température</span>
+                        <span class="sc-val" id="s-temp">—</span>
+                        <span class="sc-unit">°C</span>
+                    </div>
+                    <div class="sensor-cell">
+                        <span class="sc-lbl">Humidité</span>
+                        <span class="sc-val" id="s-hum">—</span>
+                        <span class="sc-unit">%</span>
+                    </div>
+                    <div class="sensor-cell">
+                        <span class="sc-lbl">Gaz</span>
+                        <span class="sc-val" id="s-gas">—</span>
+                        <span class="sc-unit">ppm</span>
+                    </div>
+                    <div class="sensor-cell">
+                        <span class="sc-lbl">Distance</span>
+                        <span class="sc-val" id="s-dist">—</span>
+                        <span class="sc-unit">cm</span>
+                    </div>
+                    <div class="sensor-cell">
+                        <span class="sc-lbl">Flamme</span>
+                        <span class="sc-val" id="s-flame">—</span>
+                    </div>
+                    <div class="sensor-cell">
+                        <span class="sc-lbl">Son</span>
+                        <span class="sc-val" id="s-sound">—</span>
+                        <span class="sc-unit">dB</span>
+                    </div>
+                    <div class="sensor-cell">
+                        <span class="sc-lbl">Joystick X</span>
+                        <span class="sc-val" id="s-jx">—</span>
+                    </div>
+                    <div class="sensor-cell">
+                        <span class="sc-lbl">Joystick Y</span>
+                        <span class="sc-val" id="s-jy">—</span>
+                    </div>
+                </div>
+
+                <!-- Mini chart historique -->
+                <div class="chart-wrap">
+                    <canvas id="sensorChart" aria-label="Historique température et gaz"></canvas>
+                </div>
+            </div>
+
+        </div><!-- /.col-left -->
+
+        <!-- RIGHT COLUMN -->
+        <div class="col-right" id="right-col">
+
+            <!-- ══ ALERTES — TOUJOURS VISIBLE ════ -->
+            <div class="card" role="region" aria-label="Alertes système" aria-live="polite">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-red" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </div>
+                        <span class="card-lbl">Alertes</span>
+                    </div>
+                    <span id="alert-count" style="font-size:10px;color:var(--t3);font-family:var(--mono)">0</span>
+                </div>
+                <div class="alert-list" id="alert-list">
+                    <div style="font-size:11px;color:var(--t3);padding:4px 0">Aucune alerte active.</div>
+                </div>
+            </div>
+
+            <!-- ══ LOGS — TOUJOURS VISIBLE ════ -->
+            <div class="card" role="region" aria-label="Journal système">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-grey" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        </div>
+                        <span class="card-lbl">Journal système</span>
+                    </div>
+                    <button onclick="clearLogs()" style="font-size:9px;color:var(--t3);background:none;border:none;cursor:pointer;font-family:var(--mono);" aria-label="Effacer les logs">CLEAR</button>
+                </div>
+                <div class="log-list" id="log-list" role="log" aria-live="polite"></div>
+            </div>
+
+            <!-- ══ SYSTÈME — TOUJOURS VISIBLE ════ -->
+            <div class="card" role="region" aria-label="Ressources système">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-blue" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
+                        </div>
+                        <span class="card-lbl">Raspberry Pi</span>
+                    </div>
+                    <span class="pill p-wait" id="rpi-pill"><span class="d"></span>—</span>
+                </div>
+                <div class="sys-grid">
+                    <div class="sys-cell">
+                        <div class="sys-key">CPU</div>
+                        <div class="sys-val" id="r-cpu">—<span style="font-size:11px;color:var(--t3)">%</span></div>
+                    </div>
+                    <div class="sys-cell">
+                        <div class="sys-key">RAM</div>
+                        <div class="sys-val" id="r-ram">—<span style="font-size:11px;color:var(--t3)">%</span></div>
+                    </div>
+                    <div class="sys-cell">
+                        <div class="sys-key">Temp CPU</div>
+                        <div class="sys-val" id="r-temp">—<span style="font-size:11px;color:var(--t3)">°C</span></div>
+                    </div>
+                    <div class="sys-cell">
+                        <div class="sys-key">Uptime</div>
+                        <div class="sys-val" id="r-uptime" style="font-size:13px">—</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ══ MODULES DYNAMIQUES DU PROFIL ════
+                 Ces sections s'affichent/masquent selon
+                 profile.secondary_modules côté Jinja2 + JS
+            ════════════════════════════════════════ -->
+
+            <!-- Danger Monitor -->
+            <div class="card" id="mod-danger" style="display:none" role="region" aria-label="Danger Monitor">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-red" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </div>
+                        <span class="card-lbl">Danger Monitor</span>
+                    </div>
+                    <span class="pill p-wait" id="danger-pill"><span class="d"></span>—</span>
+                </div>
+                <div class="module-widget visible">
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>Flamme</div>
+                        <span class="mod-val" id="dm-flame">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg>Infrarouge</div>
+                        <span class="mod-val" id="dm-ir">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg>Gaz seuil</div>
+                        <span class="mod-val" id="dm-gas-lvl">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Obstacle</div>
+                        <span class="mod-val" id="dm-obstacle">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Vision Objet -->
+            <div class="card" id="mod-vision" style="display:none" role="region" aria-label="Vision Objet">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-purple" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8-5.6 8-10 8S2 17 2 12z"/></svg>
+                        </div>
+                        <span class="card-lbl">Vision Objet</span>
+                    </div>
+                    <span class="pill p-wait" id="vision-pill"><span class="d"></span>—</span>
+                </div>
+                <div class="module-widget visible">
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Objets détectés</div>
+                        <span class="mod-val" id="vo-count">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>FPS analyse</div>
+                        <span class="mod-val" id="vo-fps">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Dernier objet</div>
+                        <span class="mod-val" id="vo-last" style="font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Voice Assistant -->
+            <div class="card" id="mod-voice" style="display:none" role="region" aria-label="Voice Assistant">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-teal" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                        </div>
+                        <span class="card-lbl">Voice Assistant</span>
+                    </div>
+                    <span class="pill p-wait" id="voice-pill"><span class="d"></span>—</span>
+                </div>
+                <div class="module-widget visible">
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/></svg>Statut écoute</div>
+                        <span class="mod-val" id="va-state">—</span>
+                    </div>
+                    <div class="mod-row" style="flex-direction:column;align-items:flex-start;gap:3px">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Dernière commande</div>
+                        <span style="font-size:11px;color:var(--blue);font-family:var(--mono);padding-left:4px" id="va-cmd">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MediaPipe Gestes -->
+            <div class="card" id="mod-mediapipe" style="display:none" role="region" aria-label="MediaPipe Gestes">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-amber" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+                        </div>
+                        <span class="card-lbl">MediaPipe Gestes</span>
+                    </div>
+                    <span class="pill p-wait" id="mp-pill"><span class="d"></span>—</span>
+                </div>
+                <div class="module-widget visible">
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>FPS détection</div>
+                        <span class="mod-val" id="mp-fps">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/></svg>Geste actuel</div>
+                        <span class="mod-val" id="mp-gesture">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Mains détectées</div>
+                        <span class="mod-val" id="mp-hands">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Télémétrie distante (profil Assistance à Distance) -->
+            <div class="card" id="mod-remote" style="display:none" role="region" aria-label="Télémétrie distante">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-blue" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><circle cx="12" cy="20" r="1"/></svg>
+                        </div>
+                        <span class="card-lbl">Télémétrie distante</span>
+                    </div>
+                    <span class="pill p-wait" id="remote-pill"><span class="d"></span>—</span>
+                </div>
+                <div class="module-widget visible">
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>Latence MQTT</div>
+                        <span class="mod-val" id="rt-latency">— ms</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Paquets reçus</div>
+                        <span class="mod-val" id="rt-packets">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Batterie distante</div>
+                        <span class="mod-val" id="rt-battery">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Joystick / Contrôles analogiques -->
+            <div class="card" id="mod-joystick" style="display:none" role="region" aria-label="Contrôles analogiques">
+                <div class="card-head">
+                    <div class="card-head-left">
+                        <div class="card-lbl-icon ic-green" aria-hidden="true">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="22"/><line x1="2" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="22" y2="12"/></svg>
+                        </div>
+                        <span class="card-lbl">Contrôles Analogiques</span>
+                    </div>
+                </div>
+                <div class="module-widget visible">
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><polyline points="18,8 22,12 18,16"/><line x1="2" y1="12" x2="22" y2="12"/></svg>Joy X</div>
+                        <span class="mod-val" id="js-x">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><polyline points="8,18 12,22 16,18"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Joy Y</div>
+                        <span class="mod-val" id="js-y">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>Bouton</div>
+                        <span class="mod-val" id="js-btn">—</span>
+                    </div>
+                    <div class="mod-row">
+                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Potentiomètre</div>
+                        <span class="mod-val" id="js-pot">—</span>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /.col-right -->
+
+    </main>
+
+    <!-- ── STATUSBAR ───────────────────────── -->
+    <footer class="statusbar">
+        <div class="sb-left">
+            <span>S.H.O.S</span>
+            <span>·</span>
+            <span>Profil : <span class="sb-val" id="sb-profile">{{ profile.name if profile else '—' }}</span></span>
+            <span>·</span>
+            <span>Module : <span class="sb-val" id="sb-module">{{ profile.main_module if profile else '—' }}</span></span>
+        </div>
+        <div class="sb-right">
+            <span id="hw-status" class="offline">Hardware : <span id="hw-txt">OFFLINE</span></span>
+            <span>·</span>
+            <span id="sys-clock">--:--:--</span>
+        </div>
+    </footer>
+
+</div><!-- /.root -->
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- JINJA2 : données profil injectées en JSON sécurisé  -->
+<!-- ─────────────────────────────────────────────────── -->
+<script id="profile-data" type="application/json">
+{
+    "name":               "{{ profile.name | default('') | e }}",
+    "main_module":        "{{ profile.main_module | default('') | e }}",
+    "secondary_modules":  {{ profile.secondary_modules | tojson if profile and profile.secondary_modules else '[]' }}
+}
 </script>
 
+<script>
+/* ═══════════════════════════════════════════════════════
+   S.H.O.S USER INTERFACE — JavaScript
+   Logique profil-driven + Socket.IO + Chart.js
+═══════════════════════════════════════════════════════ */
+
+/* ── PROFIL — lecture depuis le JSON injecté ─────────── */
+let PROFILE = { name:'', main_module:'', secondary_modules:[] };
+try {
+    PROFILE = JSON.parse(document.getElementById('profile-data').textContent);
+} catch(e) { console.warn('[S.H.O.S] profile-data parse error:', e); }
+
+/* ══════════════════════════════════════════════════════
+   MAP : module_id  →  id de la card DOM à afficher
+   Chaque clé correspond à une valeur possible dans
+   profile.secondary_modules venant du backend Flask.
+════════════════════════════════════════════════════════ */
+const MODULE_MAP = {
+    'danger_monitor':   'mod-danger',
+    'danger':           'mod-danger',
+    'vision':           'mod-vision',
+    'vision_object':    'mod-vision',
+    'object_detection': 'mod-vision',
+    'voice':            'mod-voice',
+    'voice_assistant':  'mod-voice',
+    'mediapipe':        'mod-mediapipe',
+    'mediapipe_gesture':'mod-mediapipe',
+    'remote':           'mod-remote',
+    'assistance':       'mod-remote',
+    'joystick':         'mod-joystick',
+    'analog':           'mod-joystick',
+    'controls':         'mod-joystick',
+};
+
+/* Modules affichés selon main_module aussi */
+const MAIN_MODULE_MAP = {
+    'danger_monitor':   ['mod-danger'],
+    'vision_object':    ['mod-vision'],
+    'voice_assistant':  ['mod-voice'],
+    'mediapipe':        ['mod-mediapipe'],
+    'remote':           ['mod-remote'],
+    'joystick':         ['mod-joystick'],
+};
+
+/**
+ * Affiche les modules selon le profil actif.
+ * Appelé au chargement et après un changement de profil.
+ */
+function applyProfileModules() {
+    /* Masquer tous les modules dynamiques */
+    Object.values(MODULE_MAP).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    const visible = new Set();
+
+    /* Module principal */
+    const mainMods = MAIN_MODULE_MAP[PROFILE.main_module] || [];
+    mainMods.forEach(id => visible.add(id));
+
+    /* Modules secondaires */
+    (PROFILE.secondary_modules || []).forEach(key => {
+        const id = MODULE_MAP[key.toLowerCase()];
+        if (id) visible.add(id);
+    });
+
+    /* Afficher les modules sélectionnés avec animation */
+    visible.forEach((id, i) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.style.display    = 'block';
+        el.style.opacity    = '0';
+        el.style.transform  = 'translateY(10px)';
+        setTimeout(() => {
+            el.style.transition = 'opacity .35s ease, transform .35s ease';
+            el.style.opacity    = '1';
+            el.style.transform  = 'none';
+        }, 50 + i * 60);
+    });
+
+    addLog('Profil « ' + (PROFILE.name || '—') + ' » appliqué · ' + visible.size + ' module(s) actif(s)', 'success');
+}
+
+/* ── HORLOGE ─────────────────────────────────────────── */
+function tick() {
+    const n   = new Date();
+    const pad = x => String(x).padStart(2,'0');
+    document.getElementById('sys-clock').textContent =
+        pad(n.getHours()) + ':' + pad(n.getMinutes()) + ':' + pad(n.getSeconds());
+}
+setInterval(tick, 1000); tick();
+
+/* ── LOGS ────────────────────────────────────────────── */
+const MAX_LOGS  = 60;
+let   logBuffer = [];
+
+function addLog(msg, type = 'info') {
+    const ts  = new Date().toLocaleTimeString('fr-FR');
+    logBuffer.push({ ts, msg, type });
+    if (logBuffer.length > MAX_LOGS) logBuffer.shift();
+    renderLogs();
+}
+
+function renderLogs() {
+    const el = document.getElementById('log-list');
+    if (!el) return;
+    el.innerHTML = logBuffer.slice().reverse().map(l =>
+        `<div class="log-line log-${l.type}">[${l.ts}] ${escHtml(l.msg)}</div>`
+    ).join('');
+}
+
+function clearLogs() { logBuffer = []; renderLogs(); }
+
+/* ── HELPERS ─────────────────────────────────────────── */
+function escHtml(s) {
+    return String(s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function setTxt(id, v) {
+    const el = document.getElementById(id);
+    if (el && el.textContent !== String(v)) el.textContent = v;
+}
+
+function setPill(id, state, label) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const cls = 'pill ' + (state==='ok' ? 'p-ok' : state==='err' ? 'p-err' : 'p-wait');
+    if (el.className !== cls) el.className = cls;
+    const nodes = el.childNodes;
+    const last  = nodes[nodes.length - 1];
+    if (last && last.nodeType === 3) {
+        if (last.textContent !== label) last.textContent = label;
+    } else {
+        el.innerHTML = '<span class="d"></span>' + label;
+    }
+}
+
+function setDot(id, state) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'dot ' + (state==='on' ? 'dot-on' : state==='off' ? 'dot-off' : 'dot-wait');
+}
+
+/* ── ALERTES ─────────────────────────────────────────── */
+let alertCount = 0;
+function showAlert(data, type) {
+    const list = document.getElementById('alert-list');
+    if (!list) return;
+    /* Supprimer le message "Aucune alerte" si présent */
+    const empty = list.querySelector('[data-empty]');
+    if (empty) empty.remove();
+
+    const el  = document.createElement('div');
+    const ico = type === 'critical'
+        ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
+        : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>';
+    const ts  = new Date().toLocaleTimeString('fr-FR');
+    el.className  = 'alert-item ' + (type === 'critical' ? 'a-crit' : 'a-warn');
+    el.innerHTML  = `<svg viewBox="0 0 24 24">${ico}</svg><span>${escHtml(data.message || JSON.stringify(data))}</span><span class="alert-ts">${ts}</span>`;
+
+    list.insertBefore(el, list.firstChild);
+    alertCount++;
+    setTxt('alert-count', alertCount);
+    setTimeout(() => { el.remove(); alertCount = Math.max(0, alertCount-1); setTxt('alert-count', alertCount); }, 12000);
+}
+
+/* ── VIDÉO ───────────────────────────────────────────── */
+function videoOnline() {
+    document.getElementById('vid-placeholder').style.display = 'none';
+    document.getElementById('vid-img').style.display = 'block';
+    document.getElementById('vid-live-badge').style.display = 'flex';
+    setPill('vid-status', 'ok', 'En ligne');
+    addLog('Flux vidéo connecté', 'success');
+}
+function videoOffline() {
+    document.getElementById('vid-placeholder').style.display = 'flex';
+    document.getElementById('vid-img').style.display = 'none';
+    document.getElementById('vid-live-badge').style.display = 'none';
+    setPill('vid-status', 'err', 'Hors ligne');
+    addLog('Flux vidéo — port 5050 inaccessible', 'error');
+}
+
+/* ── CHART MINI ──────────────────────────────────────── */
+const histMax = 30;
+const hist    = { temp:[], gas:[], ts:[] };
+const chartCtx = document.getElementById('sensorChart').getContext('2d');
+
+function makeGrad(r, g, b) {
+    const gr = chartCtx.createLinearGradient(0, 0, 0, 110);
+    gr.addColorStop(0,   `rgba(${r},${g},${b},0.22)`);
+    gr.addColorStop(1,   `rgba(${r},${g},${b},0)`);
+    return gr;
+}
+
+const sChart = new Chart(chartCtx, {
+    type:'line',
+    data:{
+        labels:[],
+        datasets:[
+            { label:'Temp °C', data:[], borderColor:'#ff6b6b', backgroundColor:makeGrad(255,107,107),
+              borderWidth:1.5, tension:0.45, fill:true, pointRadius:0 },
+            { label:'Gaz ppm', data:[], borderColor:'#e8d44d', backgroundColor:makeGrad(232,212,77),
+              borderWidth:1.5, tension:0.45, fill:true, pointRadius:0, yAxisID:'y2' }
+        ]
+    },
+    options:{
+        responsive:true, maintainAspectRatio:false,
+        animation:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:'rgba(14,18,28,.95)', titleFont:{size:9}, bodyFont:{family:'DM Mono',size:11} } },
+        scales:{
+            x:{ display:false },
+            y:{ ticks:{color:'rgba(255,255,255,.22)',font:{size:9},maxTicksLimit:4}, grid:{color:'rgba(255,255,255,.04)'}, border:{display:false} },
+            y2:{ position:'right', ticks:{color:'rgba(232,212,77,.5)',font:{size:9},maxTicksLimit:4}, grid:{drawOnChartArea:false}, border:{display:false} }
+        }
+    }
+});
+
+function pushChart(temp, gas) {
+    const ts = new Date().toLocaleTimeString('fr-FR').slice(-5);
+    hist.ts.push(ts); hist.temp.push(temp); hist.gas.push(gas);
+    if (hist.ts.length > histMax) { hist.ts.shift(); hist.temp.shift(); hist.gas.shift(); }
+    sChart.data.labels            = hist.ts;
+    sChart.data.datasets[0].data  = hist.temp;
+    sChart.data.datasets[1].data  = hist.gas;
+    sChart.update('none');
+}
+
+/* ── WATCHDOG ────────────────────────────────────────── */
+let lastData = 0;
+const WATCHDOG_MS = 10000;
+const watchFill = document.getElementById('watchdog-fill');
+const hwStatus  = document.getElementById('hw-status');
+const hwTxt     = document.getElementById('hw-txt');
+
+setInterval(() => {
+    if (lastData === 0) return;
+    const elapsed = Date.now() - lastData;
+    const pct     = Math.max(0, 100 - (elapsed / WATCHDOG_MS) * 100);
+    watchFill.style.width = pct + '%';
+
+    if (elapsed > WATCHDOG_MS) {
+        watchFill.className = 'watchdog-fill danger';
+        hwStatus.className  = 'offline';
+        hwTxt.textContent   = 'OFFLINE';
+        setPill('sensor-status', 'err', 'Déconnecté');
+    } else if (elapsed > WATCHDOG_MS * 0.6) {
+        watchFill.className = 'watchdog-fill warn';
+    } else {
+        watchFill.className = 'watchdog-fill';
+    }
+}, 500);
+
+/* ── PACKETS COUNTER ─────────────────────────────────── */
+let packetCount = 0;
+let lastPktTime = Date.now();
+
+/* ── SOCKET.IO ───────────────────────────────────────── */
+const socket = io();
+
+socket.on('connect', () => {
+    setDot('dot-socket', 'on');
+    setTxt('txt-socket', 'Flask');
+    addLog('Connecté au serveur S.H.O.S', 'success');
+});
+socket.on('disconnect', () => {
+    setDot('dot-socket', 'off');
+    setTxt('txt-socket', 'Flask');
+    addLog('Déconnecté du serveur', 'error');
+});
+
+socket.on('mqtt_status', d => {
+    setDot('dot-mqtt', d.connected ? 'on' : 'off');
+    setPill('rpi-pill', d.connected ? 'ok' : 'err', d.connected ? 'Connecté' : 'Hors ligne');
+});
+
+socket.on('arduino_status', d => {
+    setDot('dot-arduino', d.connected ? 'on' : 'off');
+});
+
+/* ── SENSOR UPDATE ───────────────────────────────────── */
+socket.on('sensor_update', (d) => {
+    lastData    = Date.now();
+    packetCount++;
+    hwStatus.className = 'online';
+    hwTxt.textContent  = 'ONLINE';
+    setPill('sensor-status', 'ok', 'Connecté');
+    addLog(`Données reçues · T=${d.temperature ?? '?'}°C G=${d.gas ?? '?'}ppm`, 'info');
+
+    /* Latence inter-paquets */
+    const now     = Date.now();
+    const latency = now - lastPktTime;
+    lastPktTime   = now;
+    if (latency < 5000) setTxt('rt-latency', latency + ' ms');
+    setTxt('rt-packets', packetCount);
+
+    /* Température */
+    if (d.temperature !== undefined) {
+        const v = +d.temperature;
+        setTxt('s-temp', v.toFixed(1));
+        const el = document.getElementById('s-temp');
+        if (el) el.className = 'sc-val' + (v > 50 ? ' alert' : v > 40 ? ' warn' : '');
+    }
+    /* Humidité */
+    if (d.humidity !== undefined) setTxt('s-hum', (+d.humidity).toFixed(0));
+    /* Gaz */
+    if (d.gas !== undefined) {
+        const v = +d.gas;
+        setTxt('s-gas', v.toFixed(0));
+        const el = document.getElementById('s-gas');
+        if (el) el.className = 'sc-val' + (v > 400 ? ' alert' : v > 200 ? ' warn' : '');
+        setTxt('dm-gas-lvl', v > 400 ? '⚠ Danger' : v > 200 ? 'Élevé' : 'Normal');
+    }
+    /* Distance */
+    if (d.distance !== undefined) {
+        const v = +d.distance;
+        setTxt('s-dist', v.toFixed(0));
+        const el = document.getElementById('s-dist');
+        if (el) el.className = 'sc-val' + (v < 30 ? ' alert' : '');
+        setTxt('dm-obstacle', v < 30 ? '⚠ Obstacle' : 'Libre');
+    }
+    /* Flamme */
+    if (d.flame !== undefined) {
+        const f = d.flame === 1;
+        setTxt('s-flame', f ? '🔥 DANGER' : '✓ RAS');
+        setTxt('dm-flame', f ? '🔥 FLAMME' : 'Normal');
+        const el = document.getElementById('s-flame');
+        if (el) el.className = 'sc-val' + (f ? ' alert' : '');
+    }
+    /* Son */
+    if (d.sound !== undefined) setTxt('s-sound', (+d.sound).toFixed(0));
+    /* Infrarouge */
+    if (d.infrared !== undefined) setTxt('dm-ir', d.infrared === 0 ? 'Obstacle' : 'Libre');
+    /* Joystick */
+    if (d.joy_x !== undefined) { setTxt('s-jx', d.joy_x); setTxt('js-x', d.joy_x); }
+    if (d.joy_y !== undefined) { setTxt('s-jy', d.joy_y); setTxt('js-y', d.joy_y); }
+    if (d.BJ    !== undefined) setTxt('js-btn', d.BJ === 0 ? '● Appuyé' : 'Relâché');
+    if (d.potentiometer !== undefined) setTxt('js-pot', d.potentiometer);
+    /* Batterie distante */
+    if (d.battery !== undefined) setTxt('rt-battery', d.battery + '%');
+
+    /* Chart */
+    if (d.temperature !== undefined && d.gas !== undefined) {
+        pushChart(+d.temperature, +d.gas);
+    }
+});
+
+/* ── SYS UPDATE ──────────────────────────────────────── */
+socket.on('sys_update', (d) => {
+    if (d.cpu  !== undefined) setTxt('r-cpu',  (+d.cpu).toFixed(1));
+    if (d.ram  !== undefined) setTxt('r-ram',  (+d.ram).toFixed(1));
+    if (d.temp !== undefined) {
+        setTxt('r-temp', (+d.temp).toFixed(1));
+        setPill('rpi-pill', 'ok', 'Actif');
+    }
+    if (d.uptime !== undefined) {
+        const h = Math.floor(+d.uptime / 3600);
+        const m = Math.floor((+d.uptime % 3600) / 60);
+        setTxt('r-uptime', h + 'h ' + m + 'm');
+    }
+});
+
+/* ── PLUGIN UPDATE ───────────────────────────────────── */
+socket.on('plugin_update', (d) => {
+    const topic = (d.topic || '').toLowerCase();
+    const data  = d.data || {};
+
+    if (topic.includes('danger'))     setPill('danger-pill', 'ok', 'Actif');
+    if (topic.includes('vision')) {
+        setPill('vision-pill', 'ok', 'Actif');
+        if (data.count   !== undefined) setTxt('vo-count', data.count);
+        if (data.fps     !== undefined) setTxt('vo-fps', (+data.fps).toFixed(1));
+        if (data.label   !== undefined) setTxt('vo-last', data.label);
+    }
+    if (topic.includes('voice')) {
+        setPill('voice-pill', 'ok', 'Actif');
+        if (data.command !== undefined) setTxt('va-cmd', data.command);
+        if (data.active  !== undefined) setTxt('va-state', data.active ? 'Écoute' : 'Inactif');
+    }
+    if (topic.includes('mediapipe') || topic.includes('gesture')) {
+        setPill('mp-pill', 'ok', 'Actif');
+        if (data.fps     !== undefined) setTxt('mp-fps', (+data.fps).toFixed(1));
+        if (data.gesture !== undefined) setTxt('mp-gesture', data.gesture);
+        if (data.hands   !== undefined) setTxt('mp-hands', data.hands);
+    }
+});
+
+/* Events dédiés modules */
+socket.on('mediapipe_status', d => setPill('mp-pill',     d.active ? 'ok':'err', d.active ? 'Actif':'Inactif'));
+socket.on('danger_status',    d => setPill('danger-pill', d.active ? 'ok':'err', d.active ? 'Actif':'Inactif'));
+socket.on('vision_status',    d => setPill('vision-pill', d.active ? 'ok':'err', d.active ? 'Actif':'Inactif'));
+socket.on('voice_status',     d => {
+    setPill('voice-pill', d.active ? 'ok':'err', d.active ? 'Actif':'Inactif');
+    if (d.active !== undefined) setTxt('va-state', d.active ? 'Écoute' : 'Inactif');
+});
+
+/* ── ALERTES SOCKET ──────────────────────────────────── */
+socket.on('alert_critical', d => { showAlert(d, 'critical'); addLog('CRITIQUE: ' + (d.message||''), 'error'); });
+socket.on('alert_warning',  d => { showAlert(d, 'warning');  addLog('ATTENTION: ' + (d.message||''), 'warning'); });
+
+/* ── PROFILE CHANGE (si le serveur émet un changement) ── */
+socket.on('profile_changed', async (d) => {
+    try {
+        const res  = await fetch('/api/get_profiles');
+        const data = await res.json();
+        if (data.profiles && data.current) {
+            const prof = data.profiles[data.current];
+            if (prof) {
+                PROFILE.name               = prof.name               || data.current;
+                PROFILE.main_module        = prof.main_module        || '';
+                PROFILE.secondary_modules  = prof.secondary_modules  || [];
+                setTxt('greeting-profile', PROFILE.name);
+                setTxt('sb-profile',       PROFILE.name);
+                setTxt('sb-module',        PROFILE.main_module);
+                applyProfileModules();
+            }
+        }
+    } catch(e) { console.error('[S.H.O.S] profile_changed fetch:', e); }
+});
+
+/* ── INIT ────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+    applyProfileModules();
+    addLog('S.H.O.S Interface initialisée', 'success');
+    addLog('En attente des données capteurs…', 'info');
+    socket.emit('request_status');
+    socket.emit('request_data');
+});
+</script>
 </body>
 </html>
