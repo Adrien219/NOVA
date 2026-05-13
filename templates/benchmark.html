@@ -1139,92 +1139,182 @@ function updateSidebarSummary(d) {
 }
 
 // ═══════════════════════════════════════════════
-// DONNÉES PRÉCÉDENTES — pré-charger la session du 10/05
-// (Vrais chiffres issus des benchmarks effectués)
+// INIT — toutes les données viennent des routes API nova.py
+// Aucune donnée écrite en dur dans ce fichier
 // ═══════════════════════════════════════════════
-const previousSession = {
-  name: 'chapitre4_final_20260510_220424',
-  ts: '10/05/2026, 22:05:30',
-  fps: {
-    'FPS observé': 1.92,
-    'Frames reçues': 115,
-    'Intervalle inter-frame': 383.06,
-    'Jitter': 56.03,
-    'Latence E2E moyenne': 0.81,
-    'Latence E2E min': 0.62,
-    'Latence E2E max': 3.28,
-    'Latence E2E P95': 1.11,
-  },
-  mqtt: {
-    'Messages envoyés': 100,
-    'Messages reçus': 100,
-    'Perte paquets': 0.0,
-    'Latence min': 0.341,
-    'Latence moyenne': 0.586,
-    'Latence médiane': 0.522,
-    'Latence max': 2.905,
-    'Latence P95': 0.745,
-    'Latence P99': 2.905,
-  },
-  sys: {
-    cpuMean: 24.31, cpuMax: 53.4, cpuMin: 0.0,
-    ramMean: 30.52, ramMax: 30.9,
-    tempMean: 50.48, tempMax: 53.5,
-    cpuSeries: [0,12,24,35,48,53,45,32,20,18,24,30,40,28,22,26,31,27,24,19],
-  },
-  summary: `======================================================================
-SHOS — RAPPORT DE BENCHMARK
-Date       : 2026-05-10 22:05:30
-Plateforme : Raspberry Pi 4 Model B Rev 1.5
-OS         : Linux-6.12.75+rpt-rpi-v8-aarch64-with-glibc2.36
-Python     : 3.11.2
-Durée test : 60 secondes
-======================================================================
 
-── 1. PERFORMANCES VIDÉO / DÉTECTION ──────────────────────────────
-  FPS observé (pipeline)  : 1.92 fps
-  Frames reçues           : 115
-  Topic MQTT observé      : shos/camera/vision
-  Intervalle inter-frame  : 383.06 ms (moy)
-  Jitter inter-frame      : 56.03 ms (écart-type)
-  Latence E2E (moy)       : 0.81 ms
-  Latence E2E (min)       : 0.62 ms
-  Latence E2E (max)       : 3.28 ms
-  Latence E2E (P95)       : 1.11 ms
-  Frames avec timestamp   : 115
+async function loadSessionsFromAPI() {
+  try {
+    const res = await fetch('/api/benchmark/results');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
 
-── 2. RESSOURCES SYSTÈME ──────────────────────────────────────────
-  CPU moyen               : 24.31 %
-  CPU max (pic)           : 53.4 %
-  CPU min                 : 0.0 %
-  RAM utilisée (moy)      : 30.52 %
-  RAM utilisée (max)      : 30.9 %
-  Température CPU (moy)   : 50.48 °C
-  Température CPU (max)   : 53.5 °C
+    if (!data.sessions || data.sessions.length === 0) {
+      renderHistory();  // état vide
+      return;
+    }
 
-── 3. LATENCE MQTT ────────────────────────────────────────────────
-  Messages envoyés        : 100
-  Messages reçus          : 100
-  Perte paquets           : 0.0 %
-  Latence moyenne         : 0.586 ms
-  Latence médiane         : 0.522 ms
-  Latence min             : 0.341 ms
-  Latence max             : 2.905 ms
-  Latence P95             : 0.745 ms
-  Latence P99             : 2.905 ms
+    // Charger chaque session (fetch des CSV via l'API)
+    for (const s of data.sessions) {
+      const session = { name: s.id, ts: '', fps: {}, mqtt: {}, sys: { cpuSeries: [] }, summary: '' };
 
-======================================================================
-FIN DU RAPPORT — Fichiers CSV détaillés dans le dossier results/
-======================================================================`,
-};
+      // Charger les fichiers disponibles en parallèle
+      const fetches = [];
 
-// Charger la session précédente au démarrage
-state.sessions.push(previousSession);
-state.currentData = previousSession;
-document.getElementById('resultCount').textContent = 1;
-renderResults(previousSession);
-renderHistory();
-updateSidebarSummary(previousSession);
+      if (s.has_fps) fetches.push(
+        fetch(`/api/benchmark/file/${s.id}_fps.csv`)
+          .then(r => r.text()).then(t => { session.fps = parseCSV(t); })
+          .catch(() => {})
+      );
+      if (s.has_mqtt) fetches.push(
+        fetch(`/api/benchmark/file/${s.id}_mqtt.csv`)
+          .then(r => r.text()).then(t => { session.mqtt = parseCSV(t); })
+          .catch(() => {})
+      );
+      if (s.has_system) fetches.push(
+        fetch(`/api/benchmark/file/${s.id}_system.csv`)
+          .then(r => r.text()).then(t => {
+            const lines = t.trim().split('\n').slice(1);
+            const cpus = [], rams = [], temps = [];
+            lines.forEach(l => {
+              const p = l.split(',');
+              if (p[1] && !isNaN(p[1])) cpus.push(parseFloat(p[1]));
+              if (p[2] && !isNaN(p[2])) rams.push(parseFloat(p[2]));
+              if (p[3] && p[3].trim() !== 'None' && !isNaN(p[3])) temps.push(parseFloat(p[3]));
+            });
+            const avg = arr => arr.length ? (arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(2) : null;
+            const max = arr => arr.length ? Math.max(...arr).toFixed(2) : null;
+            const min = arr => arr.length ? Math.min(...arr).toFixed(2) : null;
+            session.sys = { cpuMean: avg(cpus), cpuMax: max(cpus), cpuMin: min(cpus), ramMean: avg(rams), ramMax: max(rams), tempMean: avg(temps), tempMax: max(temps), cpuSeries: cpus };
+          }).catch(() => {})
+      );
+      if (s.has_summary) fetches.push(
+        fetch(`/api/benchmark/file/${s.id}_summary.txt`)
+          .then(r => r.text()).then(t => { session.summary = t; })
+          .catch(() => {})
+      );
+
+      await Promise.all(fetches);
+
+      // Extraire la date depuis le nom (format YYYYMMDD_HHMMSS)
+      const m = s.id.match(/(\d{8})_(\d{6})/);
+      if (m) {
+        const d = m[1], h = m[2];
+        session.ts = `${d.slice(6)}/${d.slice(4,6)}/${d.slice(0,4)}, ${h.slice(0,2)}:${h.slice(2,4)}:${h.slice(4,6)}`;
+      } else {
+        session.ts = s.id;
+      }
+
+      state.sessions.push(session);
+    }
+
+    document.getElementById('resultCount').textContent = state.sessions.length;
+
+    // Afficher la session la plus récente automatiquement
+    if (state.sessions.length > 0) {
+      state.currentData = state.sessions[0];
+      renderResults(state.sessions[0]);
+      updateSidebarSummary(state.sessions[0]);
+    }
+
+    renderHistory();
+
+  } catch (err) {
+    logLine('WARNING', `API non disponible (${err.message}) — importez des CSV manuellement.`);
+    renderHistory();
+  }
+}
+
+// Brancher le bouton "Lancer" sur l'API nova.py
+async function runBenchmark() {
+  if (state.benchmarkRunning) return;
+  state.benchmarkRunning = true;
+
+  const duration = parseInt(document.getElementById('param-duration').value) || 60;
+  const mode = state.mode;
+  const output = document.getElementById('param-output').value || 'benchmark';
+  const nMqtt = parseInt(document.getElementById('param-mqtt').value) || 100;
+  const topic = document.getElementById('param-topic').value || 'shos/camera/vision';
+
+  document.getElementById('launchBtn').disabled = true;
+  document.getElementById('runningBadge').style.display = 'block';
+  document.getElementById('progressWrap').style.display = 'block';
+
+  logLine('INFO', `╔══ Lancement benchmark — mode=${mode} durée=${duration}s ══╗`);
+
+  let pid = null;
+
+  try {
+    const res = await fetch('/api/benchmark/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, duration, output, mqtt_messages: nMqtt, vision_topic: topic })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+
+    pid = data.pid;
+    logLine('INFO', `Benchmark démarré (PID ${pid}) — préfixe : ${data.output_prefix}`);
+
+  } catch (err) {
+    logLine('ERROR', `Impossible de lancer le benchmark : ${err.message}`);
+    logLine('WARNING', 'Vérifier que benchmark.py est dans le même dossier que nova.py');
+    state.benchmarkRunning = false;
+    document.getElementById('launchBtn').disabled = false;
+    document.getElementById('runningBadge').style.display = 'none';
+    return;
+  }
+
+  // Polling progression — vérifie toutes les 2s si le process tourne encore
+  const startTime = Date.now();
+  const totalMs = duration * 1000 + 15000; // durée + marge MQTT
+
+  const pollInterval = setInterval(async () => {
+    const elapsed = Date.now() - startTime;
+    const pct = Math.min(95, Math.round((elapsed / totalMs) * 100));
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressPct').textContent = pct + '%';
+    document.getElementById('progressLabel').textContent =
+      pct < 80 ? 'Observation vision en cours...' : 'Finalisation MQTT...';
+    logLine('INFO', `${Math.round(elapsed/1000)}s écoulées — ${pct}% complété`);
+
+    // Vérifier si le process est terminé
+    if (pid) {
+      try {
+        const r = await fetch(`/api/benchmark/status/${pid}`);
+        const s = await r.json();
+        if (!s.running) {
+          clearInterval(pollInterval);
+          onBenchmarkComplete(output);
+        }
+      } catch {}
+    }
+  }, 10000);  // log toutes les 10s
+
+  // Timeout de sécurité
+  setTimeout(() => {
+    clearInterval(pollInterval);
+    onBenchmarkComplete(output);
+  }, totalMs + 5000);
+}
+
+async function onBenchmarkComplete(output) {
+  state.benchmarkRunning = false;
+  document.getElementById('launchBtn').disabled = false;
+  document.getElementById('runningBadge').style.display = 'none';
+  document.getElementById('progressFill').style.width = '100%';
+  document.getElementById('progressPct').textContent = '100%';
+  document.getElementById('progressLabel').textContent = 'Terminé ✓';
+  logLine('INFO', '╚══ Benchmark terminé — rechargement des résultats... ══╝');
+
+  // Recharger toutes les sessions depuis l'API
+  state.sessions = [];
+  await loadSessionsFromAPI();
+  logLine('INFO', `✅ ${state.sessions.length} session(s) chargée(s) depuis results/`);
+}
+
+// Démarrage : charger les sessions existantes depuis l'API
+loadSessionsFromAPI();
 </script>
 </body>
 </html>

@@ -1,1259 +1,805 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.H.O.S — {{ profile.name if profile else 'Interface' }}</title>
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.H.O.S — {{ profile.name if profile else 'Interface' }}</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   S.H.O.S · USER INTERFACE V4
+   ─────────────────────────────────────────────────────────────
+   Layout  :  Bento Grid  →  1 bloc principal large (gauche 65%)
+                          +  2 blocs secondaires empilés (droite 35%)
+   Design  :  Glassmorphism dark · Apple Vision Pro · #0e1117
+   Modules :  Chargés dynamiquement dans des iframes selon le profil
+═══════════════════════════════════════════════════════════════ */
 
-    <style>
-    /* ═══════════════════════════════════════════════════════
-       S.H.O.S USER INTERFACE — Profile-Driven Dynamic Layout
-       NestHome × Apple Vision Pro × Dark Glassmorphism
-    ═══════════════════════════════════════════════════════ */
-    :root {
-        --bg:          #0e1117;
-        --glass:       rgba(255,255,255,0.06);
-        --glass-card:  rgba(255,255,255,0.09);
-        --glass-hi:    rgba(255,255,255,0.14);
-        --border:      rgba(255,255,255,0.09);
-        --border-hi:   rgba(255,255,255,0.18);
-        --blur:        blur(24px) saturate(160%);
-        --blur-sm:     blur(14px) saturate(140%);
-        --blue:        #4da6ff;
-        --blue-dim:    rgba(77,166,255,0.14);
-        --teal:        #30d5c8;
-        --green:       #34c759;
-        --red:         #ff453a;
-        --amber:       #ffa340;
-        --yellow:      #e8d44d;
-        --purple:      #bf5af2;
-        --t1: rgba(255,255,255,0.93);
-        --t2: rgba(255,255,255,0.52);
-        --t3: rgba(255,255,255,0.28);
-        --font: 'DM Sans', -apple-system, sans-serif;
-        --mono: 'DM Mono', monospace;
-        --r:    14px;
-        --r-sm:  9px;
-    }
+/* ── VARIABLES ─────────────────────────────────────────────── */
+:root {
+  --bg:       #0e1117;
+  --glass:    rgba(255,255,255,0.055);
+  --glass-hi: rgba(255,255,255,0.09);
+  --border:   rgba(255,255,255,0.09);
+  --border-a: rgba(255,255,255,0.16);
+  --blur:     blur(22px) saturate(150%);
 
-    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-    html, body { height:100%; overflow:hidden; font-family:var(--font); background:var(--bg); color:var(--t1); }
+  --blue:  #4da6ff;
+  --bdim:  rgba(77,166,255,0.14);
+  --green: #34c759;
+  --red:   #ff453a;
+  --amber: #ffa340;
+  --yell:  #e8d44d;
+  --ydim:  rgba(232,212,77,0.14);
 
-    /* ── ROOT GRID ───────────────────────────── */
-    .root {
-        display: grid;
-        grid-template-columns: 52px 1fr;
-        grid-template-rows: 52px 1fr 44px;
-        height: 100vh;
-        background: var(--bg);
-    }
+  --t1: rgba(255,255,255,0.93);
+  --t2: rgba(255,255,255,0.52);
+  --t3: rgba(255,255,255,0.28);
 
-    /* ── TOPBAR ──────────────────────────────── */
-    .topbar {
-        grid-column: 1 / 3;
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0 18px;
-        background: rgba(255,255,255,0.03);
-        border-bottom: 1px solid var(--border);
-        gap: 12px;
-    }
-    .tb-left { display:flex; align-items:center; gap:10px; }
-    .logo-gem {
-        width:30px; height:30px; border-radius:9px;
-        background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,.2);
-        display:flex; align-items:center; justify-content:center; flex-shrink:0;
-    }
-    .logo-gem svg { width:14px; height:14px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
-    .brand { font-size:14px; font-weight:600; color:var(--t1); letter-spacing:.05em; }
+  --font: 'DM Sans', system-ui, sans-serif;
+  --mono: 'DM Mono', monospace;
+  --r:    15px;
 
-    .greeting { font-size:13px; font-weight:500; color:var(--t1); }
-    .greeting span { color:var(--t2); font-weight:400; font-size:12px; margin-left:6px; }
+  --topbar-h:  52px;
+  --sidebar-w: 52px;
+  --footer-h:  38px;
+  --gap:       10px;
+}
 
-    .tb-right { display:flex; align-items:center; gap:8px; }
+/* ── BASE ──────────────────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  height:100%; overflow:hidden;
+  font-family:var(--font);
+  background:var(--bg); color:var(--t1);
+}
 
-    .tb-pill {
-        display:flex; align-items:center; gap:5px;
-        padding:5px 11px; border-radius:16px;
-        background:rgba(255,255,255,.07); border:1px solid var(--border);
-        font-size:11px; font-weight:500; color:var(--t2);
-    }
-    .dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
-    .dot-on  { background:var(--green); box-shadow:0 0 5px var(--green); }
-    .dot-off { background:var(--red);   animation:blink 1s ease-in-out infinite; }
-    .dot-wait{ background:var(--amber); }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+/* ── ROOT ──────────────────────────────────────────────────── */
+.root {
+  display:grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr var(--footer-h);
+  height:100vh;
+}
 
-    .profile-badge {
-        display:flex; align-items:center; gap:7px;
-        padding:5px 12px; border-radius:16px;
-        background:var(--blue-dim); border:1px solid rgba(77,166,255,.3);
-        font-size:11px; font-weight:500; color:var(--blue);
-        font-family:var(--mono); cursor:pointer;
-        transition:all .18s;
-    }
-    .profile-badge:hover { background:rgba(77,166,255,.22); }
-    .profile-badge svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; }
+/* ══════════════════════════════════════════════════════════════
+   TOPBAR
+══════════════════════════════════════════════════════════════ */
+.topbar {
+  grid-column:1/3;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 18px;
+  background:rgba(14,17,23,0.97);
+  border-bottom:1px solid var(--border);
+  gap:12px; z-index:100;
+}
+.tb-l, .tb-r { display:flex; align-items:center; gap:8px; }
 
-    .btn-home {
-        display:flex; align-items:center; gap:5px;
-        padding:5px 12px; border-radius:14px;
-        background:rgba(255,255,255,.07); border:1px solid var(--border);
-        font-size:11px; color:var(--t2); text-decoration:none;
-        transition:all .18s;
-    }
-    .btn-home:hover { background:rgba(255,255,255,.12); color:var(--t1); }
+/* Logo */
+.logo {
+  width:28px; height:28px; border-radius:8px;
+  background:rgba(255,255,255,0.09); border:1px solid rgba(255,255,255,.16);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.logo svg { width:13px; height:13px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+.brand { font-size:13px; font-weight:600; letter-spacing:.06em; }
 
-    /* ── SIDEBAR ──────────────────────────────── */
-    .sidebar {
-        grid-column:1; grid-row:2;
-        display:flex; flex-direction:column; align-items:center;
-        padding:12px 0; gap:5px;
-        background:rgba(255,255,255,.025);
-        border-right:1px solid var(--border);
-    }
-    .sb {
-        width:34px; height:34px; border-radius:9px;
-        display:flex; align-items:center; justify-content:center;
-        background:none; border:none; cursor:pointer; transition:all .18s;
-        position:relative;
-    }
-    .sb svg { width:15px; height:15px; fill:none; stroke:var(--t3); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:stroke .18s; }
-    .sb:hover { background:rgba(255,255,255,.08); }
-    .sb:hover svg { stroke:var(--t1); }
-    .sb.active { background:var(--blue-dim); }
-    .sb.active svg { stroke:var(--blue); }
-    .sb.active::before {
-        content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
-        width:3px; height:14px; background:var(--blue); border-radius:0 3px 3px 0;
-    }
-    .sb-sep { width:20px; height:1px; background:var(--border); margin:3px 0; }
+/* Badge profil */
+.prof-badge {
+  display:flex; align-items:center; gap:7px;
+  padding:5px 12px; border-radius:14px;
+  background:var(--bdim); border:1px solid rgba(77,166,255,.28);
+  font-size:11px; font-weight:500; color:var(--blue);
+  font-family:var(--mono); cursor:pointer; transition:all .18s;
+  text-decoration:none;
+}
+.prof-badge:hover { background:rgba(77,166,255,.22); }
+.prof-badge .pico { font-size:13px; }
 
-    /* ── MAIN CONTENT ─────────────────────────── */
-    .main {
-        grid-column:2; grid-row:2;
-        overflow:hidden;
-        display:grid;
-        grid-template-columns: 1fr 300px;
-        grid-template-rows: 1fr;
-        gap:10px; padding:10px 12px 10px 10px;
-    }
+/* Pills statut */
+.pill {
+  display:flex; align-items:center; gap:5px;
+  padding:4px 10px; border-radius:12px;
+  background:rgba(255,255,255,.06); border:1px solid var(--border);
+  font-size:10px; color:var(--t2);
+}
+.dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.dot-on   { background:var(--green); box-shadow:0 0 5px var(--green); }
+.dot-off  { background:var(--red); animation:blink 1.1s ease-in-out infinite; }
+.dot-wait { background:var(--amber); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
 
-    /* ── LEFT COLUMN ──────────────────────────── */
-    .col-left {
-        display:flex; flex-direction:column; gap:10px; overflow:hidden; min-height:0;
-    }
+.btn-back {
+  display:flex; align-items:center; gap:5px;
+  padding:4px 11px; border-radius:12px;
+  background:rgba(255,255,255,.06); border:1px solid var(--border);
+  font-size:11px; color:var(--t2); text-decoration:none; transition:all .18s;
+}
+.btn-back:hover { background:rgba(255,255,255,.12); color:var(--t1); }
 
-    /* ── RIGHT COLUMN ─────────────────────────── */
-    .col-right {
-        display:flex; flex-direction:column; gap:10px; overflow-y:auto; overflow-x:hidden;
-        scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.08) transparent;
-        min-height:0;
-    }
-    .col-right::-webkit-scrollbar { width:3px; }
-    .col-right::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); border-radius:2px; }
+/* ══════════════════════════════════════════════════════════════
+   SIDEBAR
+══════════════════════════════════════════════════════════════ */
+.sidebar {
+  grid-column:1; grid-row:2;
+  display:flex; flex-direction:column; align-items:center;
+  padding:10px 0; gap:4px;
+  background:rgba(255,255,255,.022);
+  border-right:1px solid var(--border);
+}
+.sb {
+  width:34px; height:34px; border-radius:9px;
+  display:flex; align-items:center; justify-content:center;
+  background:none; border:none; cursor:pointer; transition:all .18s;
+  position:relative;
+}
+.sb svg { width:15px; height:15px; fill:none; stroke:var(--t3); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:stroke .18s; }
+.sb:hover { background:rgba(255,255,255,.08); }
+.sb:hover svg { stroke:var(--t1); }
+.sb.on { background:var(--bdim); }
+.sb.on svg { stroke:var(--blue); }
+.sb.on::before {
+  content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
+  width:3px; height:14px; background:var(--blue); border-radius:0 3px 3px 0;
+}
+.sb-sep { width:22px; height:1px; background:var(--border); margin:3px 0; }
 
-    /* ── GLASS CARD ──────────────────────────── */
-    .card {
-        background:var(--glass-card);
-        backdrop-filter:var(--blur-sm);
-        -webkit-backdrop-filter:var(--blur-sm);
-        border:1px solid var(--border);
-        border-radius:var(--r);
-        position:relative; overflow:hidden;
-        box-shadow:0 4px 18px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.08) inset;
-        flex-shrink:0;
-    }
-    .card::after {
-        content:''; position:absolute; top:0; left:10%; right:10%; height:1px;
-        background:linear-gradient(90deg,transparent,rgba(255,255,255,.10),transparent);
-        pointer-events:none;
-    }
-    .card-head {
-        display:flex; align-items:center; justify-content:space-between;
-        padding:11px 14px 9px;
-        border-bottom:1px solid rgba(255,255,255,.06);
-    }
-    .card-head-left { display:flex; align-items:center; gap:8px; }
-    .card-lbl {
-        font-size:10px; font-weight:500; letter-spacing:.1em;
-        text-transform:uppercase; color:var(--t3);
-    }
-    .card-lbl-icon {
-        width:22px; height:22px; border-radius:6px;
-        display:flex; align-items:center; justify-content:center; flex-shrink:0;
-    }
-    .card-lbl-icon svg { width:12px; height:12px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; }
-    .ic-blue   { background:rgba(77,166,255,.20);  border:1px solid rgba(77,166,255,.3); }
-    .ic-blue   svg { stroke:var(--blue); }
-    .ic-teal   { background:rgba(48,213,200,.18);  border:1px solid rgba(48,213,200,.3); }
-    .ic-teal   svg { stroke:var(--teal); }
-    .ic-green  { background:rgba(52,199,89,.18);   border:1px solid rgba(52,199,89,.3); }
-    .ic-green  svg { stroke:var(--green); }
-    .ic-red    { background:rgba(255,69,58,.18);   border:1px solid rgba(255,69,58,.3); }
-    .ic-red    svg { stroke:var(--red); }
-    .ic-amber  { background:rgba(255,163,64,.18);  border:1px solid rgba(255,163,64,.3); }
-    .ic-amber  svg { stroke:var(--amber); }
-    .ic-purple { background:rgba(191,90,242,.18);  border:1px solid rgba(191,90,242,.3); }
-    .ic-purple svg { stroke:var(--purple); }
-    .ic-grey   { background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14); }
-    .ic-grey   svg { stroke:var(--t2); }
+/* ══════════════════════════════════════════════════════════════
+   BENTO GRID — Zone centrale
+   ┌─────────────────────────┬────────────┐
+   │                         │  SEC 1     │
+   │   MODULE PRINCIPAL      ├────────────┤
+   │        (large)          │  SEC 2     │
+   └─────────────────────────┴────────────┘
+══════════════════════════════════════════════════════════════ */
+.main {
+  grid-column:2; grid-row:2;
+  display:grid;
+  grid-template-columns: 1fr 330px;
+  grid-template-rows: 1fr;
+  gap:var(--gap);
+  padding:var(--gap);
+  overflow:hidden;
+  min-height:0;
+}
 
-    /* ── VIDEO CARD ──────────────────────────── */
-    .video-card {
-        flex:1; min-height:0;
-        display:flex; flex-direction:column;
-    }
-    .video-feed {
-        flex:1; min-height:0; position:relative;
-        background:#000;
-        overflow:hidden;
-        border-radius:0 0 var(--r) var(--r);
-    }
-    .video-feed img {
-        width:100%; height:100%; object-fit:cover;
-        display:block;
-    }
-    .video-overlay {
-        position:absolute; top:8px; left:8px;
-        display:flex; gap:5px;
-    }
-    .vid-badge {
-        display:flex; align-items:center; gap:4px;
-        padding:3px 8px; border-radius:8px;
-        font-size:10px; font-weight:500; font-family:var(--mono);
-        backdrop-filter:blur(12px);
-    }
-    .vid-live { background:rgba(255,69,58,.7); color:#fff; }
-    .vid-res  { background:rgba(0,0,0,.6); border:1px solid rgba(255,255,255,.15); color:var(--t2); }
-    .vid-placeholder {
-        position:absolute; inset:0; display:flex; flex-direction:column;
-        align-items:center; justify-content:center; gap:10px; color:var(--t3);
-    }
-    .vid-placeholder svg { width:36px; height:36px; fill:none; stroke:currentColor; stroke-width:1.3; opacity:.5; }
-    .vid-placeholder span { font-size:12px; }
+/* ── BLOC COMMUN ───────────────────────────────────────────── */
+.bloc {
+  background:var(--glass);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  backdrop-filter:var(--blur);
+  -webkit-backdrop-filter:var(--blur);
+  display:flex; flex-direction:column;
+  overflow:hidden; position:relative;
+  min-height:0;
+  box-shadow:0 2px 20px rgba(0,0,0,.30), 0 1px 0 rgba(255,255,255,.06) inset;
+  transition:border-color .25s;
+}
+/* Ligne lumineuse top */
+.bloc::before {
+  content:''; position:absolute;
+  top:0; left:10%; right:10%; height:1px;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.09),transparent);
+  pointer-events:none; z-index:1;
+}
+.bloc:hover { border-color:rgba(255,255,255,.14); }
 
-    /* ── SENSOR GRID ─────────────────────────── */
-    .sensor-grid {
-        display:grid;
-        grid-template-columns:repeat(4,1fr);
-        gap:8px;
-        padding:10px 12px;
-    }
-    .sensor-cell {
-        padding:9px 10px;
-        background:rgba(255,255,255,.04);
-        border:1px solid var(--border);
-        border-radius:var(--r-sm);
-        display:flex; flex-direction:column; gap:3px;
-    }
-    .sc-lbl { font-size:9px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; }
-    .sc-val {
-        font-size:18px; font-weight:300; color:var(--t1);
-        font-variant-numeric:tabular-nums;
-        transition:color .3s ease;
-    }
-    .sc-val.alert { color:var(--red); animation:pulse-r 1s ease-in-out infinite; }
-    .sc-val.warn  { color:var(--amber); }
-    @keyframes pulse-r { 0%,100%{opacity:1} 50%{opacity:.5} }
-    .sc-unit { font-size:10px; color:var(--t3); font-family:var(--mono); }
+/* Variante bloc principal — accent jaune */
+.bloc-main {
+  border-color:rgba(232,212,77,.15);
+}
+.bloc-main::before {
+  background:linear-gradient(90deg,transparent,rgba(232,212,77,.16),transparent);
+}
+.bloc-main:hover { border-color:rgba(232,212,77,.25); }
 
-    /* ── CHART ───────────────────────────────── */
-    .chart-wrap { position:relative; height:110px; padding:0 12px 10px; }
+/* Variante blocs secondaires — accent bleu */
+.bloc-sec:hover { border-color:rgba(77,166,255,.20); }
 
-    /* ── MODULE WIDGETS (profile-driven) ─────── */
-    .module-widget {
-        padding:12px 14px;
-        display:none; /* caché par défaut — affiché par JS selon profil */
-        flex-direction:column; gap:8px;
-    }
-    .module-widget.visible { display:flex; }
+/* ── EN-TÊTE DU BLOC ───────────────────────────────────────── */
+.bloc-head {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 14px 8px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+  flex-shrink:0; gap:8px; position:relative; z-index:2;
+}
+.bloc-head-l { display:flex; align-items:center; gap:8px; min-width:0; }
+.bloc-head-r { display:flex; align-items:center; gap:6px; flex-shrink:0; }
 
-    .mod-row {
-        display:flex; align-items:center; justify-content:space-between;
-        padding:7px 9px;
-        background:rgba(255,255,255,.04); border:1px solid var(--border);
-        border-radius:var(--r-sm);
-        font-size:12px;
-    }
-    .mod-row-left { display:flex; align-items:center; gap:7px; color:var(--t2); }
-    .mod-row-left svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; flex-shrink:0; }
-    .mod-val { font-size:12px; font-weight:500; color:var(--t1); font-family:var(--mono); }
+/* Icône module */
+.bico {
+  width:24px; height:24px; border-radius:7px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:13px;
+}
+.bico-main { background:rgba(232,212,77,.12); border:1px solid rgba(232,212,77,.22); }
+.bico-sec  { background:rgba(77,166,255,.10);  border:1px solid rgba(77,166,255,.18); }
 
-    /* ── STATUS PILL ──────────────────────────── */
-    .pill {
-        display:inline-flex; align-items:center; gap:5px;
-        padding:2px 8px; border-radius:8px;
-        font-size:10px; font-weight:500; font-family:var(--mono);
-    }
-    .pill .d { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
-    .p-ok   { background:rgba(52,199,89,.14);  color:var(--green); border:1px solid rgba(52,199,89,.3); }
-    .p-ok   .d { background:var(--green); }
-    .p-err  { background:rgba(255,69,58,.14);  color:var(--red);   border:1px solid rgba(255,69,58,.3); animation:blink 1s infinite; }
-    .p-err  .d { background:var(--red); }
-    .p-wait { background:rgba(255,163,64,.12); color:var(--amber); border:1px solid rgba(255,163,64,.28); }
-    .p-wait .d { background:var(--amber); }
+/* Nom + tag du module */
+.bname {
+  font-size:11px; font-weight:500; color:var(--t2);
+  letter-spacing:.06em; text-transform:uppercase;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.btag {
+  font-family:var(--mono); font-size:9px; color:var(--t3);
+  letter-spacing:.06em; text-transform:uppercase;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  max-width:90px;
+}
 
-    /* ── ALERTS PANEL ─────────────────────────── */
-    .alert-list { display:flex; flex-direction:column; gap:5px; padding:8px 12px; max-height:140px; overflow-y:auto; }
-    .alert-item {
-        display:flex; align-items:flex-start; gap:8px;
-        padding:7px 9px; border-radius:var(--r-sm);
-        font-size:11px; line-height:1.4;
-        animation:slideIn .25s ease;
-    }
-    @keyframes slideIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
-    .alert-item svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; flex-shrink:0; margin-top:1px; }
-    .a-crit { background:rgba(255,69,58,.12); border:1px solid rgba(255,69,58,.28); color:#ff7a72; }
-    .a-warn { background:rgba(255,163,64,.10); border:1px solid rgba(255,163,64,.26); color:var(--amber); }
-    .a-info { background:rgba(77,166,255,.08); border:1px solid rgba(77,166,255,.2); color:var(--blue); }
-    .alert-ts { margin-left:auto; font-size:9px; opacity:.6; white-space:nowrap; flex-shrink:0; font-family:var(--mono); }
+/* Badge statut */
+.bstatus {
+  font-family:var(--mono); font-size:9px;
+  padding:2px 8px; border-radius:5px;
+  letter-spacing:.06em; transition:all .22s;
+}
+.bs-wait { background:rgba(255,255,255,.06); border:1px solid var(--border); color:var(--t3); }
+.bs-load { background:rgba(255,163,64,.09);  border:1px solid rgba(255,163,64,.25); color:var(--amber); }
+.bs-ok   { background:rgba(52,199,89,.09);   border:1px solid rgba(52,199,89,.25);  color:var(--green); }
+.bs-err  { background:rgba(255,69,58,.09);   border:1px solid rgba(255,69,58,.25);  color:var(--red); }
 
-    /* ── LOGS / CONSOLE ──────────────────────── */
-    .log-list {
-        padding:8px 12px; display:flex; flex-direction:column; gap:2px;
-        max-height:140px; min-height:80px; overflow-y:auto;
-        scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.06) transparent;
-    }
-    .log-list::-webkit-scrollbar { width:2px; }
-    .log-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.06); }
-    .log-line { font-size:10px; font-family:var(--mono); color:var(--t2); line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .log-info    { color:rgba(77,166,255,.7); }
-    .log-warning { color:var(--amber); }
-    .log-error   { color:var(--red); }
-    .log-success { color:var(--green); }
+/* ── CORPS DU BLOC ─────────────────────────────────────────── */
+.bloc-body {
+  flex:1; position:relative; min-height:0; overflow:hidden;
+}
 
-    /* ── SYS STATS ────────────────────────────── */
-    .sys-grid {
-        display:grid; grid-template-columns:1fr 1fr;
-        gap:6px; padding:10px 12px;
-    }
-    .sys-cell {
-        padding:8px 9px; background:rgba(255,255,255,.04);
-        border:1px solid var(--border); border-radius:var(--r-sm);
-    }
-    .sys-key { font-size:9px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; font-family:var(--mono); }
-    .sys-val { font-size:14px; font-weight:300; color:var(--t1); font-variant-numeric:tabular-nums; margin-top:2px; }
+/* Iframe */
+.bloc-iframe {
+  position:absolute; inset:0; width:100%; height:100%;
+  border:none; background:transparent;
+  opacity:0; transition:opacity .4s ease;
+}
+.bloc-iframe.ready { opacity:1; }
 
-    /* ── PROFILE SECTION HEADER ──────────────── */
-    .profile-section {
-        display:flex; align-items:center; gap:8px;
-        padding:8px 12px 4px;
-    }
-    .profile-section-line { flex:1; height:1px; background:var(--border); }
-    .profile-section-lbl { font-size:9px; color:var(--t3); text-transform:uppercase; letter-spacing:.1em; white-space:nowrap; }
+/* Loader */
+.bloc-load {
+  position:absolute; inset:0; z-index:4;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:10px;
+  background:rgba(14,17,23,.96);
+  transition:opacity .35s;
+}
+.bloc-load.gone { opacity:0; pointer-events:none; }
+.ld-ring {
+  width:28px; height:28px; border-radius:50%;
+  border:2.5px solid rgba(255,255,255,.08);
+  border-top-color:var(--blue); /* surchargé par .bloc-main */
+  animation:spin .75s linear infinite;
+}
+.bloc-main .ld-ring { border-top-color:var(--yell); }
+@keyframes spin { to { transform:rotate(360deg) } }
+.ld-txt {
+  font-family:var(--mono); font-size:10px;
+  color:var(--t3); letter-spacing:.10em; text-transform:uppercase;
+}
 
-    /* ── WATCHDOG BAR ─────────────────────────── */
-    .watchdog-bar {
-        width:100%; height:2px; background:rgba(255,255,255,.06);
-        position:absolute; bottom:0; left:0;
-    }
-    .watchdog-fill {
-        height:100%; background:var(--green); width:100%;
-        transition:width 1s linear, background .5s ease;
-        border-radius:0 2px 2px 0;
-    }
-    .watchdog-fill.danger { background:var(--red); }
-    .watchdog-fill.warn   { background:var(--amber); }
+/* Placeholder (slot vide) */
+.bloc-ph {
+  position:absolute; inset:0; display:none;
+  flex-direction:column; align-items:center; justify-content:center;
+  gap:12px; padding:24px; text-align:center;
+}
+.bloc-ph.show { display:flex; }
+.ph-ico  { font-size:34px; opacity:.18; line-height:1; }
+.ph-ttl  { font-size:13px; font-weight:500; color:var(--t2); }
+.ph-sub  { font-size:11px; color:var(--t3); line-height:1.55; max-width:220px; }
+.ph-link {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:7px 16px; border-radius:9px;
+  background:var(--bdim); border:1px solid rgba(77,166,255,.28);
+  color:var(--blue); font-size:11px; text-decoration:none; transition:all .18s;
+}
+.ph-link:hover { background:rgba(77,166,255,.22); }
 
-    /* ── STATUSBAR ────────────────────────────── */
-    .statusbar {
-        grid-column:1/3; grid-row:3;
-        display:flex; align-items:center; justify-content:space-between;
-        padding:0 16px;
-        background:rgba(255,255,255,.03);
-        border-top:1px solid var(--border);
-        font-size:11px; font-family:var(--mono);
-        gap:12px;
-    }
-    .sb-left  { display:flex; align-items:center; gap:10px; color:var(--t3); }
-    .sb-right { display:flex; align-items:center; gap:10px; color:var(--t3); }
-    .sb-val   { color:var(--t2); }
-    #sys-clock { font-weight:400; color:var(--t2); }
-    #hw-status { transition:color .3s; }
-    #hw-status.online  { color:var(--green); }
-    #hw-status.offline { color:var(--red); }
+/* ── COLONNE SECONDAIRES ───────────────────────────────────── */
+.col-sec {
+  display:flex; flex-direction:column;
+  gap:var(--gap); min-height:0; overflow:hidden;
+}
+.col-sec .bloc { flex:1; } /* 50/50 en hauteur */
 
-    /* ── RESPONSIVE ───────────────────────────── */
-    @media(max-width:900px) {
-        .main { grid-template-columns:1fr; grid-template-rows:auto 1fr; }
-        .col-right { grid-row:1; max-height:220px; }
-        .sensor-grid { grid-template-columns:repeat(2,1fr); }
-    }
-    @media(max-width:600px) {
-        .root { grid-template-columns:1fr; }
-        .sidebar { display:none; }
-        .sensor-grid { grid-template-columns:1fr 1fr; }
-    }
-    </style>
+/* ══════════════════════════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════════════════════════ */
+.footer {
+  grid-column:1/3;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 16px;
+  background:rgba(255,255,255,.018);
+  border-top:1px solid var(--border);
+  font-family:var(--mono); font-size:10px; color:var(--t3);
+}
+.ft-l, .ft-r { display:flex; align-items:center; gap:10px; }
+.sep { opacity:.3; }
+.ftv { color:var(--t2); }
+#ft-hw { display:flex; align-items:center; gap:5px; }
+#ft-hw.online { color:var(--green); }
+#ft-hw.off    { color:var(--red);   }
+
+/* ── ANIMATIONS ENTRÉE ─────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(7px); }
+  to   { opacity:1; transform:translateY(0);   }
+}
+#zone-main              { animation:fadeUp .30s ease both; }
+#zone-sec-1             { animation:fadeUp .30s .07s ease both; }
+#zone-sec-2             { animation:fadeUp .30s .14s ease both; }
+
+/* ── SCROLLBAR ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); border-radius:2px; }
+
+/* ── RESPONSIVE ────────────────────────────────────────────── */
+@media (max-width:960px) {
+  .main { grid-template-columns:1fr; grid-template-rows:56% 1fr; }
+  .col-sec { flex-direction:row; }
+}
+@media (max-width:640px) {
+  :root { --sidebar-w:0px; }
+  .sidebar { display:none; }
+  .main { padding:6px; gap:6px; }
+}
+</style>
 </head>
 <body>
 <div class="root">
 
-    <!-- ── TOPBAR ────────────────────────────── -->
-    <header class="topbar">
-        <div class="tb-left">
-            <div class="logo-gem" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-            </div>
-            <span class="brand">S.H.O.S</span>
+<!-- ══════════════════════════════ TOPBAR ══════════════════════════════ -->
+<header class="topbar" role="banner">
+  <div class="tb-l">
+    <!-- Logo -->
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 14 14">
+        <polygon points="7,1 13,5 13,9 7,13 1,9 1,5"/>
+        <line x1="7" y1="1" x2="7" y2="13"/>
+        <line x1="1" y1="5" x2="13" y2="5"/>
+        <line x1="1" y1="9" x2="13" y2="9"/>
+      </svg>
+    </div>
+    <span class="brand">S.H.O.S</span>
+
+    <!-- Profil actif — cliquable pour changer -->
+    <a class="prof-badge" href="/profiles"
+       id="prof-badge" title="Changer de profil"
+       role="button" aria-label="Profil actif">
+      <span class="pico" id="prof-ico">👤</span>
+      <span id="prof-nm">{{ profile.name if profile else 'Sans profil' }}</span>
+    </a>
+  </div>
+
+  <div class="tb-r">
+    <!-- Indicateurs temps réel -->
+    <div class="pill" aria-live="polite">
+      <div class="dot dot-wait" id="dot-mqtt"></div>
+      <span>MQTT</span>
+    </div>
+    <div class="pill" aria-live="polite">
+      <div class="dot dot-wait" id="dot-hw"></div>
+      <span>Capteurs</span>
+    </div>
+    <div class="pill" aria-live="polite">
+      <div class="dot dot-wait" id="dot-cam"></div>
+      <span>Vision</span>
+    </div>
+    <a href="/profiles" class="btn-back" aria-label="Retour aux profils">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+        <path d="M7.5 9.5L3 5.5l4.5-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Profils
+    </a>
+  </div>
+</header>
+
+<!-- ══════════════════════════════ SIDEBAR ══════════════════════════════ -->
+<nav class="sidebar" role="navigation" aria-label="Navigation principale">
+  <button class="sb on" title="Interface" aria-label="Interface utilisateur" aria-current="page">
+    <svg viewBox="0 0 16 16">
+      <rect x="1" y="1" width="6" height="6" rx="1.5"/>
+      <rect x="9" y="1" width="6" height="6" rx="1.5"/>
+      <rect x="1" y="9" width="6" height="6" rx="1.5"/>
+      <rect x="9" y="9" width="6" height="6" rx="1.5"/>
+    </svg>
+  </button>
+  <div class="sb-sep"></div>
+  <button class="sb" onclick="location.href='/profiles'" title="Profils" aria-label="Profils">
+    <svg viewBox="0 0 16 16">
+      <circle cx="8" cy="5.5" r="2.5"/>
+      <path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5"/>
+    </svg>
+  </button>
+  <button class="sb" onclick="location.href='/dashboard'" title="Dashboard" aria-label="Dashboard">
+    <svg viewBox="0 0 16 16">
+      <rect x="1" y="9" width="4" height="6"/>
+      <rect x="6" y="5" width="4" height="10"/>
+      <rect x="11" y="1" width="4" height="14"/>
+    </svg>
+  </button>
+  <button class="sb" onclick="location.href='/settings'" title="Paramètres" aria-label="Paramètres">
+    <svg viewBox="0 0 16 16">
+      <circle cx="8" cy="8" r="2.5"/>
+      <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4"/>
+    </svg>
+  </button>
+</nav>
+
+<!-- ══════════════════════════════ BENTO GRID ══════════════════════════════ -->
+<main class="main" role="main" aria-label="Modules actifs">
+
+  <!-- ▌ MODULE PRINCIPAL — large ▐ -->
+  <div class="bloc bloc-main" id="zone-main" aria-label="Module principal">
+
+    <div class="bloc-head">
+      <div class="bloc-head-l">
+        <div class="bico bico-main" id="main-ico" aria-hidden="true">📦</div>
+        <span class="bname" id="main-name">Module principal</span>
+        <span class="btag"  id="main-tag">—</span>
+      </div>
+      <div class="bloc-head-r">
+        <span class="bstatus bs-wait" id="main-status">En attente</span>
+      </div>
+    </div>
+
+    <div class="bloc-body">
+      <!-- Loader -->
+      <div class="bloc-load" id="main-load">
+        <div class="ld-ring"></div>
+        <span class="ld-txt">Chargement du module...</span>
+      </div>
+      <!-- Iframe du module principal -->
+      <iframe
+        class="bloc-iframe"
+        id="iframe-main"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+        allow="camera; microphone"
+        src="about:blank"
+        title="Module principal"
+      ></iframe>
+      <!-- Placeholder si aucun module -->
+      <div class="bloc-ph" id="main-ph">
+        <div class="ph-ico">📦</div>
+        <div class="ph-ttl">Aucun module principal</div>
+        <div class="ph-sub">Ce profil n'a pas de module principal assigné. Modifiez le profil pour en choisir un.</div>
+        <a href="/profiles" class="ph-link">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <circle cx="5.5" cy="3.5" r="2"/>
+            <path d="M1 10c0-2.2 2-4 4.5-4s4.5 1.8 4.5 4"/>
+          </svg>
+          Gérer les profils
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ▌ COLONNE SECONDAIRES ▐ -->
+  <div class="col-sec" aria-label="Modules secondaires">
+
+    <!-- SECONDAIRE 1 -->
+    <div class="bloc bloc-sec" id="zone-sec-1" aria-label="Module secondaire 1">
+      <div class="bloc-head">
+        <div class="bloc-head-l">
+          <div class="bico bico-sec" id="s1-ico" aria-hidden="true">🔧</div>
+          <span class="bname" id="s1-name">Secondaire 1</span>
+          <span class="btag"  id="s1-tag">—</span>
         </div>
-
-        <div class="greeting">
-            Bonjour —
-            <span id="greeting-profile">{{ profile.name if profile else '—' }}</span>
+        <div class="bloc-head-r">
+          <span class="bstatus bs-wait" id="s1-status">—</span>
         </div>
-
-        <div class="tb-right" role="status" aria-label="Statuts connexion">
-            <div class="tb-pill">
-                <span class="dot dot-wait" id="dot-socket" aria-hidden="true"></span>
-                <span id="txt-socket">Socket</span>
-            </div>
-            <div class="tb-pill">
-                <span class="dot dot-wait" id="dot-mqtt" aria-hidden="true"></span>
-                <span id="txt-mqtt">MQTT</span>
-            </div>
-            <div class="tb-pill">
-                <span class="dot dot-wait" id="dot-arduino" aria-hidden="true"></span>
-                <span id="txt-arduino">Arduino</span>
-            </div>
-            <div class="profile-badge" onclick="location.href='/profile_manager'" aria-label="Changer de profil">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-                {{ profile.name if profile else 'Aucun profil' }}
-            </div>
-            <a href="/" class="btn-home" aria-label="Accueil">← Accueil</a>
+      </div>
+      <div class="bloc-body">
+        <div class="bloc-load" id="s1-load">
+          <div class="ld-ring"></div>
+          <span class="ld-txt">Chargement...</span>
         </div>
-    </header>
-
-    <!-- ── SIDEBAR ───────────────────────────── -->
-    <nav class="sidebar" aria-label="Navigation">
-        <button class="sb active" title="Interface" aria-label="Interface">
-            <svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
-        </button>
-        <button class="sb" title="Dashboard" onclick="location.href='/dashboard'" aria-label="Dashboard">
-            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        </button>
-        <div class="sb-sep" aria-hidden="true"></div>
-        <button class="sb" title="HUD" onclick="location.href='/hud'" aria-label="Mode HUD">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8-5.6 8-10 8S2 17 2 12z"/></svg>
-        </button>
-        <button class="sb" title="Diagnostic" onclick="location.href='/diagnostic_ultimate'" aria-label="Diagnostic">
-            <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        </button>
-        <div class="sb-sep" aria-hidden="true"></div>
-        <button class="sb" title="Paramètres" onclick="location.href='/settings'" aria-label="Paramètres">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        </button>
-    </nav>
-
-    <!-- ── MAIN ──────────────────────────────── -->
-    <main class="main">
-
-        <!-- LEFT COLUMN -->
-        <div class="col-left">
-
-            <!-- ══ VIDÉO — TOUJOURS VISIBLE ════ -->
-            <div class="card video-card">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-red" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/></svg>
-                        </div>
-                        <span class="card-lbl">Flux Vidéo</span>
-                        <span class="pill p-wait" id="vid-status"><span class="d"></span>—</span>
-                    </div>
-                    <div style="font-size:10px;color:var(--t3);font-family:var(--mono)" id="vid-src-lbl">Port 5050</div>
-                </div>
-
-                <div class="video-feed" id="vid-feed">
-                    <div class="vid-placeholder" id="vid-placeholder">
-                        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/></svg>
-                        <span>En attente du flux caméra…</span>
-                    </div>
-                    <!-- Flux vidéo principal — Port 5050 comme dans l'ancien code -->
-                    <img id="video-stream" 
-                             src="http://{{ request.host.split(':')[0] }}:5050/video_feed" 
-                             alt="En attente du flux NOVA VISION..." 
-                             style="width: 100%; height: auto; display: block;"
-                             title="Flux IA en temps réel"
-                             onclick="this.src='http://{{ request.host.split(':')[0] }}:5050/video_feed?' + new Date().getTime();"
-                             onerror="handleVideoError(this)">
-                        
-                        <div id="camera-status-badge" style="position: absolute; top: 10px; left: 10px; background: rgba(0,255,0,0.7); color: black; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-                        </div>
-                    <div class="video-overlay">
-                        <span class="vid-badge vid-live" id="vid-live-badge" style="display:none">● LIVE</span>
-                        <span class="vid-badge vid-res">{{ profile.name if profile else 'CAM' }}</span>
-                    </div>
-                    <!-- Watchdog bar -->
-                    <div class="watchdog-bar" aria-hidden="true">
-                        <div class="watchdog-fill" id="watchdog-fill"></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ══ CAPTEURS — TOUJOURS VISIBLE ════ -->
-            <div class="card">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-teal" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                        </div>
-                        <span class="card-lbl">Capteurs temps réel</span>
-                    </div>
-                    <span class="pill p-wait" id="sensor-status"><span class="d"></span>—</span>
-                </div>
-
-                <div class="sensor-grid" role="region" aria-label="Valeurs des capteurs">
-                    <div class="sensor-cell">
-                        <span class="sc-lbl">Température</span>
-                        <span class="sc-val" id="s-temp">—</span>
-                        <span class="sc-unit">°C</span>
-                    </div>
-                    <div class="sensor-cell">
-                        <span class="sc-lbl">Humidité</span>
-                        <span class="sc-val" id="s-hum">—</span>
-                        <span class="sc-unit">%</span>
-                    </div>
-                    <div class="sensor-cell">
-                        <span class="sc-lbl">Gaz</span>
-                        <span class="sc-val" id="s-gas">—</span>
-                        <span class="sc-unit">ppm</span>
-                    </div>
-                    <div class="sensor-cell">
-                        <span class="sc-lbl">Distance</span>
-                        <span class="sc-val" id="s-dist">—</span>
-                        <span class="sc-unit">cm</span>
-                    </div>
-                    <div class="sensor-cell">
-                        <span class="sc-lbl">Flamme</span>
-                        <span class="sc-val" id="s-flame">—</span>
-                    </div>
-                    <div class="sensor-cell">
-                        <span class="sc-lbl">Son</span>
-                        <span class="sc-val" id="s-sound">—</span>
-                        <span class="sc-unit">dB</span>
-                    </div>
-                    <div class="sensor-cell">
-                        <span class="sc-lbl">Joystick X</span>
-                        <span class="sc-val" id="s-jx">—</span>
-                    </div>
-                    <div class="sensor-cell">
-                        <span class="sc-lbl">Joystick Y</span>
-                        <span class="sc-val" id="s-jy">—</span>
-                    </div>
-                </div>
-
-                <!-- Mini chart historique -->
-                <div class="chart-wrap">
-                    <canvas id="sensorChart" aria-label="Historique température et gaz"></canvas>
-                </div>
-            </div>
-
-        </div><!-- /.col-left -->
-
-        <!-- RIGHT COLUMN -->
-        <div class="col-right" id="right-col">
-
-            <!-- ══ ALERTES — TOUJOURS VISIBLE ════ -->
-            <div class="card" role="region" aria-label="Alertes système" aria-live="polite">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-red" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        </div>
-                        <span class="card-lbl">Alertes</span>
-                    </div>
-                    <span id="alert-count" style="font-size:10px;color:var(--t3);font-family:var(--mono)">0</span>
-                </div>
-                <div class="alert-list" id="alert-list">
-                    <div style="font-size:11px;color:var(--t3);padding:4px 0">Aucune alerte active.</div>
-                </div>
-            </div>
-
-            <!-- ══ LOGS — TOUJOURS VISIBLE ════ -->
-            <div class="card" role="region" aria-label="Journal système">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-grey" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                        </div>
-                        <span class="card-lbl">Journal système</span>
-                    </div>
-                    <button onclick="clearLogs()" style="font-size:9px;color:var(--t3);background:none;border:none;cursor:pointer;font-family:var(--mono);" aria-label="Effacer les logs">CLEAR</button>
-                </div>
-                <div class="log-list" id="log-list" role="log" aria-live="polite"></div>
-            </div>
-
-            <!-- ══ SYSTÈME — TOUJOURS VISIBLE ════ -->
-            <div class="card" role="region" aria-label="Ressources système">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-blue" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/></svg>
-                        </div>
-                        <span class="card-lbl">Raspberry Pi</span>
-                    </div>
-                    <span class="pill p-wait" id="rpi-pill"><span class="d"></span>—</span>
-                </div>
-                <div class="sys-grid">
-                    <div class="sys-cell">
-                        <div class="sys-key">CPU</div>
-                        <div class="sys-val" id="r-cpu">—<span style="font-size:11px;color:var(--t3)">%</span></div>
-                    </div>
-                    <div class="sys-cell">
-                        <div class="sys-key">RAM</div>
-                        <div class="sys-val" id="r-ram">—<span style="font-size:11px;color:var(--t3)">%</span></div>
-                    </div>
-                    <div class="sys-cell">
-                        <div class="sys-key">Temp CPU</div>
-                        <div class="sys-val" id="r-temp">—<span style="font-size:11px;color:var(--t3)">°C</span></div>
-                    </div>
-                    <div class="sys-cell">
-                        <div class="sys-key">Uptime</div>
-                        <div class="sys-val" id="r-uptime" style="font-size:13px">—</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ══ MODULES DYNAMIQUES DU PROFIL ════
-                 Ces sections s'affichent/masquent selon
-                 profile.secondary_modules côté Jinja2 + JS
-            ════════════════════════════════════════ -->
-
-            <!-- Danger Monitor -->
-            <div class="card" id="mod-danger" style="display:none" role="region" aria-label="Danger Monitor">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-red" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                        </div>
-                        <span class="card-lbl">Danger Monitor</span>
-                    </div>
-                    <span class="pill p-wait" id="danger-pill"><span class="d"></span>—</span>
-                </div>
-                <div class="module-widget visible">
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>Flamme</div>
-                        <span class="mod-val" id="dm-flame">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m8 0h3a2 2 0 0 0 2-2v-3"/></svg>Infrarouge</div>
-                        <span class="mod-val" id="dm-ir">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg>Gaz seuil</div>
-                        <span class="mod-val" id="dm-gas-lvl">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Obstacle</div>
-                        <span class="mod-val" id="dm-obstacle">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Vision Objet -->
-            <div class="card" id="mod-vision" style="display:none" role="region" aria-label="Vision Objet">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-purple" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8-5.6 8-10 8S2 17 2 12z"/></svg>
-                        </div>
-                        <span class="card-lbl">Vision Objet</span>
-                    </div>
-                    <span class="pill p-wait" id="vision-pill"><span class="d"></span>—</span>
-                </div>
-                <div class="module-widget visible">
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Objets détectés</div>
-                        <span class="mod-val" id="vo-count">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>FPS analyse</div>
-                        <span class="mod-val" id="vo-fps">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Dernier objet</div>
-                        <span class="mod-val" id="vo-last" style="font-size:11px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Voice Assistant -->
-            <div class="card" id="mod-voice" style="display:none" role="region" aria-label="Voice Assistant">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-teal" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
-                        </div>
-                        <span class="card-lbl">Voice Assistant</span>
-                    </div>
-                    <span class="pill p-wait" id="voice-pill"><span class="d"></span>—</span>
-                </div>
-                <div class="module-widget visible">
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/></svg>Statut écoute</div>
-                        <span class="mod-val" id="va-state">—</span>
-                    </div>
-                    <div class="mod-row" style="flex-direction:column;align-items:flex-start;gap:3px">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Dernière commande</div>
-                        <span style="font-size:11px;color:var(--blue);font-family:var(--mono);padding-left:4px" id="va-cmd">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- MediaPipe Gestes -->
-            <div class="card" id="mod-mediapipe" style="display:none" role="region" aria-label="MediaPipe Gestes">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-amber" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
-                        </div>
-                        <span class="card-lbl">MediaPipe Gestes</span>
-                    </div>
-                    <span class="pill p-wait" id="mp-pill"><span class="d"></span>—</span>
-                </div>
-                <div class="module-widget visible">
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>FPS détection</div>
-                        <span class="mod-val" id="mp-fps">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/></svg>Geste actuel</div>
-                        <span class="mod-val" id="mp-gesture">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Mains détectées</div>
-                        <span class="mod-val" id="mp-hands">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Télémétrie distante (profil Assistance à Distance) -->
-            <div class="card" id="mod-remote" style="display:none" role="region" aria-label="Télémétrie distante">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-blue" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><circle cx="12" cy="20" r="1"/></svg>
-                        </div>
-                        <span class="card-lbl">Télémétrie distante</span>
-                    </div>
-                    <span class="pill p-wait" id="remote-pill"><span class="d"></span>—</span>
-                </div>
-                <div class="module-widget visible">
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22,2 15,22 11,13 2,9"/></svg>Latence MQTT</div>
-                        <span class="mod-val" id="rt-latency">— ms</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Paquets reçus</div>
-                        <span class="mod-val" id="rt-packets">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Batterie distante</div>
-                        <span class="mod-val" id="rt-battery">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Joystick / Contrôles analogiques -->
-            <div class="card" id="mod-joystick" style="display:none" role="region" aria-label="Contrôles analogiques">
-                <div class="card-head">
-                    <div class="card-head-left">
-                        <div class="card-lbl-icon ic-green" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="8"/><line x1="12" y1="16" x2="12" y2="22"/><line x1="2" y1="12" x2="8" y2="12"/><line x1="16" y1="12" x2="22" y2="12"/></svg>
-                        </div>
-                        <span class="card-lbl">Contrôles Analogiques</span>
-                    </div>
-                </div>
-                <div class="module-widget visible">
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><polyline points="18,8 22,12 18,16"/><line x1="2" y1="12" x2="22" y2="12"/></svg>Joy X</div>
-                        <span class="mod-val" id="js-x">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><polyline points="8,18 12,22 16,18"/><line x1="12" y1="2" x2="12" y2="22"/></svg>Joy Y</div>
-                        <span class="mod-val" id="js-y">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>Bouton</div>
-                        <span class="mod-val" id="js-btn">—</span>
-                    </div>
-                    <div class="mod-row">
-                        <div class="mod-row-left"><svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Potentiomètre</div>
-                        <span class="mod-val" id="js-pot">—</span>
-                    </div>
-                </div>
-            </div>
-
-        </div><!-- /.col-right -->
-
-    </main>
-
-    <!-- ── STATUSBAR ───────────────────────── -->
-    <footer class="statusbar">
-        <div class="sb-left">
-            <span>S.H.O.S</span>
-            <span>·</span>
-            <span>Profil : <span class="sb-val" id="sb-profile">{{ profile.name if profile else '—' }}</span></span>
-            <span>·</span>
-            <span>Module : <span class="sb-val" id="sb-module">{{ profile.main_module if profile else '—' }}</span></span>
+        <iframe
+          class="bloc-iframe" id="iframe-s1"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+          allow="camera; microphone"
+          src="about:blank" title="Module secondaire 1"
+        ></iframe>
+        <div class="bloc-ph" id="s1-ph">
+          <div class="ph-ico" style="font-size:26px">🔧</div>
+          <div class="ph-ttl" style="font-size:12px">Slot vide</div>
+          <div class="ph-sub" style="font-size:10px">Aucun module secondaire dans ce slot</div>
         </div>
-        <div class="sb-right">
-            <span id="hw-status" class="offline">Hardware : <span id="hw-txt">OFFLINE</span></span>
-            <span>·</span>
-            <span id="sys-clock">--:--:--</span>
+      </div>
+    </div>
+
+    <!-- SECONDAIRE 2 -->
+    <div class="bloc bloc-sec" id="zone-sec-2" aria-label="Module secondaire 2">
+      <div class="bloc-head">
+        <div class="bloc-head-l">
+          <div class="bico bico-sec" id="s2-ico" aria-hidden="true">🔧</div>
+          <span class="bname" id="s2-name">Secondaire 2</span>
+          <span class="btag"  id="s2-tag">—</span>
         </div>
-    </footer>
+        <div class="bloc-head-r">
+          <span class="bstatus bs-wait" id="s2-status">—</span>
+        </div>
+      </div>
+      <div class="bloc-body">
+        <div class="bloc-load" id="s2-load">
+          <div class="ld-ring"></div>
+          <span class="ld-txt">Chargement...</span>
+        </div>
+        <iframe
+          class="bloc-iframe" id="iframe-s2"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+          allow="camera; microphone"
+          src="about:blank" title="Module secondaire 2"
+        ></iframe>
+        <div class="bloc-ph" id="s2-ph">
+          <div class="ph-ico" style="font-size:26px">🔧</div>
+          <div class="ph-ttl" style="font-size:12px">Slot vide</div>
+          <div class="ph-sub" style="font-size:10px">Aucun module secondaire dans ce slot</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.col-sec -->
+</main>
+
+<!-- ══════════════════════════════ FOOTER ══════════════════════════════ -->
+<footer class="footer" role="contentinfo">
+  <div class="ft-l">
+    <span>S.H.O.S V3</span>
+    <span class="sep">·</span>
+    <span>Profil&nbsp;: <span class="ftv" id="ft-profil">{{ profile.name if profile else '—' }}</span></span>
+    <span class="sep">·</span>
+    <span>Module&nbsp;: <span class="ftv" id="ft-mod">{{ profile.main_module if profile else '—' }}</span></span>
+  </div>
+  <div class="ft-r">
+    <span id="ft-hw" class="off">
+      <span class="dot dot-off"></span>
+      Hardware hors ligne
+    </span>
+    <span class="sep">·</span>
+    <span id="ft-clock">--:--:--</span>
+  </div>
+</footer>
 
 </div><!-- /.root -->
 
-<!-- ─────────────────────────────────────────────────── -->
-<!-- JINJA2 : données profil injectées en JSON sécurisé  -->
-<!-- ─────────────────────────────────────────────────── -->
+<!-- ══════════════════════════════════════════════════════════════
+     DONNÉES PROFIL — injectées par Jinja2 en JSON (sécurisé)
+══════════════════════════════════════════════════════════════ -->
 <script id="profile-data" type="application/json">
 {
-    "name":               "{{ profile.name | default('') | e }}",
-    "main_module":        "{{ profile.main_module | default('') | e }}",
-    "secondary_modules":  {{ profile.secondary_modules | tojson if profile and profile.secondary_modules else '[]' }}
+  "name":             "{{ profile.name             | default('') | e }}",
+  "icon":             "{{ profile.icon             | default('👤') | e }}",
+  "main_module":      "{{ profile.main_module      | default('') | e }}",
+  "secondary_modules": {{ profile.secondary_modules | tojson if profile and profile.secondary_modules else '[]' }}
 }
 </script>
 
 <script>
-/* ═══════════════════════════════════════════════════════
-   S.H.O.S USER INTERFACE — JavaScript
-   Logique profil-driven + Socket.IO + Chart.js
-═══════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   S.H.O.S USER INTERFACE V4 · Module Loader Dynamique
+   ────────────────────────────────────────────────────────────
+   Chaque zone (main, sec1, sec2) charge son module dans une iframe.
+   Les URLs sont résolues depuis MODULE_URLS selon l'identifiant
+   du module défini dans profile.main_module / secondary_modules.
+════════════════════════════════════════════════════════════════ */
 
-/* ── PROFIL — lecture depuis le JSON injecté ─────────── */
-let PROFILE = { name:'', main_module:'', secondary_modules:[] };
+/* ── LECTURE PROFIL JINJA2 ──────────────────────────────────── */
+let PROFILE = { name:'', icon:'👤', main_module:'', secondary_modules:[] };
 try {
-    PROFILE = JSON.parse(document.getElementById('profile-data').textContent);
-} catch(e) { console.warn('[S.H.O.S] profile-data parse error:', e); }
+  PROFILE = JSON.parse(document.getElementById('profile-data').textContent);
+} catch(e) { console.warn('[SHOS] profil parse error', e); }
 
-/* ══════════════════════════════════════════════════════
-   MAP : module_id  →  id de la card DOM à afficher
-   Chaque clé correspond à une valeur possible dans
-   profile.secondary_modules venant du backend Flask.
-════════════════════════════════════════════════════════ */
-const MODULE_MAP = {
-    'danger_monitor':   'mod-danger',
-    'danger':           'mod-danger',
-    'vision':           'mod-vision',
-    'vision_object':    'mod-vision',
-    'object_detection': 'mod-vision',
-    'voice':            'mod-voice',
-    'voice_assistant':  'mod-voice',
-    'mediapipe':        'mod-mediapipe',
-    'mediapipe_gesture':'mod-mediapipe',
-    'remote':           'mod-remote',
-    'assistance':       'mod-remote',
-    'joystick':         'mod-joystick',
-    'analog':           'mod-joystick',
-    'controls':         'mod-joystick',
+/* ══════════════════════════════════════════════════════════════
+   MODULE_URLS : module_id → URL Flask
+   ─────────────────────────────────────────────────────────────
+   Ajouter ici chaque nouveau module créé dans plugins/modules/.
+   Format standard : '/module/<nom_dossier>'
+   Exceptions      : le module streaming a sa propre route.
+══════════════════════════════════════════════════════════════ */
+const MODULE_URLS = {
+  /* Streaming vidéo live */
+  'video_streaming':     '/streaming/',
+
+  /* Vision / détection objets */
+  'vision_objet':        '/module/vision_objet',
+  'vision_object':       '/module/vision_object',
+  'vision':              '/module/vision_objet',
+
+  /* Assistant vocal */
+  'voice_assistant':     '/module/voice_assistant',
+  'voice':               '/module/voice_assistant',
+
+  /* Alertes / danger */
+  'danger_monitor':      '/module/danger_monitor',
+  'danger':              '/module/danger_monitor',
+
+  /* OCR / lecture de texte */
+  'text_reader':         '/module/text_reader',
+  'ocr':                 '/module/text_reader',
+
+  /* Contrôle gestuel */
+  'hand_control':        '/module/hand_control',
+  'mediapipe':           '/module/mediapipe',
+  'mediapipe_gesture':   '/module/mediapipe',
+
+  /* Télémétrie / assistance */
+  'remote':              '/module/remote',
+  'assistance':          '/module/remote',
+
+  /* Joystick / contrôles analogiques */
+  'joystick':            '/module/joystick',
+  'controls':            '/module/joystick',
+  'analog':              '/module/joystick',
 };
 
-/* Modules affichés selon main_module aussi */
-const MAIN_MODULE_MAP = {
-    'danger_monitor':   ['mod-danger'],
-    'vision_object':    ['mod-vision'],
-    'voice_assistant':  ['mod-voice'],
-    'mediapipe':        ['mod-mediapipe'],
-    'remote':           ['mod-remote'],
-    'joystick':         ['mod-joystick'],
+/* ── MÉTADONNÉES VISUELLES ──────────────────────────────────── */
+const MODULE_META = {
+  'video_streaming':   { ico:'📡', name:'Streaming Vidéo',   tag:'live·mjpeg' },
+  'vision_objet':      { ico:'👁',  name:'Vision Objet',      tag:'mediapipe' },
+  'vision_object':     { ico:'👁',  name:'Vision Objet',      tag:'mediapipe' },
+  'vision':            { ico:'👁',  name:'Vision',            tag:'mediapipe' },
+  'voice_assistant':   { ico:'🎙',  name:'Assistant Vocal',   tag:'whisper' },
+  'voice':             { ico:'🎙',  name:'Vocal',             tag:'speech' },
+  'danger_monitor':    { ico:'⚠️',  name:'Danger Monitor',    tag:'alertes' },
+  'danger':            { ico:'⚠️',  name:'Alertes',           tag:'mqtt' },
+  'text_reader':       { ico:'📖',  name:'Lecteur Texte',     tag:'ocr·tesseract' },
+  'ocr':               { ico:'📖',  name:'OCR',               tag:'tesseract' },
+  'hand_control':      { ico:'✋',  name:'Contrôle Gestuel',  tag:'hands·ml' },
+  'mediapipe':         { ico:'🤖',  name:'MediaPipe Gestes',  tag:'ml' },
+  'mediapipe_gesture': { ico:'🤖',  name:'Gestes',            tag:'ml' },
+  'remote':            { ico:'📡',  name:'Télémétrie',        tag:'mqtt' },
+  'assistance':        { ico:'🆘',  name:'Assistance',        tag:'remote' },
+  'joystick':          { ico:'🕹',  name:'Joystick',          tag:'analogique' },
+  'controls':          { ico:'🕹',  name:'Contrôles',         tag:'analogique' },
 };
 
-/**
- * Affiche les modules selon le profil actif.
- * Appelé au chargement et après un changement de profil.
- */
-function applyProfileModules() {
-    /* Masquer tous les modules dynamiques */
-    Object.values(MODULE_MAP).forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-    });
+/* ══════════════════════════════════════════════════════════════
+   loadSlot(slot, moduleId)
+   ─────────────────────────────────────────────────────────────
+   slot     : 'main' | 's1' | 's2'
+   moduleId : identifiant du module (clé dans MODULE_URLS)
 
-    const visible = new Set();
+   Séquence :
+   1. Met à jour l'en-tête (icône, nom, tag, badge)
+   2. Affiche le loader animé
+   3. Injecte l'URL dans l'iframe après un court délai
+   4. onload → masque le loader, badge "Actif"
+   5. Si moduleId vide → affiche le placeholder
+══════════════════════════════════════════════════════════════ */
+function loadSlot(slot, moduleId) {
+  /* Références DOM */
+  const iframe  = document.getElementById('iframe-' + slot);
+  const loader  = document.getElementById(slot + '-load');
+  const ph      = document.getElementById(slot + '-ph');
+  const status  = document.getElementById(slot + '-status');
+  const ico     = document.getElementById(slot + '-ico');
+  const nm      = document.getElementById(slot + '-name');
+  const tg      = document.getElementById(slot + '-tag');
 
-    /* Module principal */
-    const mainMods = MAIN_MODULE_MAP[PROFILE.main_module] || [];
-    mainMods.forEach(id => visible.add(id));
+  /* Slot vide → placeholder ─────────────────────────────── */
+  if (!moduleId || moduleId.trim() === '') {
+    loader?.classList.add('gone');
+    if (iframe) { iframe.style.display = 'none'; }
+    ph?.classList.add('show');
+    if (status) { status.textContent = 'Vide'; status.className = 'bstatus bs-wait'; }
+    if (nm) nm.textContent = slot === 'main' ? 'Module principal' : 'Secondaire';
+    if (tg) tg.textContent = '—';
+    return;
+  }
 
-    /* Modules secondaires */
-    (PROFILE.secondary_modules || []).forEach(key => {
-        const id = MODULE_MAP[key.toLowerCase()];
-        if (id) visible.add(id);
-    });
+  /* Résolution URL + méta ───────────────────────────────── */
+  const key  = moduleId.toLowerCase().trim();
+  const url  = MODULE_URLS[key] ?? ('/module/' + key);
+  const meta = MODULE_META[key] ?? { ico:'📦', name:key.replace(/_/g,' '), tag:key };
 
-    /* Afficher les modules sélectionnés avec animation */
-    visible.forEach((id, i) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.style.display    = 'block';
-        el.style.opacity    = '0';
-        el.style.transform  = 'translateY(10px)';
-        setTimeout(() => {
-            el.style.transition = 'opacity .35s ease, transform .35s ease';
-            el.style.opacity    = '1';
-            el.style.transform  = 'none';
-        }, 50 + i * 60);
-    });
+  /* Mise à jour en-tête ────────────────────────────────── */
+  if (ico) ico.textContent = meta.ico;
+  if (nm)  nm.textContent  = meta.name;
+  if (tg)  tg.textContent  = meta.tag;
+  if (status) { status.textContent = 'Chargement'; status.className = 'bstatus bs-load'; }
 
-    addLog('Profil « ' + (PROFILE.name || '—') + ' » appliqué · ' + visible.size + ' module(s) actif(s)', 'success');
+  /* Cacher placeholder, montrer loader ─────────────────── */
+  ph?.classList.remove('show');
+  loader?.classList.remove('gone');
+  if (iframe) { iframe.classList.remove('ready'); iframe.style.display = 'block'; }
+
+  /* Chargement iframe ──────────────────────────────────── */
+  if (!iframe) return;
+
+  iframe.onload = function () {
+    if (iframe.src === 'about:blank') return;
+    loader?.classList.add('gone');
+    iframe.classList.add('ready');
+    if (status) { status.textContent = 'Actif'; status.className = 'bstatus bs-ok'; }
+    console.info('[SHOS]', slot, '→ "' + meta.name + '" actif (' + url + ')');
+  };
+
+  iframe.onerror = function () {
+    loader?.classList.add('gone');
+    if (status) { status.textContent = 'Erreur'; status.className = 'bstatus bs-err'; }
+    console.warn('[SHOS]', slot, '→ erreur chargement', url);
+  };
+
+  /* Décalage progressif pour ne pas saturer le réseau */
+  const delay = slot === 'main' ? 80 : slot === 's1' ? 180 : 280;
+  setTimeout(() => { iframe.src = url; }, delay);
 }
 
-/* ── HORLOGE ─────────────────────────────────────────── */
-function tick() {
-    const n   = new Date();
-    const pad = x => String(x).padStart(2,'0');
-    document.getElementById('sys-clock').textContent =
-        pad(n.getHours()) + ':' + pad(n.getMinutes()) + ':' + pad(n.getSeconds());
-}
-setInterval(tick, 1000); tick();
+/* ══════════════════════════════════════════════════════════════
+   applyProfile()
+   ─────────────────────────────────────────────────────────────
+   Lit PROFILE et charge les 3 slots.
+   Appelée au chargement ET si le profil change en session.
+══════════════════════════════════════════════════════════════ */
+function applyProfile() {
+  /* Topbar */
+  const el_ico = document.getElementById('prof-ico');
+  const el_nm  = document.getElementById('prof-nm');
+  if (el_ico) el_ico.textContent = PROFILE.icon  || '👤';
+  if (el_nm)  el_nm.textContent  = PROFILE.name  || 'Sans profil';
 
-/* ── LOGS ────────────────────────────────────────────── */
-const MAX_LOGS  = 60;
-let   logBuffer = [];
+  /* Footer */
+  const ft_p = document.getElementById('ft-profil');
+  const ft_m = document.getElementById('ft-mod');
+  if (ft_p) ft_p.textContent = PROFILE.name       || '—';
+  if (ft_m) ft_m.textContent = (PROFILE.main_module || '—').replace(/_/g,' ');
 
-function addLog(msg, type = 'info') {
-    const ts  = new Date().toLocaleTimeString('fr-FR');
-    logBuffer.push({ ts, msg, type });
-    if (logBuffer.length > MAX_LOGS) logBuffer.shift();
-    renderLogs();
-}
+  /* Chargement des 3 zones */
+  const sec = Array.isArray(PROFILE.secondary_modules) ? PROFILE.secondary_modules : [];
+  loadSlot('main', PROFILE.main_module || '');
+  loadSlot('s1',   sec[0] || '');
+  loadSlot('s2',   sec[1] || '');
 
-function renderLogs() {
-    const el = document.getElementById('log-list');
-    if (!el) return;
-    el.innerHTML = logBuffer.slice().reverse().map(l =>
-        `<div class="log-line log-${l.type}">[${l.ts}] ${escHtml(l.msg)}</div>`
-    ).join('');
-}
-
-function clearLogs() { logBuffer = []; renderLogs(); }
-
-/* ── HELPERS ─────────────────────────────────────────── */
-function escHtml(s) {
-    return String(s)
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  console.info('[SHOS] Profil appliqué :', PROFILE.name,
+    '| main:', PROFILE.main_module || '(vide)',
+    '| sec:', sec.slice(0,2).join(' + ') || 'aucun');
 }
 
-function setTxt(id, v) {
-    const el = document.getElementById(id);
-    if (el && el.textContent !== String(v)) el.textContent = v;
-}
+/* ══════════════════════════════════════════════════════════════
+   SOCKET.IO — Indicateurs temps réel
+══════════════════════════════════════════════════════════════ */
+const socket = io({ transports:['websocket','polling'] });
 
-function setPill(id, state, label) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const cls = 'pill ' + (state==='ok' ? 'p-ok' : state==='err' ? 'p-err' : 'p-wait');
-    if (el.className !== cls) el.className = cls;
-    const nodes = el.childNodes;
-    const last  = nodes[nodes.length - 1];
-    if (last && last.nodeType === 3) {
-        if (last.textContent !== label) last.textContent = label;
-    } else {
-        el.innerHTML = '<span class="d"></span>' + label;
-    }
-}
-
-function setDot(id, state) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.className = 'dot ' + (state==='on' ? 'dot-on' : state==='off' ? 'dot-off' : 'dot-wait');
-}
-
-/* ── ALERTES ─────────────────────────────────────────── */
-let alertCount = 0;
-function showAlert(data, type) {
-    const list = document.getElementById('alert-list');
-    if (!list) return;
-    /* Supprimer le message "Aucune alerte" si présent */
-    const empty = list.querySelector('[data-empty]');
-    if (empty) empty.remove();
-
-    const el  = document.createElement('div');
-    const ico = type === 'critical'
-        ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
-        : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>';
-    const ts  = new Date().toLocaleTimeString('fr-FR');
-    el.className  = 'alert-item ' + (type === 'critical' ? 'a-crit' : 'a-warn');
-    el.innerHTML  = `<svg viewBox="0 0 24 24">${ico}</svg><span>${escHtml(data.message || JSON.stringify(data))}</span><span class="alert-ts">${ts}</span>`;
-
-    list.insertBefore(el, list.firstChild);
-    alertCount++;
-    setTxt('alert-count', alertCount);
-    setTimeout(() => { el.remove(); alertCount = Math.max(0, alertCount-1); setTxt('alert-count', alertCount); }, 12000);
-}
-
-/* ── VIDÉO ───────────────────────────────────────────── */
-function videoOnline() {
-    document.getElementById('vid-placeholder').style.display = 'none';
-    document.getElementById('vid-img').style.display = 'block';
-    document.getElementById('vid-live-badge').style.display = 'flex';
-    setPill('vid-status', 'ok', 'En ligne');
-    addLog('Flux vidéo connecté', 'success');
-}
-function videoOffline() {
-    document.getElementById('vid-placeholder').style.display = 'flex';
-    document.getElementById('vid-img').style.display = 'none';
-    document.getElementById('vid-live-badge').style.display = 'none';
-    setPill('vid-status', 'err', 'Hors ligne');
-    addLog('Flux vidéo — port 5050 inaccessible', 'error');
-}
-
-/* ── CHART MINI ──────────────────────────────────────── */
-const histMax = 30;
-const hist    = { temp:[], gas:[], ts:[] };
-const chartCtx = document.getElementById('sensorChart').getContext('2d');
-
-function makeGrad(r, g, b) {
-    const gr = chartCtx.createLinearGradient(0, 0, 0, 110);
-    gr.addColorStop(0,   `rgba(${r},${g},${b},0.22)`);
-    gr.addColorStop(1,   `rgba(${r},${g},${b},0)`);
-    return gr;
-}
-
-const sChart = new Chart(chartCtx, {
-    type:'line',
-    data:{
-        labels:[],
-        datasets:[
-            { label:'Temp °C', data:[], borderColor:'#ff6b6b', backgroundColor:makeGrad(255,107,107),
-              borderWidth:1.5, tension:0.45, fill:true, pointRadius:0 },
-            { label:'Gaz ppm', data:[], borderColor:'#e8d44d', backgroundColor:makeGrad(232,212,77),
-              borderWidth:1.5, tension:0.45, fill:true, pointRadius:0, yAxisID:'y2' }
-        ]
-    },
-    options:{
-        responsive:true, maintainAspectRatio:false,
-        animation:false,
-        interaction:{ mode:'index', intersect:false },
-        plugins:{ legend:{ display:false }, tooltip:{ backgroundColor:'rgba(14,18,28,.95)', titleFont:{size:9}, bodyFont:{family:'DM Mono',size:11} } },
-        scales:{
-            x:{ display:false },
-            y:{ ticks:{color:'rgba(255,255,255,.22)',font:{size:9},maxTicksLimit:4}, grid:{color:'rgba(255,255,255,.04)'}, border:{display:false} },
-            y2:{ position:'right', ticks:{color:'rgba(232,212,77,.5)',font:{size:9},maxTicksLimit:4}, grid:{drawOnChartArea:false}, border:{display:false} }
-        }
-    }
-});
-
-function pushChart(temp, gas) {
-    const ts = new Date().toLocaleTimeString('fr-FR').slice(-5);
-    hist.ts.push(ts); hist.temp.push(temp); hist.gas.push(gas);
-    if (hist.ts.length > histMax) { hist.ts.shift(); hist.temp.shift(); hist.gas.shift(); }
-    sChart.data.labels            = hist.ts;
-    sChart.data.datasets[0].data  = hist.temp;
-    sChart.data.datasets[1].data  = hist.gas;
-    sChart.update('none');
-}
-
-/* ── WATCHDOG ────────────────────────────────────────── */
-let lastData = 0;
-const WATCHDOG_MS = 10000;
-const watchFill = document.getElementById('watchdog-fill');
-const hwStatus  = document.getElementById('hw-status');
-const hwTxt     = document.getElementById('hw-txt');
-
-setInterval(() => {
-    if (lastData === 0) return;
-    const elapsed = Date.now() - lastData;
-    const pct     = Math.max(0, 100 - (elapsed / WATCHDOG_MS) * 100);
-    watchFill.style.width = pct + '%';
-
-    if (elapsed > WATCHDOG_MS) {
-        watchFill.className = 'watchdog-fill danger';
-        hwStatus.className  = 'offline';
-        hwTxt.textContent   = 'OFFLINE';
-        setPill('sensor-status', 'err', 'Déconnecté');
-    } else if (elapsed > WATCHDOG_MS * 0.6) {
-        watchFill.className = 'watchdog-fill warn';
-    } else {
-        watchFill.className = 'watchdog-fill';
-    }
-}, 500);
-
-/* ── PACKETS COUNTER ─────────────────────────────────── */
-let packetCount = 0;
-let lastPktTime = Date.now();
-
-/* ── SOCKET.IO ───────────────────────────────────────── */
-const socket = io();
-
-socket.on('connect', () => {
-    setDot('dot-socket', 'on');
-    setTxt('txt-socket', 'Flask');
-    addLog('Connecté au serveur S.H.O.S', 'success');
-});
-socket.on('disconnect', () => {
-    setDot('dot-socket', 'off');
-    setTxt('txt-socket', 'Flask');
-    addLog('Déconnecté du serveur', 'error');
-});
+socket.on('connect', () => console.info('[SHOS] SocketIO connecté'));
 
 socket.on('mqtt_status', d => {
-    setDot('dot-mqtt', d.connected ? 'on' : 'off');
-    setPill('rpi-pill', d.connected ? 'ok' : 'err', d.connected ? 'Connecté' : 'Hors ligne');
+  const dot = document.getElementById('dot-mqtt');
+  if (dot) dot.className = 'dot ' + (d.connected ? 'dot-on' : 'dot-off');
 });
 
-socket.on('arduino_status', d => {
-    setDot('dot-arduino', d.connected ? 'on' : 'off');
+socket.on('sensor_update', () => {
+  const dot = document.getElementById('dot-hw');
+  if (dot) dot.className = 'dot dot-on';
+  const ft = document.getElementById('ft-hw');
+  if (ft) {
+    ft.className = 'online';
+    ft.innerHTML = '<span class="dot dot-on"></span> Hardware actif';
+  }
 });
 
-/* ── SENSOR UPDATE ───────────────────────────────────── */
-socket.on('sensor_update', (d) => {
-    lastData    = Date.now();
-    packetCount++;
-    hwStatus.className = 'online';
-    hwTxt.textContent  = 'ONLINE';
-    setPill('sensor-status', 'ok', 'Connecté');
-    addLog(`Données reçues · T=${d.temperature ?? '?'}°C G=${d.gas ?? '?'}ppm`, 'info');
-
-    /* Latence inter-paquets */
-    const now     = Date.now();
-    const latency = now - lastPktTime;
-    lastPktTime   = now;
-    if (latency < 5000) setTxt('rt-latency', latency + ' ms');
-    setTxt('rt-packets', packetCount);
-
-    /* Température */
-    if (d.temperature !== undefined) {
-        const v = +d.temperature;
-        setTxt('s-temp', v.toFixed(1));
-        const el = document.getElementById('s-temp');
-        if (el) el.className = 'sc-val' + (v > 50 ? ' alert' : v > 40 ? ' warn' : '');
-    }
-    /* Humidité */
-    if (d.humidity !== undefined) setTxt('s-hum', (+d.humidity).toFixed(0));
-    /* Gaz */
-    if (d.gas !== undefined) {
-        const v = +d.gas;
-        setTxt('s-gas', v.toFixed(0));
-        const el = document.getElementById('s-gas');
-        if (el) el.className = 'sc-val' + (v > 400 ? ' alert' : v > 200 ? ' warn' : '');
-        setTxt('dm-gas-lvl', v > 400 ? '⚠ Danger' : v > 200 ? 'Élevé' : 'Normal');
-    }
-    /* Distance */
-    if (d.distance !== undefined) {
-        const v = +d.distance;
-        setTxt('s-dist', v.toFixed(0));
-        const el = document.getElementById('s-dist');
-        if (el) el.className = 'sc-val' + (v < 30 ? ' alert' : '');
-        setTxt('dm-obstacle', v < 30 ? '⚠ Obstacle' : 'Libre');
-    }
-    /* Flamme */
-    if (d.flame !== undefined) {
-        const f = d.flame === 1;
-        setTxt('s-flame', f ? '🔥 DANGER' : '✓ RAS');
-        setTxt('dm-flame', f ? '🔥 FLAMME' : 'Normal');
-        const el = document.getElementById('s-flame');
-        if (el) el.className = 'sc-val' + (f ? ' alert' : '');
-    }
-    /* Son */
-    if (d.sound !== undefined) setTxt('s-sound', (+d.sound).toFixed(0));
-    /* Infrarouge */
-    if (d.infrared !== undefined) setTxt('dm-ir', d.infrared === 0 ? 'Obstacle' : 'Libre');
-    /* Joystick */
-    if (d.joy_x !== undefined) { setTxt('s-jx', d.joy_x); setTxt('js-x', d.joy_x); }
-    if (d.joy_y !== undefined) { setTxt('s-jy', d.joy_y); setTxt('js-y', d.joy_y); }
-    if (d.BJ    !== undefined) setTxt('js-btn', d.BJ === 0 ? '● Appuyé' : 'Relâché');
-    if (d.potentiometer !== undefined) setTxt('js-pot', d.potentiometer);
-    /* Batterie distante */
-    if (d.battery !== undefined) setTxt('rt-battery', d.battery + '%');
-
-    /* Chart */
-    if (d.temperature !== undefined && d.gas !== undefined) {
-        pushChart(+d.temperature, +d.gas);
-    }
+socket.on('camera_vision', () => {
+  const dot = document.getElementById('dot-cam');
+  if (dot) dot.className = 'dot dot-on';
 });
 
-/* ── SYS UPDATE ──────────────────────────────────────── */
-socket.on('sys_update', (d) => {
-    if (d.cpu  !== undefined) setTxt('r-cpu',  (+d.cpu).toFixed(1));
-    if (d.ram  !== undefined) setTxt('r-ram',  (+d.ram).toFixed(1));
-    if (d.temp !== undefined) {
-        setTxt('r-temp', (+d.temp).toFixed(1));
-        setPill('rpi-pill', 'ok', 'Actif');
-    }
-    if (d.uptime !== undefined) {
-        const h = Math.floor(+d.uptime / 3600);
-        const m = Math.floor((+d.uptime % 3600) / 60);
-        setTxt('r-uptime', h + 'h ' + m + 'm');
-    }
+/* Changement de profil en cours de session */
+socket.on('profile_changed', d => {
+  if (d?.profile) {
+    Object.assign(PROFILE, d.profile);
+    applyProfile();
+    console.info('[SHOS] Profil changé en session :', d.profile.name);
+  }
 });
 
-/* ── PLUGIN UPDATE ───────────────────────────────────── */
-socket.on('plugin_update', (d) => {
-    const topic = (d.topic || '').toLowerCase();
-    const data  = d.data || {};
+/* ── HORLOGE ────────────────────────────────────────────────── */
+setInterval(() => {
+  const el = document.getElementById('ft-clock');
+  if (el) el.textContent = new Date().toLocaleTimeString('fr-FR',
+    { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}, 1000);
 
-    if (topic.includes('danger'))     setPill('danger-pill', 'ok', 'Actif');
-    if (topic.includes('vision')) {
-        setPill('vision-pill', 'ok', 'Actif');
-        if (data.count   !== undefined) setTxt('vo-count', data.count);
-        if (data.fps     !== undefined) setTxt('vo-fps', (+data.fps).toFixed(1));
-        if (data.label   !== undefined) setTxt('vo-last', data.label);
-    }
-    if (topic.includes('voice')) {
-        setPill('voice-pill', 'ok', 'Actif');
-        if (data.command !== undefined) setTxt('va-cmd', data.command);
-        if (data.active  !== undefined) setTxt('va-state', data.active ? 'Écoute' : 'Inactif');
-    }
-    if (topic.includes('mediapipe') || topic.includes('gesture')) {
-        setPill('mp-pill', 'ok', 'Actif');
-        if (data.fps     !== undefined) setTxt('mp-fps', (+data.fps).toFixed(1));
-        if (data.gesture !== undefined) setTxt('mp-gesture', data.gesture);
-        if (data.hands   !== undefined) setTxt('mp-hands', data.hands);
-    }
-});
-
-/* Events dédiés modules */
-socket.on('mediapipe_status', d => setPill('mp-pill',     d.active ? 'ok':'err', d.active ? 'Actif':'Inactif'));
-socket.on('danger_status',    d => setPill('danger-pill', d.active ? 'ok':'err', d.active ? 'Actif':'Inactif'));
-socket.on('vision_status',    d => setPill('vision-pill', d.active ? 'ok':'err', d.active ? 'Actif':'Inactif'));
-socket.on('voice_status',     d => {
-    setPill('voice-pill', d.active ? 'ok':'err', d.active ? 'Actif':'Inactif');
-    if (d.active !== undefined) setTxt('va-state', d.active ? 'Écoute' : 'Inactif');
-});
-
-/* ── ALERTES SOCKET ──────────────────────────────────── */
-socket.on('alert_critical', d => { showAlert(d, 'critical'); addLog('CRITIQUE: ' + (d.message||''), 'error'); });
-socket.on('alert_warning',  d => { showAlert(d, 'warning');  addLog('ATTENTION: ' + (d.message||''), 'warning'); });
-
-/* ── PROFILE CHANGE (si le serveur émet un changement) ── */
-socket.on('profile_changed', async (d) => {
-    try {
-        const res  = await fetch('/api/get_profiles');
-        const data = await res.json();
-        if (data.profiles && data.current) {
-            const prof = data.profiles[data.current];
-            if (prof) {
-                PROFILE.name               = prof.name               || data.current;
-                PROFILE.main_module        = prof.main_module        || '';
-                PROFILE.secondary_modules  = prof.secondary_modules  || [];
-                setTxt('greeting-profile', PROFILE.name);
-                setTxt('sb-profile',       PROFILE.name);
-                setTxt('sb-module',        PROFILE.main_module);
-                applyProfileModules();
-            }
-        }
-    } catch(e) { console.error('[S.H.O.S] profile_changed fetch:', e); }
-});
-
-/* ── INIT ────────────────────────────────────────────── */
-window.addEventListener('DOMContentLoaded', () => {
-    applyProfileModules();
-    addLog('S.H.O.S Interface initialisée', 'success');
-    addLog('En attente des données capteurs…', 'info');
-    socket.emit('request_status');
-    socket.emit('request_data');
-});
+/* ── INIT ───────────────────────────────────────────────────── */
+applyProfile();
 </script>
 </body>
 </html>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.H.O.S · Streaming Live</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   MODULE : VIDEO STREAMING HUD — S.H.O.S
+   Logique originale (SocketIO / métriques / vocal / switch source) conservée
+   Adapté pour fonctionner dans un bloc compact (iframe)
+═══════════════════════════════════════════════ */
+:root {
+  --bg:    #0e1117;
+  --glass: rgba(8,10,7,0.72);
+  --border:rgba(255,255,255,0.09);
+  --y:     #e8d44d;
+  --y2:    rgba(232,212,77,0.14);
+  --y3:    rgba(232,212,77,0.06);
+  --blue:  #4da6ff;
+  --green: #34c759;
+  --red:   #ff453a;
+  --amber: #ffa340;
+  --t1:    rgba(255,255,255,0.93);
+  --t2:    rgba(255,255,255,0.52);
+  --t3:    rgba(255,255,255,0.25);
+  --font:  'DM Sans', system-ui, sans-serif;
+  --mono:  'DM Mono', monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:var(--font);background:#000;color:var(--t1)}
+
+/* ── LAYOUT PRINCIPAL ── */
+.wrap { height:100vh; display:flex; flex-direction:column; position:relative; }
+
+/* ── VIDÉO FOND PLEIN ÉCRAN ── */
+#video-bg {
+  position:absolute; inset:0; z-index:0;
+  background:#050807;
+}
+#video-feed {
+  width:100%; height:100%; object-fit:cover; display:block;
+}
+
+/* Scanlines HUD */
+#video-bg::after {
+  content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);
+}
+
+/* ── OVERLAY HUD ── */
+.hud {
+  position:absolute; inset:0; z-index:10;
+  display:flex; flex-direction:column;
+  pointer-events:none;
+}
+.hud > * { pointer-events:all; }
+
+/* Coins HUD */
+.corner {
+  position:fixed; width:clamp(16px,3vw,28px); height:clamp(16px,3vw,28px);
+  border-color:rgba(232,212,77,0.4); border-style:solid; pointer-events:none; z-index:20;
+}
+.c-tl{top:8px;left:8px;border-width:2px 0 0 2px}
+.c-tr{top:8px;right:8px;border-width:2px 2px 0 0}
+.c-bl{bottom:8px;left:8px;border-width:0 0 2px 2px}
+.c-br{bottom:8px;right:8px;border-width:0 2px 2px 0}
+
+/* ── TOPBAR HUD ── */
+.hud-top {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:clamp(6px,1.5vh,10px) clamp(10px,2vw,16px);
+  background:rgba(8,10,7,.72); backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border); gap:8px; flex-shrink:0;
+}
+.hud-logo { display:flex; align-items:center; gap:6px; }
+.hud-logo-name { font-family:var(--mono); font-size:clamp(9px,1.6vw,11px); letter-spacing:.12em; color:var(--y); }
+.hud-clock { font-family:var(--mono); font-size:clamp(8px,1.4vw,10px); color:var(--t3); }
+
+/* Source switcher */
+.src-switch { display:flex; gap:4px; }
+.src-btn {
+  padding:3px 8px; border-radius:6px;
+  background:rgba(255,255,255,.06); border:1px solid var(--border);
+  font-family:var(--mono); font-size:clamp(7px,1.2vw,9px); color:var(--t3);
+  cursor:pointer; transition:all .18s; letter-spacing:.04em;
+}
+.src-btn:hover { border-color:rgba(232,212,77,.3); color:var(--y); }
+.src-btn.active { background:var(--y2); border-color:rgba(232,212,77,.35); color:var(--y); }
+
+/* ── MÉTRIQUES OVERLAY (coins) ── */
+.metrics-tl {
+  position:absolute; top:clamp(40px,8vh,60px); left:clamp(10px,2vw,16px);
+  z-index:12; display:flex; flex-direction:column; gap:4px;
+}
+.metrics-tr {
+  position:absolute; top:clamp(40px,8vh,60px); right:clamp(10px,2vw,16px);
+  z-index:12; display:flex; flex-direction:column; gap:4px; align-items:flex-end;
+}
+.m-chip {
+  display:flex; align-items:center; gap:5px;
+  padding:3px 8px; border-radius:6px;
+  background:var(--glass); border:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px);
+}
+.m-label { color:var(--t3); letter-spacing:.06em; }
+.m-val   { color:var(--t1); font-weight:500; min-width:28px; text-align:right; }
+.m-val.ok  { color:var(--green); }
+.m-val.warn{ color:var(--amber); }
+.m-val.err { color:var(--red); }
+
+/* Objets détectés overlay */
+.objects-overlay {
+  position:absolute; top:clamp(40px,8vh,60px); left:50%; transform:translateX(-50%);
+  z-index:12; max-width:200px;
+}
+.obj-chip {
+  padding:3px 10px; border-radius:20px;
+  background:rgba(52,199,89,.15); border:1px solid rgba(52,199,89,.3);
+  font-family:var(--mono); font-size:clamp(8px,1.3vw,10px); color:var(--green);
+  backdrop-filter:blur(12px); white-space:nowrap;
+  display:none; animation:fadeIn .25s ease;
+}
+@keyframes fadeIn{from{opacity:0;transform:translate(-50%,-4px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* ── BARRE BAS (vocal + alertes) ── */
+.hud-bottom {
+  position:absolute; bottom:0; left:0; right:0; z-index:12;
+  background:rgba(8,10,7,.78); backdrop-filter:blur(16px);
+  border-top:1px solid var(--border);
+  padding:clamp(6px,1.5vh,10px) clamp(10px,2vw,16px);
+  display:flex; align-items:center; gap:10px;
+}
+
+/* Bouton micro */
+.mic-btn {
+  width:clamp(28px,5vw,36px); height:clamp(28px,5vw,36px);
+  border-radius:50%; flex-shrink:0;
+  background:rgba(255,255,255,.06); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .2s; font-size:clamp(12px,2vw,16px);
+}
+.mic-btn:hover { border-color:rgba(232,212,77,.35); background:var(--y2); }
+.mic-btn.listening { background:var(--y2); border-color:rgba(232,212,77,.5); animation:micPulse 1.2s ease-in-out infinite; }
+@keyframes micPulse{0%,100%{box-shadow:0 0 0 0 rgba(232,212,77,.4)}50%{box-shadow:0 0 0 6px rgba(232,212,77,0)}}
+
+/* Zone texte vocal */
+.voice-zone { flex:1; min-width:0; }
+.voice-status { font-family:var(--mono); font-size:clamp(7px,1.2vw,9px); color:var(--t3); letter-spacing:.08em; text-transform:uppercase; }
+.voice-text {
+  font-size:clamp(10px,1.8vw,12px); color:var(--t2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  margin-top:2px; transition:color .25s;
+}
+.voice-text.active { color:var(--y); }
+
+/* Alertes compactes */
+.alerts-stack { display:flex; flex-direction:column; gap:3px; max-width:clamp(120px,30%,200px); }
+.alert-chip {
+  padding:3px 8px; border-radius:5px; font-family:var(--mono);
+  font-size:clamp(8px,1.3vw,10px); display:flex; align-items:center; gap:5px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  animation:chipIn .25s ease;
+}
+@keyframes chipIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.chip-warn { background:rgba(255,163,64,.12); border:1px solid rgba(255,163,64,.28); color:var(--amber); }
+.chip-err  { background:rgba(255,69,58,.14);  border:1px solid rgba(255,69,58,.35);  color:var(--red); }
+
+/* Offline placeholder */
+#video-offline {
+  position:absolute; inset:0; z-index:2;
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; color:var(--t3); font-family:var(--mono); font-size:11px;
+  background:#050807;
+}
+.off-icon { font-size:32px; opacity:.25; }
+</style>
+</head>
+<body>
+
+<!-- COINS HUD -->
+<div class="corner c-tl"></div>
+<div class="corner c-tr"></div>
+<div class="corner c-bl"></div>
+<div class="corner c-br"></div>
+
+<!-- VIDÉO FOND -->
+<div id="video-bg">
+  <img id="video-feed" src="" alt="Stream">
+  <div id="video-offline">
+    <div class="off-icon">📡</div>
+    <span>Flux indisponible</span>
+  </div>
+</div>
+
+<!-- HUD OVERLAY -->
+<div class="hud">
+
+  <!-- TOP BAR -->
+  <div class="hud-top">
+    <div class="hud-logo">
+      <span style="font-size:13px">📡</span>
+      <span class="hud-logo-name">LIVE</span>
+    </div>
+    <div class="src-switch">
+      <button class="src-btn active" id="src-pi"  onclick="switchSource('picamera')">Pi</button>
+      <button class="src-btn"        id="src-esp" onclick="switchSource('esp32')">ESP32</button>
+    </div>
+    <div class="hud-clock" id="clock">--:--:--</div>
+  </div>
+
+  <!-- MÉTRIQUES TL -->
+  <div class="metrics-tl">
+    <div class="m-chip">
+      <span class="m-label">FPS</span>
+      <span class="m-val" id="m-fps">—</span>
+    </div>
+    <div class="m-chip">
+      <span class="m-label">CPU</span>
+      <span class="m-val" id="m-cpu">—</span>
+    </div>
+  </div>
+
+  <!-- MÉTRIQUES TR -->
+  <div class="metrics-tr">
+    <div class="m-chip">
+      <span class="m-label">TEMP</span>
+      <span class="m-val" id="m-temp">—</span>
+    </div>
+    <div class="m-chip">
+      <span class="m-label">RAM</span>
+      <span class="m-val" id="m-ram">—</span>
+    </div>
+  </div>
+
+  <!-- OBJETS DÉTECTÉS -->
+  <div class="objects-overlay">
+    <div class="obj-chip" id="obj-chip">0 objet</div>
+  </div>
+
+  <!-- BARRE BAS -->
+  <div class="hud-bottom">
+    <button class="mic-btn" id="mic-btn" onclick="toggleSpeech()" title="Micro">🎙</button>
+    <div class="voice-zone">
+      <div class="voice-status" id="voice-status">En attente</div>
+      <div class="voice-text" id="voice-text">Appuyez pour parler...</div>
+    </div>
+    <div class="alerts-stack" id="alerts-stack"></div>
+  </div>
+
+</div>
+
+<script>
+/* ════════════════════════════════════════════════
+   Logique originale conservée + adaptée compact
+════════════════════════════════════════════════ */
+const BASE = window.STREAMING_BASE || '/streaming';
+const socket = io({ transports:['websocket','polling'] });
+
+// ── INIT VIDÉO ───────────────────────────────
+function initVideo(source) {
+  const img = document.getElementById('video-feed');
+  const off = document.getElementById('video-offline');
+  const url = BASE + '/video?src=' + (source||'picamera') + '&t=' + Date.now();
+  img.src = url;
+  img.onload = () => { off.style.display='none'; img.style.display='block'; };
+  img.onerror= () => { off.style.display='flex'; img.style.display='none'; };
+}
+
+// ── SWITCH SOURCE ────────────────────────────
+let activeSource = 'picamera';
+function switchSource(src) {
+  activeSource = src;
+  document.getElementById('src-pi').className  = 'src-btn' + (src==='picamera'?' active':'');
+  document.getElementById('src-esp').className = 'src-btn' + (src==='esp32'?' active':'');
+  initVideo(src);
+  if (socket) socket.emit('switch_source', {source: src});
+}
+
+// ── MÉTRIQUES ────────────────────────────────
+socket.on('metrics_update', function(d) {
+  setM('m-fps',  d.fps,  '%');
+  setM('m-cpu',  d.cpu,  '%');
+  setM('m-ram',  d.ram,  '%');
+  setM('m-temp', d.temp, '°C');
+
+  // Vision
+  const v = d.vision || {};
+  if (v.hands_detected > 0 || v.pose_detected) {
+    const objChip = document.getElementById('obj-chip');
+    const n = (v.hands_detected||0) + (v.pose_detected?1:0);
+    objChip.textContent = n + ' objet' + (n>1?'s':'') + ' détecté' + (n>1?'s':'');
+    objChip.style.display = 'block';
+  } else {
+    document.getElementById('obj-chip').style.display = 'none';
+  }
+
+  // Alertes
+  const alerts = d.alerts || [];
+  renderAlerts(alerts);
+
+  // Capteurs
+  const s = d.sensors || {};
+  if (s.distance && s.distance > 0 && s.distance < 30) addAlert('danger','Obstacle '+s.distance+'cm');
+  if (s.flame === 1) addAlert('danger','FLAMME DÉTECTÉE');
+  if (s.gas && s.gas > 400) addAlert('danger','Gaz '+s.gas+'ppm');
+});
+
+function setM(id, val, unit) {
+  const el = document.getElementById(id);
+  if (!el || val==null) return;
+  el.textContent = (typeof val === 'number' ? val.toFixed(0) : val) + unit;
+  el.className   = 'm-val' + (val > 80 ? ' err' : val > 60 ? ' warn' : ' ok');
+}
+
+// ── ALERTES ──────────────────────────────────
+const alertsStack  = document.getElementById('alerts-stack');
+function renderAlerts(alerts) {
+  alertsStack.innerHTML = '';
+  alerts.slice(-2).forEach(a => {
+    const chip = document.createElement('div');
+    chip.className = 'alert-chip ' + (a.level==='danger'?'chip-err':'chip-warn');
+    chip.textContent = (a.level==='danger'?'⚠ ':'• ') + a.message;
+    alertsStack.appendChild(chip);
+  });
+}
+function addAlert(level, msg) {
+  const chip = document.createElement('div');
+  chip.className = 'alert-chip ' + (level==='danger'?'chip-err':'chip-warn');
+  chip.textContent = (level==='danger'?'⚠ ':'• ') + msg;
+  alertsStack.prepend(chip);
+  setTimeout(()=>chip.remove(), 4000);
+}
+
+// ── WEB SPEECH ───────────────────────────────
+let recognition = null;
+let listening   = false;
+
+function toggleSpeech() {
+  const btn = document.getElementById('mic-btn');
+  const SR  = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { addAlert('warn','Web Speech non supporté'); return; }
+
+  if (!recognition) {
+    recognition = new SR();
+    recognition.lang = 'fr-FR'; recognition.continuous = true; recognition.interimResults = true;
+    recognition.onresult = e => {
+      let interim='', final='';
+      for (let i=e.resultIndex;i<e.results.length;i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final+=t; else interim+=t;
+      }
+      const vt = document.getElementById('voice-text');
+      if (interim) { vt.textContent=interim; vt.classList.add('active'); }
+      if (final)   {
+        vt.textContent = final; vt.classList.remove('active');
+        socket.emit('voice_text', {text:final});
+        fetch(BASE+'/api/voice/transcript',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:final})}).catch(()=>{});
+      }
+    };
+    recognition.onend = () => { if (listening) recognition.start(); };
+    recognition.onerror = () => { listening=false; btn.classList.remove('listening'); };
+  }
+
+  listening = !listening;
+  btn.classList.toggle('listening', listening);
+  document.getElementById('voice-status').textContent = listening ? 'Écoute active' : 'En attente';
+  if (listening) recognition.start(); else { recognition.stop(); document.getElementById('voice-text').textContent='Appuyez pour parler...'; }
+}
+
+// ── SOCKET ────────────────────────────────────
+socket.on('connect', () => initVideo(activeSource));
+socket.on('source_changed', d => { if(d.source) switchSource(d.source); });
+socket.on('voice_update',   d => {
+  if(d.text) {
+    const vt = document.getElementById('voice-text');
+    vt.textContent = d.text;
+  }
+});
+
+// ── HORLOGE ──────────────────────────────────
+setInterval(() => {
+  const el = document.getElementById('clock');
+  if(el) el.textContent = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}, 1000);
+
+// ── POLLING FALLBACK ──────────────────────────
+let pollInterval;
+function startPolling() {
+  pollInterval = setInterval(async()=>{
+    if (socket.connected) { clearInterval(pollInterval); return; }
+    try {
+      const r = await fetch(BASE+'/api/metrics');
+      const d = await r.json();
+      socket.emit && void 0; // socket déconnecté — utilise les données directement
+      setM('m-fps',d.fps,'fps'); setM('m-cpu',d.cpu,'%'); setM('m-ram',d.ram,'%'); setM('m-temp',d.temp,'°C');
+    } catch(e){}
+  }, 2000);
+}
+startPolling();
+initVideo('picamera');
+</script>
+</body>
+</html>

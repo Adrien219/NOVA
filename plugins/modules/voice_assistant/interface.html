@@ -1,182 +1,290 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NOVA - Assistant Vocal</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <style>
-        :root {
-            --nova-blue: #00f2ff;
-            --nova-glow: rgba(0, 242, 255, 0.5);
-            --bg-dark: #050a14;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.H.O.S · Assistant Vocal</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   MODULE : ASSISTANT VOCAL — S.H.O.S design system
+   Logique originale conservée intégralement
+   Responsive : fonctionne de 280px à plein écran
+═══════════════════════════════════════════════ */
+:root {
+  --bg:     #0e1117;
+  --glass:  rgba(255,255,255,0.055);
+  --border: rgba(255,255,255,0.09);
+  --y:      #e8d44d;
+  --y2:     rgba(232,212,77,0.14);
+  --y3:     rgba(232,212,77,0.06);
+  --blue:   #4da6ff;
+  --green:  #34c759;
+  --red:    #ff453a;
+  --t1:     rgba(255,255,255,0.93);
+  --t2:     rgba(255,255,255,0.52);
+  --t3:     rgba(255,255,255,0.28);
+  --font:   'DM Sans', system-ui, sans-serif;
+  --mono:   'DM Mono', monospace;
+}
 
-        body {
-            background-color: var(--bg-dark);
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            background: radial-gradient(circle at center, #0a192f 0%, #050a14 100%);
-        }
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 
-        /* Header avec Scanline */
-        .header {
-            padding: 20px;
-            border-bottom: 1px solid var(--nova-glow);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0, 0, 0, 0.4);
-        }
+html, body {
+  height:100%; overflow:hidden;
+  font-family:var(--font);
+  background:var(--bg); color:var(--t1);
+}
 
-        .status-badge {
-            color: var(--nova-blue);
-            font-size: 0.8rem;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            animation: blink 2s infinite;
-        }
+/* ── LAYOUT ── */
+.wrap {
+  height:100vh;
+  display:flex; flex-direction:column;
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 60%, rgba(77,166,255,0.07) 0%, transparent 70%),
+    var(--bg);
+}
 
-        /* Cercle Central de l'Assistant */
-        .main-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
+/* ── HEADER ── */
+.hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:clamp(8px,2vh,14px) clamp(10px,3vw,18px);
+  background:rgba(14,17,23,0.95);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0; gap:8px;
+}
+.hdr-left { display:flex; align-items:center; gap:7px; min-width:0; }
+.mod-ico {
+  width:clamp(18px,3vw,22px); height:clamp(18px,3vw,22px);
+  border-radius:6px; background:rgba(77,166,255,0.12);
+  border:1px solid rgba(77,166,255,0.25);
+  display:flex; align-items:center; justify-content:center;
+  font-size:clamp(9px,1.5vw,12px); flex-shrink:0;
+}
+.mod-name {
+  font-size:clamp(9px,1.8vw,11px); font-weight:500;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--t2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.status-pill {
+  display:flex; align-items:center; gap:4px;
+  padding:3px 9px; border-radius:10px;
+  background:rgba(255,255,255,.06); border:1px solid var(--border);
+  font-family:var(--mono); font-size:clamp(8px,1.5vw,10px); color:var(--t2);
+  white-space:nowrap; flex-shrink:0;
+}
+.dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.dot-blue { background:var(--blue); box-shadow:0 0 6px var(--blue); }
+.dot-green{ background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 1.2s ease-in-out infinite; }
+.dot-wait { background:rgba(255,255,255,.3); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
 
-        .nova-orb {
-            position: relative;
-            width: 150px;
-            height: 150px;
-            border-radius: 50%;
-            background: transparent;
-            border: 2px solid var(--nova-blue);
-            box-shadow: 0 0 20px var(--nova-glow), inset 0 0 20px var(--nova-glow);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            transition: all 0.3s ease;
-        }
+/* ── CENTRE ── */
+.center {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:clamp(12px,3vh,24px);
+  padding:clamp(10px,3vh,20px);
+  overflow:hidden;
+}
 
-        .nova-orb.listening {
-            transform: scale(1.1);
-            border-color: #fff;
-            box-shadow: 0 0 40px #fff;
-        }
+/* Orbe IA */
+.orb-wrap { position:relative; display:flex; align-items:center; justify-content:center; }
 
-        /* Ondes Sonores Animées */
-        .wave {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            border: 1px solid var(--nova-blue);
-            animation: ripple 2s linear infinite;
-            opacity: 0;
-        }
+.orb {
+  position:relative; border-radius:50%;
+  width:clamp(60px,20vw,120px); height:clamp(60px,20vw,120px);
+  background:rgba(77,166,255,0.06);
+  border:1.5px solid rgba(77,166,255,0.35);
+  box-shadow:0 0 20px rgba(77,166,255,0.15), inset 0 0 20px rgba(77,166,255,0.08);
+  display:flex; align-items:center; justify-content:center;
+  transition:all .35s ease;
+  cursor:pointer;
+}
+.orb-icon { font-size:clamp(20px,5vw,36px); user-select:none; }
 
-        .wave:nth-child(2) { animation-delay: 0.7s; }
-        .wave:nth-child(3) { animation-delay: 1.4s; }
+/* Ondes */
+.wave {
+  position:absolute; border-radius:50%;
+  border:1px solid rgba(77,166,255,0.3);
+  width:100%; height:100%;
+  animation:ripple 2.2s linear infinite; opacity:0;
+}
+.wave:nth-child(2) { animation-delay:.7s; }
+.wave:nth-child(3) { animation-delay:1.4s; }
+@keyframes ripple {
+  0%  { transform:scale(1); opacity:.5; }
+  100%{ transform:scale(2.6); opacity:0; }
+}
 
-        /* Transcription Textuelle */
-        .transcription-zone {
-            margin-top: 50px;
-            text-align: center;
-            width: 80%;
-            max-width: 600px;
-        }
+/* Orbe actif */
+.orb.listening {
+  border-color:rgba(232,212,77,0.6);
+  box-shadow:0 0 28px rgba(232,212,77,0.25), inset 0 0 20px rgba(232,212,77,0.08);
+  background:rgba(232,212,77,0.06);
+}
+.orb.listening .wave {
+  border-color:rgba(232,212,77,0.3);
+}
 
-        #transcription-text {
-            font-size: 1.5rem;
-            font-weight: 300;
-            color: var(--nova-blue);
-            text-shadow: 0 0 10px var(--nova-glow);
-            min-height: 2em;
-        }
+/* Transcription */
+.transcription {
+  text-align:center; width:100%; max-width:360px;
+}
+#transcription-text {
+  font-size:clamp(11px,2.5vw,16px); font-weight:400;
+  color:var(--blue);
+  text-shadow:0 0 12px rgba(77,166,255,0.4);
+  line-height:1.5;
+  min-height:2em;
+  padding:0 8px;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+  overflow:hidden;
+  transition:color .3s;
+}
+#transcription-text.active { color:var(--y); text-shadow:0 0 12px rgba(232,212,77,0.4); }
 
-        .btn-back {
-            position: absolute;
-            bottom: 30px;
-            left: 30px;
-            color: #444;
-            text-decoration: none;
-            font-size: 0.8rem;
-            border: 1px solid #222;
-            padding: 5px 15px;
-            transition: 0.3s;
-        }
+/* Badge statut sous la transcription */
+#status {
+  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px);
+  letter-spacing:.12em; text-transform:uppercase; color:var(--t3);
+  margin-top:6px; transition:color .3s;
+}
+#status.active { color:var(--y); }
+#status.listening { color:var(--blue); }
 
-        .btn-back:hover { color: var(--nova-blue); border-color: var(--nova-blue); }
-
-        @keyframes ripple {
-            0% { transform: scale(1); opacity: 0.5; }
-            100% { transform: scale(2.5); opacity: 0; }
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
-    </style>
+/* ── HISTORIQUE COMPACT ── */
+.history {
+  width:100%; max-width:360px;
+  background:var(--glass); border:1px solid var(--border);
+  border-radius:10px; overflow:hidden;
+  flex-shrink:0;
+}
+.history-head {
+  padding:5px 10px;
+  border-bottom:1px solid var(--border);
+  font-family:var(--mono); font-size:9px;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--t3);
+}
+.history-list {
+  max-height:clamp(50px,12vh,80px);
+  overflow-y:auto; padding:4px 0;
+}
+.history-list::-webkit-scrollbar { width:3px; }
+.history-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); }
+.h-item {
+  padding:4px 10px;
+  font-size:clamp(9px,1.6vw,11px); color:var(--t2);
+  border-left:2px solid rgba(77,166,255,.3);
+  margin:3px 6px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  animation:slideIn .25s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
+.h-empty { padding:8px 10px; font-size:10px; color:var(--t3); font-family:var(--mono); }
+</style>
 </head>
 <body>
-    <div class="header">
-        <div>UNITÉ : <span style="color: var(--nova-blue);">{{ config.name }}</span></div>
-        <div id="status" class="status-badge">PRÊT / EN ATTENTE</div>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-left">
+      <div class="mod-ico">🎙</div>
+      <span class="mod-name">{{ config.name if config else 'Assistant Vocal' }}</span>
+    </div>
+    <div class="status-pill">
+      <div class="dot dot-wait" id="dot"></div>
+      <span id="status">EN ATTENTE</span>
+    </div>
+  </header>
+
+  <!-- CENTRE -->
+  <div class="center">
+
+    <!-- Orbe IA -->
+    <div class="orb-wrap">
+      <div class="orb" id="orb">
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <div class="wave"></div>
+        <span class="orb-icon">🎙</span>
+      </div>
     </div>
 
-    <div class="main-container">
-        <div class="nova-orb" id="orb">
-            <div class="wave"></div>
-            <div class="wave"></div>
-            <div class="wave"></div>
-            <span style="font-size: 2rem;">🎙️</span>
-        </div>
-
-        <div class="transcription-zone">
-            <div id="transcription-text">"Bonjour Adrien, je vous écoute..."</div>
-        </div>
+    <!-- Transcription -->
+    <div class="transcription">
+      <div id="transcription-text">En attente de la voix...</div>
+      <div id="status-sub" style="font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-top:5px;">NOVA · PRÊT</div>
     </div>
 
-    <a href="/" class="btn-back">RETOUR TERMINAL</a>
+    <!-- Historique -->
+    <div class="history">
+      <div class="history-head">Historique</div>
+      <div class="history-list" id="history">
+        <div class="h-empty">Aucune transcription</div>
+      </div>
+    </div>
 
-    <script>
-        const socket = io();
-        const orb = document.getElementById('orb');
-        const textDisplay = document.getElementById('transcription-text');
-        const statusBadge = document.getElementById('status');
+  </div>
+</div>
 
-        socket.on('plugin_data', function(data) {
-            // Vérification si les données viennent du plugin vocal
-            if (data.plugin === "voice_assistant" || data.module === "voice_assistant") {
-                
-                // 1. Mise à jour de la transcription
-                if (data.type === "transcription" || data.value) {
-                    const phrase = data.value || data.text;
-                    textDisplay.innerText = `"${phrase}"`;
-                    
-                    // Effet visuel "en écoute"
-                    orb.classList.add('listening');
-                    statusBadge.innerText = "NOVA ANALYSE...";
-                    statusBadge.style.color = "#fff";
+<script>
+const socket = io();
+const orb    = document.getElementById('orb');
+const txt    = document.getElementById('transcription-text');
+const dot    = document.getElementById('dot');
+const status = document.getElementById('status');
+const statusSub = document.getElementById('status-sub');
+const history   = document.getElementById('history');
 
-                    // Retour au calme après 2 secondes
-                    setTimeout(() => {
-                        orb.classList.remove('listening');
-                        statusBadge.innerText = "PRÊT / EN ATTENTE";
-                        statusBadge.style.color = "var(--nova-blue)";
-                    }, 2500);
-                }
-            }
-        });
-    </script>
+let resetTimer;
+let firstItem = true;
+
+/* ── Réception données plugin (logique originale conservée) ── */
+socket.on('plugin_data', function(data) {
+  if (data.plugin === "voice_assistant" || data.module === "voice_assistant") {
+    if (data.type === "transcription" || data.value || data.text) {
+      const phrase = data.value || data.text || '';
+      if (!phrase) return;
+
+      // Mise à jour transcription
+      txt.textContent = '\u00ab\u00a0' + phrase + '\u00a0\u00bb';
+      txt.classList.add('active');
+
+      // Orbe actif
+      orb.classList.add('listening');
+      dot.className = 'dot dot-green';
+      status.textContent = 'NOVA ANALYSE...';
+      statusSub.textContent = 'TRAITEMENT EN COURS';
+
+      // Historique
+      if (firstItem) { history.innerHTML = ''; firstItem = false; }
+      const item = document.createElement('div');
+      item.className = 'h-item';
+      item.textContent = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) + ' · ' + phrase;
+      history.prepend(item);
+      if (history.children.length > 6) history.lastElementChild.remove();
+
+      // Reset
+      clearTimeout(resetTimer);
+      resetTimer = setTimeout(() => {
+        orb.classList.remove('listening');
+        txt.classList.remove('active');
+        dot.className = 'dot dot-wait';
+        status.textContent = 'EN ATTENTE';
+        statusSub.textContent = 'NOVA \u00b7 PR\u00caT';
+      }, 2500);
+    }
+  }
+});
+
+socket.on('disconnect', () => {
+  dot.className = 'dot';
+  dot.style.background = 'var(--red)';
+  status.textContent = 'D\u00c9CONNECT\u00c9';
+});
+</script>
 </body>
 </html>

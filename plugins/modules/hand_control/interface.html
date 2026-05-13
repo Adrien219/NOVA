@@ -1,248 +1,236 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SHOS - {{ config.name }}</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <style>
-        :root { --neon-green: #09f687; --neon-blue: #00b4ff; --bg-dark: #0a0e14; }
-        
-        body { 
-            background: var(--bg-dark); 
-            color: white; 
-            font-family: 'Segoe UI', sans-serif; 
-            margin: 0; 
-            overflow: hidden;
-            border: 2px solid var(--neon-green);
-            height: 98vh;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.H.O.S · Contrôle Gestuel</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   MODULE : CONTRÔLE GESTUEL — S.H.O.S
+   Logique originale (plugin_data / hand_control) conservée
+═══════════════════════════════════════════════ */
+:root {
+  --bg:    #0e1117;
+  --glass: rgba(255,255,255,0.055);
+  --border:rgba(255,255,255,0.09);
+  --y:     #e8d44d;
+  --y2:    rgba(232,212,77,0.12);
+  --blue:  #4da6ff;
+  --green: #34c759;
+  --red:   #ff453a;
+  --t1:    rgba(255,255,255,0.93);
+  --t2:    rgba(255,255,255,0.52);
+  --t3:    rgba(255,255,255,0.28);
+  --font:  'DM Sans', system-ui, sans-serif;
+  --mono:  'DM Mono', monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--bg);color:var(--t1)}
 
-        .hud-container {
-            display: grid;
-            grid-template-columns: 1fr 300px;
-            gap: 20px;
-            padding: 20px;
-            height: 90%;
-        }
+.wrap { height:100vh; display:flex; flex-direction:column; }
 
-        .video-section {
-            position: relative;
-            border: 2px solid var(--neon-blue);
-            box-shadow: 0 0 20px rgba(0, 180, 255, 0.2);
-            border-radius: 10px;
-            background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+/* ── HEADER ── */
+.hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:clamp(7px,1.8vh,12px) clamp(10px,2vw,16px);
+  background:rgba(14,17,23,.97); border-bottom:1px solid var(--border);
+  flex-shrink:0; gap:8px;
+}
+.hdr-l { display:flex; align-items:center; gap:7px; min-width:0; }
+.m-ico { width:20px; height:20px; border-radius:6px; background:rgba(52,199,89,.12); border:1px solid rgba(52,199,89,.25); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
+.m-name { font-size:clamp(9px,1.6vw,11px); font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.spill { display:flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px; background:rgba(255,255,255,.06); border:1px solid var(--border); font-family:var(--mono); font-size:clamp(8px,1.4vw,10px); color:var(--t2); flex-shrink:0; }
+.dot { width:5px; height:5px; border-radius:50%; }
+.d-ok { background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 1.5s ease-in-out infinite; }
+.d-w  { background:rgba(255,255,255,.3); }
+.d-y  { background:var(--y); box-shadow:0 0 6px var(--y); }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
 
-        .video-feed { width: 100%; height: auto; border-radius: 5px; }
+/* ── MAIN LAYOUT ── */
+.main {
+  flex:1; display:grid;
+  grid-template-columns:1fr clamp(110px,30%,190px);
+  overflow:hidden; min-height:0;
+}
 
-        .gesture-badge {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(0, 255, 136, 0.2);
-            border: 1px solid var(--neon-green);
-            padding: 10px 20px;
-            font-weight: bold;
-            color: var(--neon-green);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
+/* Vidéo */
+.video-zone {
+  position:relative; background:#000;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; border-right:1px solid var(--border);
+}
+.video-zone img { width:100%; height:100%; object-fit:cover; }
 
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
+/* Badge geste actuel */
+.gesture-badge {
+  position:absolute; top:8px; left:8px; z-index:5;
+  padding:5px 11px; border-radius:7px;
+  background:rgba(52,199,89,.15); border:1px solid rgba(52,199,89,.3);
+  font-family:var(--mono); font-size:clamp(9px,1.5vw,11px); color:var(--green);
+  letter-spacing:.08em; text-transform:uppercase; transition:all .25s;
+  max-width:calc(100% - 20px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.gesture-badge.active {
+  background:rgba(77,166,255,.2); border-color:rgba(77,166,255,.4); color:var(--blue);
+}
+.gesture-badge.confirmed {
+  background:rgba(232,212,77,.18); border-color:rgba(232,212,77,.4); color:var(--y);
+}
 
-        .info-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-left: 4px solid var(--neon-blue);
-            padding: 15px;
-            border-radius: 0 10px 10px 0;
-        }
+/* Toast validation */
+.toast {
+  position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
+  padding:7px 18px; border-radius:20px;
+  background:rgba(52,199,89,.9); color:#0e1117;
+  font-family:var(--mono); font-size:clamp(10px,1.8vw,12px); font-weight:700;
+  letter-spacing:.08em; z-index:10; white-space:nowrap;
+  display:none; box-shadow:0 4px 16px rgba(52,199,89,.4);
+  animation:toastIn .25s ease;
+}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
-        .command-list {
-            list-style: none;
-            padding: 0;
-        }
+/* ── SIDEBAR COMMANDES ── */
+.sidebar {
+  background:rgba(14,17,23,.95); display:flex; flex-direction:column; overflow:hidden;
+}
+.sb-head {
+  padding:7px 10px 5px; border-bottom:1px solid var(--border);
+  font-family:var(--mono); font-size:9px; letter-spacing:.10em;
+  text-transform:uppercase; color:var(--t3); flex-shrink:0;
+}
 
-        .command-item {
-            padding: 10px;
-            margin-bottom: 5px;
-            border: 1px solid rgba(0, 255, 136, 0.1);
-            font-size: 0.9rem;
-            transition: 0.3s;
-        }
+.cmd-list {
+  flex:1; overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:4px;
+}
+.cmd-list::-webkit-scrollbar{width:3px}
+.cmd-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}
 
-        .command-item.active {
-            background: var(--neon-green);
-            color: black;
-            font-weight: bold;
-            box-shadow: 0 0 15px var(--neon-green);
-        }
-
-        .back-btn {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 25px;
-            background: transparent;
-            border: 1px solid var(--neon-blue);
-            color: var(--neon-blue);
-            text-decoration: none;
-            cursor: pointer;
-        }
-    </style>
+.command-item {
+  padding:clamp(6px,1.5vh,9px) 9px; border-radius:8px;
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  font-size:clamp(9px,1.6vw,11px); color:var(--t2);
+  transition:all .22s ease; cursor:default;
+  display:flex; align-items:center; gap:6px;
+  white-space:nowrap; overflow:hidden;
+}
+.cmd-emoji { font-size:clamp(11px,2vw,14px); flex-shrink:0; }
+.cmd-label { overflow:hidden; text-overflow:ellipsis; }
+.command-item.active {
+  background:rgba(52,199,89,.12); border-color:rgba(52,199,89,.35);
+  color:var(--green); font-weight:600;
+  box-shadow:0 0 10px rgba(52,199,89,.08);
+}
+.command-item.flash {
+  background:rgba(255,255,255,.14); color:var(--t1);
+}
+</style>
 </head>
 <body>
-    <div style="padding: 10px 20px; background: rgba(0, 255, 136, 0.1); border-bottom: 1px solid #00ff88;">
-        <span style="color: #00ff88;">SYSTEM:</span> {{ config.name }} | <span style="color: #00f2ff;">USER:</span> {{ profile.name }}
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-l">
+      <div class="m-ico">✋</div>
+      <span class="m-name">{{ config.name if config else 'Contrôle Gestuel' }}</span>
+    </div>
+    <div class="spill">
+      <div class="dot d-ok" id="gesture-dot"></div>
+      <span id="gesture-status">SCANNING</span>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- VIDÉO -->
+    <div class="video-zone">
+      <div class="gesture-badge" id="current-gesture">SCANNING...</div>
+      <div class="toast" id="status-toast">✓ VALIDÉ</div>
+      <img src="/video_feed" id="main-video" alt="Flux caméra"
+           onerror="this.style.display='none'">
     </div>
 
-    <div class="hud-container" style="display: flex; gap: 20px; padding: 20px;">
-        
-        <div class="video-section" style="flex: 2; position: relative;">
-            <div class="gesture-badge" id="current-gesture" 
-                 style="position: absolute; top: 10px; left: 10px; z-index: 10; padding: 5px 15px; background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; border-radius: 5px; color: #00ff88; font-family: monospace; font-weight: bold;">
-                 SCANNING...
-            </div>
-                                
-            <div class="video-container" style="position: relative; border: 2px solid #00f2ff; background: #000; min-height: 300px; box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);">
-                <img id="main-video" src="{{ url_for('video_feed') }}" 
-                     style="width: 100%; height: auto; display: block;" 
-                     onerror="this.src='https://via.placeholder.com/640x480?text=CAMERA+OFFLINE';">
-            
-                <div id="video-loader" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #00f2ff; font-weight: bold;">
-                    CHARGEMENT DU FLUX...
-                </div>
-            </div>
+    <!-- COMMANDES -->
+    <div class="sidebar">
+      <div class="sb-head">Commandes</div>
+      <div class="cmd-list">
+        <div class="command-item" id="START_SYSTEM">
+          <span class="cmd-emoji">🖐</span>
+          <span class="cmd-label">Pleine main : Start</span>
         </div>
-
-        <div class="sidebar" style="flex: 1; display: flex; flex-direction: column; gap: 20px;">
-            <div class="info-card" style="border: 1px solid #00f2ff; padding: 15px; background: rgba(0, 242, 255, 0.05);">
-                <h3 style="margin:0; color: #00f2ff; font-size: 1rem; letter-spacing: 1px;">STATUT IA</h3>
-                <p id="ai-status" style="font-size: 0.8rem; opacity: 0.8; color: #fff; margin-top: 5px;">Médiapipe Hand Tracking : OK</p>
-            </div>
-
-            <div class="info-card" style="border: 1px solid #00ff88; padding: 15px; background: rgba(0, 255, 136, 0.05);">
-                <h4 style="margin:0 0 10px 0; color: #00ff88; font-size: 0.9rem;">BIBLIOTHÈQUE DE COMMANDES</h4>
-                <div class="command-list" style="display: flex; flex-direction: column; gap: 10px;">
-                    <div id="START_SYSTEM" class="command-item">🖐️ PLEINE MAIN : START</div>
-                    <div id="STOP_SYSTEM" class="command-item">✊ POING : STOP</div>
-                    <div id="READ_TEXT" class="command-item">☝️ INDEX : LIRE TEXTE</div>
-                    <div id="TRIGGER_FLORENCE" class="command-item">👍 POUCE : FLORENCE-2</div>
-                </div>
-            </div>
+        <div class="command-item" id="STOP_SYSTEM">
+          <span class="cmd-emoji">✊</span>
+          <span class="cmd-label">Poing : Stop</span>
         </div>
+        <div class="command-item" id="READ_TEXT">
+          <span class="cmd-emoji">☝️</span>
+          <span class="cmd-label">Index : Lire texte</span>
+        </div>
+        <div class="command-item" id="TRIGGER_FLORENCE">
+          <span class="cmd-emoji">👍</span>
+          <span class="cmd-label">Pouce : Florence-2</span>
+        </div>
+      </div>
     </div>
 
-    <style>
-        body { background: #000; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; overflow: hidden; }
-        
-        .command-item {
-            padding: 8px;
-            border-radius: 3px;
-            border: 1px solid rgba(255,255,255,0.1);
-            font-size: 0.85rem;
-            transition: all 0.3s ease;
-            color: rgba(255,255,255,0.6);
-        }
+  </div>
+</div>
 
-        .command-item.active {
-            background: rgba(0, 255, 136, 0.3);
-            border-color: #00ff88;
-            color: #fff;
-            font-weight: bold;
-            box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
-            transform: scale(1.02);
-        }
+<script>
+const socket  = io();
+const badge   = document.getElementById('current-gesture');
+const toast   = document.getElementById('status-toast');
+const dot     = document.getElementById('gesture-dot');
+const statEl  = document.getElementById('gesture-status');
+const vimg    = document.getElementById('main-video');
 
-        .back-btn {
-            display: inline-block;
-            margin: 0 20px 20px;
-            padding: 8px 15px;
-            border: 1px solid rgba(255,255,255,0.3);
-            color: rgba(255,255,255,0.7);
-            text-decoration: none;
-            font-size: 0.8rem;
-            transition: 0.3s;
-        }
-        .back-btn:hover { background: #fff; color: #000; border-color: #fff; }
-    </style>
+/* ── Logique originale conservée ── */
+socket.on('plugin_data', function(data) {
+  if (data.plugin === "hand_control") {
+    const gesture     = data.gesture || 'NONE';
+    const isConfirmed = data.status === "confirmed";
 
-    <a href="/" class="back-btn">RETOUR MENU PRINCIPAL</a>
-    <div id="status-toast" style="position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); 
-     padding: 15px 30px; background: rgba(0, 242, 255, 0.9); color: #000; font-weight: bold; 
-     border-radius: 50px; display: none; z-index: 1000; box-shadow: 0 0 20px #00f2ff;
-     text-transform: uppercase; letter-spacing: 2px; font-size: 1.2rem;">
-    COMMANDE VALIDÉE
-    </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script>
-    const socket = io();
-    const badge = document.getElementById('current-gesture');
-    const vimg = document.getElementById('main-video');
-    const toast = document.getElementById('status-toast');
-    
-    // Cacher le loader quand le flux vidéo est reçu
-    vimg.onload = () => { 
-        document.getElementById('video-loader').style.display = 'none'; 
-    };
+    // 1. Badge geste en cours
+    if (gesture !== 'NONE') {
+      badge.textContent = gesture.replace('_', ' ');
+      badge.className   = 'gesture-badge active';
+      dot.className     = 'dot d-y';
+      statEl.textContent= gesture.replace('_', ' ');
+    } else {
+      badge.textContent = 'SCANNING...';
+      badge.className   = 'gesture-badge';
+      dot.className     = 'dot d-ok';
+      statEl.textContent= 'SCANNING';
+    }
 
-    // Réception des données du plugin (via le pont MQTT de nova.py)
-    socket.on('plugin_data', function(data) {
-        // On vérifie que les données viennent bien du module de gestion des mains
-        if (data.plugin === "hand_control") {
-            const gesture = data.gesture;
-            const isConfirmed = data.status === "confirmed";
+    // 2. Highlight commande (logique originale)
+    document.querySelectorAll('.command-item').forEach(el => el.classList.remove('active'));
+    const activeItem = document.getElementById(gesture);
+    if (activeItem) activeItem.classList.add('active');
 
-            // 1. MISE À JOUR DU BADGE (État en temps réel)
-            if (gesture !== "NONE") {
-                badge.textContent = "ACTION: " + gesture.replace('_', ' ');
-                badge.style.background = "rgba(0, 180, 255, 0.6)";
-                badge.style.borderColor = "#00f2ff";
-                badge.style.color = "#fff";
-            } else {
-                badge.textContent = "SCANNING...";
-                badge.style.background = "rgba(0, 255, 136, 0.2)";
-                badge.style.borderColor = "#00ff88";
-                badge.style.color = "#00ff88";
-            }
+    // 3. Validation confirmée (toast + flash)
+    if (isConfirmed && gesture !== 'NONE') {
+      badge.className = 'gesture-badge confirmed';
+      toast.innerHTML = '✅ ' + gesture.replace('_', ' ');
+      toast.style.display = 'block';
 
-            // 2. MISE À JOUR DE LA LISTE (Highlight de sélection)
-            document.querySelectorAll('.command-item').forEach(el => el.classList.remove('active'));
-            const activeItem = document.getElementById(gesture);
-            if (activeItem) {
-                activeItem.classList.add('active');
-            }
+      if (activeItem) {
+        activeItem.classList.add('flash');
+        setTimeout(() => activeItem.classList.remove('flash'), 300);
+      }
+      setTimeout(() => { toast.style.display = 'none'; }, 2000);
+    }
+  }
+});
 
-            // 3. RETOUR DE VALIDATION (Flash et Toast)
-            if (isConfirmed && gesture !== "NONE") {
-                // Affichage du toast central
-                toast.innerHTML = `<span style="font-size: 1.5rem;">✅</span> ${gesture.replace('_', ' ')}`;
-                toast.style.display = 'block';
-                
-                // Petit effet de "clignotement" sur la commande active
-                if (activeItem) {
-                    activeItem.style.background = "rgba(255, 255, 255, 0.9)";
-                    activeItem.style.color = "#000";
-                    setTimeout(() => {
-                        activeItem.style.background = "";
-                        activeItem.style.color = "";
-                    }, 300);
-                }
-
-                // Disparition du toast après 2 secondes
-                setTimeout(() => {
-                    toast.style.display = 'none';
-                }, 2000);
-            }
-        }
-    });
+socket.on('disconnect', () => {
+  dot.className = 'dot';
+  dot.style.background = '#ff453a';
+  statEl.textContent = 'DÉCONNECTÉ';
+});
 </script>
 </body>
 </html>

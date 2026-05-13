@@ -1,0 +1,18 @@
+{
+  "name":            "Video Streaming",
+  "template":        "interface.html",
+  "description":     "Stream vidéo temps réel, métriques capteurs, reconnaissance vocale",
+  "icon":            "📡",
+  "version":         "1.0.0",
+
+  "picamera_url":    "http://localhost:5051/video_feed",
+  "esp32_url":       "",
+  "default_source":  "picamera",
+
+  "mqtt_broker":     "localhost",
+  "mqtt_port":       1883,
+
+  "whisper_model":   "base",
+  "whisper_language":"fr",
+  "metrics_interval_s": 1.0
+}
