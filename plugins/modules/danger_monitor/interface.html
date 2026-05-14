@@ -1,279 +1,299 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N.O.V.A - {{ config.name }}</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <style>
-        :root {
-            --safe-green: #00ff88;
-            --warn-orange: #ffaa00;
-            --danger-red: #ff0044;
-            --panel-bg: rgba(10, 10, 10, 0.9);
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.H.O.S · Danger Monitor</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   MODULE : DANGER MONITOR — S.H.O.S
+   Logique originale (module_update / sensor_update / renderAlerts) conservée
+═══════════════════════════════════════════════ */
+:root {
+  --bg:    #0e1117;
+  --glass: rgba(255,255,255,0.055);
+  --border:rgba(255,255,255,0.09);
+  --y:     #e8d44d;
+  --blue:  #4da6ff;
+  --green: #34c759;
+  --red:   #ff453a;
+  --amber: #ffa340;
+  --t1:    rgba(255,255,255,0.93);
+  --t2:    rgba(255,255,255,0.52);
+  --t3:    rgba(255,255,255,0.28);
+  --font:  'DM Sans', system-ui, sans-serif;
+  --mono:  'DM Mono', monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--bg);color:var(--t1);transition:background .5s}
 
-        body {
-            background: #000;
-            color: white;
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            border: 4px solid var(--safe-green);
-            transition: border-color 0.3s;
-        }
+/* État danger global */
+body.alert-active { background:linear-gradient(135deg,rgba(255,69,58,.08),var(--bg)); }
 
-        /* État Alerte Critique */
-        body.alert-active {
-            border-color: var(--danger-red);
-            animation: pulse-border 0.5s infinite alternate;
-        }
+.wrap { height:100vh; display:flex; flex-direction:column; }
 
-        @keyframes pulse-border {
-            from { box-shadow: inset 0 0 20px var(--danger-red); }
-            to { box-shadow: inset 0 0 60px var(--danger-red); }
-        }
+/* ── HEADER ── */
+.hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:clamp(7px,1.8vh,12px) clamp(10px,2vw,16px);
+  background:rgba(14,17,23,.97); border-bottom:1px solid var(--border);
+  flex-shrink:0; gap:8px; transition:border-color .3s;
+}
+.hdr.danger { border-bottom-color:rgba(255,69,58,.5); }
+.hdr-l { display:flex; align-items:center; gap:7px; min-width:0; }
+.m-ico { width:20px; height:20px; border-radius:6px; background:rgba(255,69,58,.12); border:1px solid rgba(255,69,58,.25); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
+.m-name { font-size:clamp(9px,1.6vw,11px); font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
-        .header {
-            padding: 20px;
-            background: var(--panel-bg);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
+.status-text {
+  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px);
+  letter-spacing:.10em; text-transform:uppercase; color:var(--green);
+  transition:color .3s; white-space:nowrap;
+}
+.status-text.danger { color:var(--red); animation:pulse-txt .5s ease-in-out infinite alternate; }
+@keyframes pulse-txt{from{opacity:1}to{opacity:.5}}
 
-        .status-text {
-            font-weight: bold;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
+/* ── ZONE CENTRALE ── */
+.center {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:clamp(10px,3vh,20px);
+  padding:clamp(8px,2vh,16px);
+  overflow:hidden; min-height:0;
+}
 
-        /* Radar / Zone centrale */
-        .monitor-zone {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
+/* Radar */
+.radar-wrap { position:relative; flex-shrink:0; }
 
-        .radar-circle {
-            width: 200px;
-            height: 200px;
-            border: 2px solid var(--safe-green);
-            border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            position: relative;
-        }
+.radar-circle {
+  width:clamp(80px,25vw,140px); height:clamp(80px,25vw,140px);
+  border-radius:50%;
+  border:1.5px solid var(--green);
+  box-shadow:0 0 16px rgba(52,199,89,.15), inset 0 0 16px rgba(52,199,89,.06);
+  display:flex; align-items:center; justify-content:center; flex-direction:column;
+  position:relative; transition:all .35s ease;
+}
+.radar-circle.danger {
+  border-color:var(--red);
+  box-shadow:0 0 20px rgba(255,69,58,.3), inset 0 0 16px rgba(255,69,58,.1);
+  animation:pulse-radar .6s ease-in-out infinite alternate;
+}
+@keyframes pulse-radar{from{box-shadow:0 0 16px rgba(255,69,58,.2)}to{box-shadow:0 0 28px rgba(255,69,58,.5)}}
 
-        .radar-sweep {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: conic-gradient(from 0deg, transparent, rgba(0, 255, 136, 0.2));
-            animation: rotate 4s linear infinite;
-        }
+.radar-sweep {
+  position:absolute; width:100%; height:100%; border-radius:50%;
+  background:conic-gradient(from 0deg, transparent 80%, rgba(52,199,89,.2));
+  animation:rotate 3s linear infinite; pointer-events:none;
+}
+.radar-circle.danger .radar-sweep {
+  background:conic-gradient(from 0deg, transparent 80%, rgba(255,69,58,.2));
+}
+@keyframes rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 
-        @keyframes rotate { from {transform: rotate(0deg);} to {transform: rotate(360deg);} }
+#dist-val {
+  font-family:var(--mono); font-size:clamp(18px,5vw,32px); font-weight:700;
+  color:var(--green); line-height:1; transition:color .3s; position:relative; z-index:1;
+}
+#dist-val.danger { color:var(--red); }
+.dist-unit { font-family:var(--mono); font-size:clamp(7px,1.2vw,9px); color:var(--t3); letter-spacing:.1em; position:relative; z-index:1; }
 
-        /* Panneau de logs d'alertes */
-        .alerts-log {
-            height: 200px;
-            background: var(--panel-bg);
-            padding: 15px;
-            overflow-y: auto;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
+/* Gaz */
+.gas-row {
+  display:flex; align-items:center; gap:8px;
+  background:var(--glass); border:1px solid var(--border); border-radius:8px;
+  padding:7px 12px; width:100%; max-width:240px; flex-shrink:0;
+}
+.gas-label { font-family:var(--mono); font-size:9px; color:var(--t3); letter-spacing:.08em; text-transform:uppercase; flex-shrink:0; }
+.gas-bar-wrap { flex:1; height:4px; background:rgba(255,255,255,.08); border-radius:2px; overflow:hidden; }
+.gas-bar { height:100%; background:var(--amber); border-radius:2px; width:0%; transition:width .5s, background .3s; }
+.gas-bar.danger { background:var(--red); }
+#gas-num { font-family:var(--mono); font-size:clamp(10px,1.8vw,12px); font-weight:600; color:var(--amber); transition:color .3s; flex-shrink:0; min-width:36px; text-align:right; }
+#gas-num.danger { color:var(--red); }
 
-        .alert-entry {
-            padding: 10px;
-            margin-bottom: 5px;
-            border-left: 4px solid var(--danger-red);
-            background: rgba(255, 0, 68, 0.1);
-            animation: slideIn 0.3s ease-out;
-        }
+/* ── LOG ALERTES ── */
+.alerts-panel {
+  flex-shrink:0; width:100%; max-width:340px;
+  background:rgba(14,17,23,.95); border:1px solid var(--border);
+  border-radius:10px; overflow:hidden;
+}
+.alerts-head {
+  padding:5px 10px; border-bottom:1px solid var(--border);
+  font-family:var(--mono); font-size:9px; letter-spacing:.10em;
+  text-transform:uppercase; color:var(--t3);
+  display:flex; align-items:center; gap:6px;
+}
+.alert-count {
+  margin-left:auto; font-family:var(--mono); font-size:9px;
+  padding:1px 6px; border-radius:5px;
+  background:rgba(255,69,58,.12); color:var(--red); display:none;
+}
+.alert-count.visible { display:block; }
 
-        @keyframes slideIn { from { transform: translateX(-20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.alerts-log {
+  max-height:clamp(60px,18vh,100px); overflow-y:auto;
+  padding:4px 0;
+}
+.alerts-log::-webkit-scrollbar{width:3px}
+.alerts-log::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}
 
-        .back-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            padding: 10px 15px;
-            border: 1px solid white;
-            color: white;
-            text-decoration: none;
-            font-size: 0.8rem;
-        }
-    </style>
+#log-placeholder { padding:8px 10px; text-align:center; font-size:10px; color:var(--t3); font-family:var(--mono); }
+
+.alert-entry {
+  padding:6px 10px; margin:3px 6px; border-radius:6px;
+  background:rgba(255,69,58,.08); border-left:3px solid var(--red);
+  animation:slideIn .3s ease;
+}
+.alert-entry.warn { background:rgba(255,163,64,.08); border-left-color:var(--amber); }
+.alert-time { font-family:var(--mono); font-size:8px; color:var(--t3); }
+.alert-msg  { font-size:clamp(9px,1.6vw,11px); color:var(--t1); margin-top:2px; }
+.alert-level{ font-family:var(--mono); font-size:8px; }
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+</style>
 </head>
 <body>
-    <div class="header">
-        <div class="status-text" id="global-status">SURVEILLANCE ACTIVE</div>
-        <div id="connection-badge" style="color: #00ff88;">● BACKBONE CONNECTÉ</div>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header class="hdr" id="hdr">
+    <div class="hdr-l">
+      <div class="m-ico">⚠️</div>
+      <span class="m-name">{{ config.name if config else 'Danger Monitor' }}</span>
+    </div>
+    <span class="status-text" id="global-status">SURVEILLANCE ACTIVE</span>
+  </header>
+
+  <!-- CENTRE -->
+  <div class="center">
+
+    <!-- Radar -->
+    <div class="radar-wrap">
+      <div class="radar-circle" id="radar">
+        <div class="radar-sweep"></div>
+        <div id="dist-val">--</div>
+        <div class="dist-unit">CM · DISTANCE</div>
+      </div>
     </div>
 
-    <a href="/" class="back-btn">X FERMER</a>
-
-    <div class="monitor-zone" id="main-view">
-        <div class="radar-circle" id="radar">
-            <div class="radar-sweep"></div>
-            <div id="dist-val" style="font-size: 2.5rem; font-weight: bold; text-shadow: 0 0 10px #00f2ff;">--</div>
-            <div style="font-size: 0.8rem; position: absolute; bottom: 40px; letter-spacing: 2px;">DISTANCE (CM)</div>
-        </div>
-        <div id="gas-val" style="margin-top: 30px; font-family: 'Courier New', monospace;">
-            GAZ : <span id="gas-num" style="color: #ffcc00; font-weight: bold;">--</span> <span style="font-size: 0.7rem;">PPM</span>
-        </div>
+    <!-- Gaz -->
+    <div class="gas-row">
+      <span class="gas-label">GAZ</span>
+      <div class="gas-bar-wrap"><div class="gas-bar" id="gas-bar"></div></div>
+      <span id="gas-num">--</span>
     </div>
 
-    <div class="alerts-log" id="log">
-        <div id="log-placeholder" style="color: #555; text-align: center; padding-top: 20px;">
-            En attente de données capteurs...
-        </div>
+    <!-- Log alertes -->
+    <div class="alerts-panel">
+      <div class="alerts-head">
+        Alertes
+        <span class="alert-count" id="alert-count">0</span>
+      </div>
+      <div class="alerts-log" id="log">
+        <div id="log-placeholder">En attente de données...</div>
+      </div>
     </div>
 
-    <script>
-        const socket = io();
-        const body = document.body;
-        const log = document.getElementById('log');
-        const logPlaceholder = document.getElementById('log-placeholder');
-        const distVal = document.getElementById('dist-val');
-        const gasNum = document.getElementById('gas-num');
-        const statusText = document.getElementById('global-status');
-        const radar = document.getElementById('radar');
+  </div>
+</div>
 
-        let lastDangerTime = 0;
+<script>
+const socket       = io();
+const body         = document.body;
+const hdr          = document.getElementById('hdr');
+const log          = document.getElementById('log');
+const placeholder  = document.getElementById('log-placeholder');
+const distVal      = document.getElementById('dist-val');
+const gasNum       = document.getElementById('gas-num');
+const gasBar       = document.getElementById('gas-bar');
+const statusText   = document.getElementById('global-status');
+const radar        = document.getElementById('radar');
+const alertCountEl = document.getElementById('alert-count');
 
-        // 1. Réception des alertes traitées par le plugin Python
-        socket.on('module_update', function(msg) {
-            if (msg.module === "danger_monitor") {
-                renderAlerts(msg.data.alerts);
-                lastDangerTime = Date.now();
-            }
-        });
+let lastDangerTime  = 0;
+let totalAlerts     = 0;
+const GAS_WARN      = 200;
+const GAS_DANGER    = 400;
+const DIST_DANGER   = 30;
 
-        // 2. Mise à jour des valeurs en temps réel (via nova.py : sensor_update)
-        socket.on('sensor_update', function(data) {
-            if (data.dist !== undefined) {
-                distVal.innerText = Math.round(data.dist);
-                // Si la distance est critique (< 30), le radar devient rouge
-                radar.style.borderColor = data.dist < 30 ? "#ff0044" : "#00f2ff";
-                radar.style.boxShadow = data.dist < 30 ? "0 0 20px #ff0044" : "0 0 15px rgba(0, 242, 255, 0.3)";
-            }
-            if (data.gas !== undefined) {
-                gasNum.innerText = data.gas;
-                gasNum.style.color = data.gas > 400 ? "#ff0044" : "#ffcc00";
-            }
-        });
+/* ── Logique originale conservée ── */
+socket.on('module_update', function(msg) {
+  if (msg.module === "danger_monitor") {
+    renderAlerts(msg.data.alerts);
+    lastDangerTime = Date.now();
+  }
+});
 
-        function renderAlerts(alerts) {
-            if (!alerts || alerts.length === 0) return;
+socket.on('sensor_update', function(data) {
+  // Distance
+  if (data.distance !== undefined && data.distance !== -1) {
+    const d = Math.round(data.distance);
+    distVal.textContent = d;
+    const isDanger = d < DIST_DANGER;
+    distVal.classList.toggle('danger', isDanger);
+    radar.classList.toggle('danger', isDanger);
+  }
+  // Gaz
+  if (data.gas !== undefined) {
+    const g = +data.gas;
+    gasNum.textContent = g;
+    const pct = Math.min(100, (g / GAS_DANGER) * 100);
+    gasBar.style.width = pct + '%';
+    const isDanger = g > GAS_DANGER;
+    const isWarn   = g > GAS_WARN;
+    gasNum.classList.toggle('danger', isDanger);
+    gasBar.classList.toggle('danger', isDanger);
+    gasBar.style.background = isDanger ? 'var(--red)' : isWarn ? 'var(--amber)' : 'var(--green)';
+  }
+});
 
-            if (logPlaceholder) logPlaceholder.remove();
+function renderAlerts(alerts) {
+  if (!alerts || alerts.length === 0) return;
 
-            // Activer l'alerte visuelle globale
-            body.classList.add('alert-active');
-            statusText.innerText = "⚠️ DANGER DÉTECTÉ";
-            statusText.style.color = "#ff0044";
+  // Alerte visuelle globale (logique originale)
+  body.classList.add('alert-active');
+  hdr.classList.add('danger');
+  statusText.textContent = '⚠ DANGER DÉTECTÉ';
+  statusText.classList.add('danger');
 
-            alerts.forEach(alert => {
-                const entry = document.createElement('div');
-                entry.className = 'alert-entry';
-                entry.style.borderLeft = alert.level === 'CRITICAL' ? "4px solid #ff0044" : "4px solid #ffcc00";
-                
-                const time = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                entry.innerHTML = `
-                    <div style="font-size: 0.7rem; color: #888;">${time}</div>
-                    <strong>${alert.type}</strong> : ${alert.value} <span style="font-size:0.8rem;">(${alert.level})</span>
-                `;
-                
-                log.prepend(entry);
-                
-                // Animation d'entrée
-                entry.style.animation = "slideIn 0.3s ease-out";
-                
-                // Limiter à 5 logs pour la lisibilité sur les lunettes
-                if (log.children.length > 5) log.lastElementChild.remove();
-            });
-        }
+  if (placeholder.parentNode) placeholder.remove();
 
-        // Nettoyage automatique du statut après 4 secondes sans danger
-        setInterval(() => {
-            if (Date.now() - lastDangerTime > 4000) {
-                body.classList.remove('alert-active');
-                statusText.innerText = "SURVEILLANCE ACTIVE";
-                statusText.style.color = "#00ff88";
-            }
-        }, 1000);
-    </script>
+  alerts.forEach(alert => {
+    totalAlerts++;
+    const entry    = document.createElement('div');
+    const isCrit   = alert.level === 'CRITICAL';
+    entry.className = 'alert-entry' + (isCrit ? '' : ' warn');
 
-    <style>
-        :root {
-            --safe-green: #00ff88;
-            --danger-red: #ff0044;
-            --hud-blue: #00f2ff;
-        }
+    const t = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    entry.innerHTML =
+      '<div class="alert-time">' + t + '</div>' +
+      '<div class="alert-msg">' +
+        '<strong>' + (alert.type||'') + '</strong>' +
+        (alert.value ? ' : ' + alert.value : '') +
+      '</div>' +
+      '<div class="alert-level" style="color:' + (isCrit?'var(--red)':'var(--amber)') + '">' + (alert.level||'') + '</div>';
 
-        body {
-            background-color: #000;
-            color: white;
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            overflow: hidden;
-            transition: background 0.5s;
-        }
+    log.prepend(entry);
+    if (log.children.length > 5) log.lastElementChild.remove();
+  });
 
-        .alert-active {
-            background-color: rgba(255, 0, 68, 0.15);
-        }
+  alertCountEl.textContent = totalAlerts;
+  alertCountEl.classList.add('visible');
+}
 
-        .radar-circle {
-            position: relative;
-            width: 200px;
-            height: 200px;
-            border: 2px solid var(--hud-blue);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            margin: 0 auto;
-            transition: all 0.3s;
-        }
+// Nettoyage automatique (logique originale)
+setInterval(() => {
+  if (Date.now() - lastDangerTime > 4000) {
+    body.classList.remove('alert-active');
+    hdr.classList.remove('danger');
+    statusText.textContent = 'SURVEILLANCE ACTIVE';
+    statusText.classList.remove('danger');
+  }
+}, 1000);
 
-        .radar-sweep {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: conic-gradient(from 0deg, transparent 80%, rgba(0, 242, 255, 0.2));
-            animation: rotate 2s linear infinite;
-        }
-
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .alert-entry {
-            background: rgba(255, 255, 255, 0.05);
-            margin: 5px 10px;
-            padding: 8px 12px;
-            border-radius: 4px;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-    </style>
+socket.on('disconnect', () => {
+  statusText.textContent = 'DÉCONNECTÉ';
+  statusText.style.color = 'var(--red)';
+});
+</script>
 </body>
 </html>

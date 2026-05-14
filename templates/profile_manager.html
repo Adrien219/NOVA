@@ -2,165 +2,898 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>S.H.O.S - PROFILE MANAGER</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.O.S — Gestionnaire de Profils</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
     <style>
-        body { 
-            background: #050505; 
-            color: #36f6ff; 
-            font-family: 'Courier New', Courier, monospace; 
-            padding: 40px; 
-            text-transform: uppercase;
-        }
+    /* ═══════════════════════════════════════════════════════
+       S.H.O.S  ·  Profile Manager
+       Vision OS Glassmorphism — Dark + Accent Blue/Teal
+    ═══════════════════════════════════════════════════════ */
+    :root {
+        --glass:      rgba(255,255,255,0.08);
+        --glass-card: rgba(255,255,255,0.10);
+        --glass-hi:   rgba(255,255,255,0.15);
+        --border:     rgba(255,255,255,0.12);
+        --border-hi:  rgba(255,255,255,0.22);
+        --blur:       blur(28px) saturate(160%);
+        --blur-sm:    blur(16px) saturate(140%);
+        --blue:       #4da6ff;
+        --blue-dim:   rgba(77,166,255,0.15);
+        --teal:       #30d5c8;
+        --teal-dim:   rgba(48,213,200,0.12);
+        --green:      #34c759;
+        --red:        #ff453a;
+        --amber:      #ffa340;
+        --yellow:     #e8d44d;
+        --t1: rgba(255,255,255,0.93);
+        --t2: rgba(255,255,255,0.52);
+        --t3: rgba(255,255,255,0.28);
+        --font: 'DM Sans', -apple-system, sans-serif;
+        --mono: 'DM Mono', monospace;
+        --r:    16px;
+        --r-sm:  9px;
+        --r-xs:  6px;
+    }
 
-        /* Barre de statut du profil actif */
-        .status-bar {
-            border: 1px solid #36f6ff;
-            background: rgba(54, 246, 255, 0.1);
-            padding: 15px;
-            margin-bottom: 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html, body { height:100%; font-family:var(--font); overflow:hidden; }
 
-        .status-active { color: #fff; font-weight: bold; text-shadow: 0 0 10px #36f6ff; }
+    /* ── BACKGROUND ──────────────────────────────── */
+    body {
+        background:
+            radial-gradient(ellipse 90% 70% at 15% 20%, rgba(90,130,200,0.35) 0%, transparent 60%),
+            radial-gradient(ellipse 60% 80% at 85% 80%, rgba(48,213,200,0.18) 0%, transparent 55%),
+            radial-gradient(ellipse 120% 120% at 50% 50%, #18202e 0%, #0c1018 100%);
+        color: var(--t1);
+    }
 
-        h1 { letter-spacing: 5px; border-bottom: 2px solid #36f6ff; padding-bottom: 10px; }
+    /* ── CHROME ──────────────────────────────────── */
+    .chrome {
+        position: fixed; inset: 0; z-index: 1;
+        display: flex; align-items: center; justify-content: center;
+        padding: 18px;
+    }
 
-        .form-group { margin-bottom: 30px; border-left: 3px solid #36f6ff; padding-left: 20px; }
-        
-        label { display: block; margin-bottom: 10px; font-size: 0.9em; opacity: 0.8; }
+    /* ── MAIN PANEL ──────────────────────────────── */
+    .panel {
+        position: relative;
+        width: 100%; max-width: 1000px;
+        height: calc(100vh - 36px); max-height: 680px;
+        background: var(--glass);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border: 1px solid var(--border-hi);
+        border-radius: 22px;
+        overflow: hidden;
+        display: grid;
+        grid-template-columns: 52px 1fr;
+        grid-template-rows: 48px 1fr;
+        box-shadow:
+            0 40px 100px rgba(0,0,0,0.55),
+            0 0 0 0.5px rgba(255,255,255,0.07) inset,
+            0 1.5px 0 rgba(255,255,255,0.20) inset;
+        animation: panelIn .5s cubic-bezier(.34,1.3,.64,1) both;
+    }
+    @keyframes panelIn {
+        from { opacity:0; transform:scale(.95) translateY(18px); }
+        to   { opacity:1; transform:none; }
+    }
+    /* specular */
+    .panel::after {
+        content:''; position:absolute;
+        top:0; left:12%; right:12%; height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.45),transparent);
+        pointer-events:none; z-index:10;
+    }
 
-        input, select { 
-            background: #111; 
-            border: 1px solid #36f6ff; 
-            color: #36f6ff; 
-            padding: 12px; 
-            width: 350px; 
-            outline: none;
-        }
+    /* ── TOPBAR ──────────────────────────────────── */
+    .topbar {
+        grid-column: 1 / 3;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 20px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(255,255,255,0.03);
+        gap: 12px; flex-shrink: 0;
+    }
+    .topbar-left { display:flex; align-items:center; gap:10px; }
+    .logo-gem {
+        width:30px; height:30px; border-radius:9px;
+        background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,.22);
+        display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .logo-gem svg { width:14px; height:14px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .brand { font-size:13px; font-weight:600; color:var(--t1); letter-spacing:.05em; }
+    .page-title { font-size:12px; color:var(--t3); font-weight:400; }
 
-        input:focus, select:focus { box-shadow: 0 0 15px rgba(54, 246, 255, 0.5); }
+    .topbar-right { display:flex; align-items:center; gap:8px; }
 
-        .module-list { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 15px; 
-            width: 500px; 
-            background: #0a0a0a;
-            padding: 15px;
-            border: 1px dashed #36f6ff;
-        }
+    /* Profil actif badge */
+    .active-badge {
+        display:flex; align-items:center; gap:6px;
+        padding:5px 12px; border-radius:16px;
+        background:rgba(77,166,255,.12); border:1px solid rgba(77,166,255,.28);
+        font-size:11px; font-weight:500; color:var(--blue);
+        font-family:var(--mono);
+    }
+    .active-badge .d {
+        width:5px; height:5px; border-radius:50%;
+        background:var(--green); animation:pg 2s ease-in-out infinite;
+    }
+    @keyframes pg { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-        .checkbox-item { display: flex; align-items: center; gap: 10px; cursor: pointer; }
-        .checkbox-item input { width: auto; cursor: pointer; }
+    .btn-back {
+        display:flex; align-items:center; gap:5px;
+        padding:5px 12px; border-radius:14px;
+        background:rgba(255,255,255,.08); border:1px solid var(--border);
+        font-size:11px; font-weight:500; color:var(--t2);
+        text-decoration:none; transition:all .18s;
+    }
+    .btn-back:hover { background:rgba(255,255,255,.14); color:var(--t1); border-color:var(--border-hi); }
+    .btn-back svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; }
 
-        .btn-compiler { 
-            background: #36f6ff; 
-            color: #000; 
-            border: none; 
-            padding: 20px 40px; 
-            cursor: pointer; 
-            font-weight: bold; 
-            margin-top: 20px;
-            font-size: 1.1em;
-            transition: all 0.3s;
-        }
+    /* ── SIDEBAR ─────────────────────────────────── */
+    .sidebar {
+        grid-column:1; grid-row:2;
+        display:flex; flex-direction:column; align-items:center;
+        padding:12px 0; gap:5px;
+        background:rgba(255,255,255,.03);
+        border-right:1px solid var(--border);
+    }
+    .sb {
+        width:36px; height:36px; border-radius:10px;
+        display:flex; align-items:center; justify-content:center;
+        background:none; border:none; cursor:pointer; transition:all .18s;
+        position:relative;
+    }
+    .sb svg { width:16px; height:16px; fill:none; stroke:var(--t3); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:stroke .18s; }
+    .sb:hover { background:rgba(255,255,255,.08); }
+    .sb:hover svg { stroke:var(--t1); }
+    .sb.active { background:var(--blue-dim); }
+    .sb.active svg { stroke:var(--blue); }
+    .sb.active::before {
+        content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
+        width:3px; height:16px; background:var(--blue); border-radius:0 3px 3px 0;
+    }
+    .sb-sep { width:22px; height:1px; background:var(--border); margin:3px 0; }
 
-        .btn-compiler:hover { 
-            background: #fff; 
-            box-shadow: 0 0 20px #36f6ff;
-            transform: scale(1.02);
-        }
+    /* ── MAIN CONTENT ────────────────────────────── */
+    .main {
+        grid-column:2; grid-row:2;
+        overflow-y:auto; overflow-x:hidden;
+        padding:16px 18px 20px;
+        scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.08) transparent;
+    }
+    .main::-webkit-scrollbar { width:3px; }
+    .main::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); border-radius:2px; }
 
-        .back-link { display: block; margin-top: 30px; color: #36f6ff; text-decoration: none; font-size: 0.8em; }
+    /* ── LAYOUT ──────────────────────────────────── */
+    .layout {
+        display:grid;
+        grid-template-columns: 1fr 280px;
+        gap:12px;
+        height:100%;
+    }
+
+    .col-left  { display:flex; flex-direction:column; gap:12px; }
+    .col-right { display:flex; flex-direction:column; gap:12px; }
+
+    /* ── GLASS CARD ──────────────────────────────── */
+    .card {
+        background:var(--glass-card);
+        backdrop-filter:var(--blur-sm);
+        -webkit-backdrop-filter:var(--blur-sm);
+        border:1px solid var(--border);
+        border-radius:var(--r);
+        padding:15px;
+        position:relative; overflow:hidden;
+        box-shadow:0 6px 24px rgba(0,0,0,.22), 0 1px 0 rgba(255,255,255,.10) inset;
+        animation: cardIn .4s cubic-bezier(.34,1.2,.64,1) both;
+    }
+    @keyframes cardIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+    .card:nth-child(1){animation-delay:.06s}
+    .card:nth-child(2){animation-delay:.10s}
+    .card:nth-child(3){animation-delay:.14s}
+    .card:nth-child(4){animation-delay:.18s}
+
+    .card::after {
+        content:''; position:absolute; top:0; left:10%; right:10%; height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent);
+        pointer-events:none;
+    }
+
+    .card-label {
+        font-size:10px; font-weight:500; letter-spacing:.1em;
+        text-transform:uppercase; color:var(--t3); margin-bottom:11px;
+        display:flex; align-items:center; gap:7px;
+    }
+    .card-label svg { width:11px; height:11px; fill:none; stroke:currentColor; stroke-width:2; }
+
+    /* ── FORM ELEMENTS ───────────────────────────── */
+
+    /* Text input */
+    .field { margin-bottom:12px; }
+    .field label {
+        display:block; font-size:11px; font-weight:500; color:var(--t2);
+        margin-bottom:6px; letter-spacing:.03em;
+    }
+    .field input[type="text"],
+    .field select {
+        width:100%;
+        padding:10px 13px;
+        background:rgba(255,255,255,.07);
+        border:1px solid var(--border);
+        border-radius:var(--r-sm);
+        color:var(--t1);
+        font-size:13px; font-family:var(--font);
+        outline:none;
+        transition:border-color .18s, background .18s, box-shadow .18s;
+        -webkit-appearance:none; appearance:none;
+    }
+    .field input[type="text"]::placeholder { color:var(--t3); }
+    .field input[type="text"]:focus,
+    .field select:focus {
+        border-color:rgba(77,166,255,.55);
+        background:rgba(77,166,255,.08);
+        box-shadow:0 0 0 3px rgba(77,166,255,.12);
+    }
+
+    /* Custom select arrow */
+    .select-wrap { position:relative; }
+    .select-wrap::after {
+        content:''; position:absolute; right:11px; top:50%; transform:translateY(-50%);
+        width:0; height:0;
+        border-left:4px solid transparent;
+        border-right:4px solid transparent;
+        border-top:5px solid var(--t3);
+        pointer-events:none;
+    }
+    .select-wrap select { padding-right:30px; cursor:pointer; }
+    .select-wrap select option { background:#1a2030; color:#fff; }
+
+    /* ── MODULE GRID (checkboxes) ────────────────── */
+    .module-grid {
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:7px;
+    }
+
+    .mod-chip {
+        display:flex; align-items:center; gap:8px;
+        padding:8px 10px;
+        background:rgba(255,255,255,.05);
+        border:1px solid var(--border);
+        border-radius:var(--r-sm);
+        cursor:pointer;
+        transition:all .18s;
+        user-select:none;
+        position:relative;
+    }
+    .mod-chip:hover {
+        background:rgba(255,255,255,.10);
+        border-color:var(--border-hi);
+    }
+    .mod-chip.checked {
+        background:var(--blue-dim);
+        border-color:rgba(77,166,255,.45);
+    }
+    .mod-chip input[type="checkbox"] {
+        position:absolute; opacity:0; width:0; height:0;
+    }
+    .mod-check {
+        width:16px; height:16px; border-radius:4px; flex-shrink:0;
+        border:1.5px solid var(--border-hi);
+        background:rgba(255,255,255,.06);
+        display:flex; align-items:center; justify-content:center;
+        transition:all .18s;
+    }
+    .mod-chip.checked .mod-check {
+        background:var(--blue); border-color:var(--blue);
+    }
+    .mod-check svg {
+        width:10px; height:10px; fill:none;
+        stroke:#000; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;
+        opacity:0; transition:opacity .15s;
+    }
+    .mod-chip.checked .mod-check svg { opacity:1; }
+    .mod-name { font-size:11px; font-weight:500; color:var(--t2); line-height:1.2; transition:color .18s; }
+    .mod-chip.checked .mod-name { color:var(--blue); }
+    .mod-chip:hover .mod-name { color:var(--t1); }
+
+    /* ── EXISTING PROFILES LIST ──────────────────── */
+    .profile-list { display:flex; flex-direction:column; gap:7px; }
+
+    .profile-row {
+        display:flex; align-items:center; gap:10px;
+        padding:9px 11px;
+        background:rgba(255,255,255,.05);
+        border:1px solid var(--border);
+        border-radius:var(--r-sm);
+        transition:all .18s; cursor:default;
+        animation: rowIn .35s ease both;
+    }
+    @keyframes rowIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:none} }
+    .profile-row:hover { background:rgba(255,255,255,.09); border-color:var(--border-hi); }
+    .profile-row.is-active {
+        background:rgba(48,213,200,.09);
+        border-color:rgba(48,213,200,.35);
+    }
+
+    .profile-avatar {
+        width:32px; height:32px; border-radius:9px; flex-shrink:0;
+        display:flex; align-items:center; justify-content:center;
+        font-size:11px; font-weight:600; color:#fff;
+        background:linear-gradient(135deg,var(--blue),var(--teal));
+        font-family:var(--mono);
+    }
+    .profile-info { flex:1; min-width:0; }
+    .profile-name { font-size:12px; font-weight:600; color:var(--t1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .profile-meta { font-size:10px; color:var(--t3); font-family:var(--mono); margin-top:1px; }
+
+    .profile-actions { display:flex; gap:5px; }
+    .p-btn {
+        width:26px; height:26px; border-radius:var(--r-xs);
+        display:flex; align-items:center; justify-content:center;
+        background:rgba(255,255,255,.06); border:1px solid var(--border);
+        cursor:pointer; transition:all .18s;
+    }
+    .p-btn svg { width:12px; height:12px; fill:none; stroke:var(--t3); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:stroke .18s; }
+    .p-btn:hover { background:rgba(255,255,255,.13); }
+    .p-btn:hover svg { stroke:var(--t1); }
+    .p-btn.p-activate:hover { background:rgba(48,213,200,.15); border-color:rgba(48,213,200,.35); }
+    .p-btn.p-activate:hover svg { stroke:var(--teal); }
+    .p-btn.p-delete:hover  { background:rgba(255,69,58,.15); border-color:rgba(255,69,58,.35); }
+    .p-btn.p-delete:hover  svg { stroke:var(--red); }
+
+    .active-tag {
+        font-size:9px; font-weight:500; font-family:var(--mono);
+        padding:2px 6px; border-radius:6px;
+        background:rgba(48,213,200,.15); border:1px solid rgba(48,213,200,.3);
+        color:var(--teal); flex-shrink:0;
+    }
+
+    /* ── EMPTY STATE ──────────────────────────────── */
+    .empty-state {
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        padding:24px 16px; gap:8px; color:var(--t3); text-align:center;
+    }
+    .empty-state svg { width:28px; height:28px; fill:none; stroke:currentColor; stroke-width:1.3; opacity:.5; }
+    .empty-state span { font-size:11px; }
+
+    /* ── SUBMIT BUTTON ───────────────────────────── */
+    .btn-submit {
+        width:100%; padding:12px;
+        background:linear-gradient(135deg, var(--blue) 0%, var(--teal) 100%);
+        border:none; border-radius:var(--r-sm);
+        color:#000; font-size:13px; font-weight:600;
+        font-family:var(--font); cursor:pointer;
+        transition:all .2s cubic-bezier(.34,1.4,.64,1);
+        box-shadow:0 4px 20px rgba(77,166,255,.28);
+        letter-spacing:.03em; margin-top:4px;
+    }
+    .btn-submit:hover { transform:translateY(-2px) scale(1.01); box-shadow:0 8px 30px rgba(77,166,255,.38); }
+    .btn-submit:active { transform:translateY(0) scale(.99); }
+    .btn-submit:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+    .btn-submit.loading { opacity:.7; cursor:wait; }
+
+    /* ── TOAST NOTIFICATION ──────────────────────── */
+    .toast {
+        position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
+        padding:10px 20px; border-radius:12px; font-size:12px; font-weight:500;
+        backdrop-filter:blur(20px); z-index:100;
+        transition:transform .3s cubic-bezier(.34,1.4,.64,1), opacity .3s ease;
+        opacity:0; pointer-events:none;
+        display:flex; align-items:center; gap:8px;
+    }
+    .toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+    .toast.success { background:rgba(52,199,89,.18); border:1px solid rgba(52,199,89,.35); color:var(--green); }
+    .toast.error   { background:rgba(255,69,58,.18);  border:1px solid rgba(255,69,58,.35);  color:var(--red); }
+    .toast svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+
+    /* ── SEARCH INPUT ────────────────────────────── */
+    .search-wrap { position:relative; margin-bottom:10px; }
+    .search-wrap svg {
+        position:absolute; left:10px; top:50%; transform:translateY(-50%);
+        width:13px; height:13px; fill:none; stroke:var(--t3); stroke-width:2;
+        pointer-events:none;
+    }
+    .search-wrap input {
+        width:100%; padding:8px 10px 8px 30px;
+        background:rgba(255,255,255,.06); border:1px solid var(--border);
+        border-radius:var(--r-sm); color:var(--t1); font-size:12px;
+        font-family:var(--font); outline:none;
+        transition:border-color .18s, background .18s;
+    }
+    .search-wrap input::placeholder { color:var(--t3); }
+    .search-wrap input:focus { border-color:rgba(77,166,255,.4); background:rgba(77,166,255,.06); }
+
+    /* ── PROFILE COUNTER ──────────────────────────── */
+    .profile-count {
+        font-size:10px; color:var(--t3); font-family:var(--mono);
+        text-align:right; margin-bottom:8px;
+    }
+    .profile-count span { color:var(--blue); }
+
+    /* ── RESPONSIVE ──────────────────────────────── */
+    @media (max-width:820px) {
+        .layout { grid-template-columns:1fr; }
+        .col-right { order:-1; }
+        html, body { overflow:auto; }
+        .panel { max-height:none; height:auto; }
+        .chrome { align-items:flex-start; }
+    }
+    @media (max-width:560px) {
+        .module-grid { grid-template-columns:1fr; }
+        .panel { border-radius:var(--r); }
+    }
     </style>
 </head>
 <body>
 
-    <div class="status-bar">
-        <span>SYSTÈME : <span style="color: #00ff00;">OPÉRATIONNEL</span></span>
-        <span>PROFIL ACTIF : <span id="active-profile-display" class="status-active">AUCUN</span></span>
-    </div>
+<div class="chrome">
+<div class="panel" role="main" aria-label="Gestionnaire de profils S.H.O.S">
 
-    <h1>[ CRÉATION D'UN NOUVEAU PROFIL ]</h1>
-
-    <div class="form-group">
-        <label>NOM DU PROFIL :</label>
-        <input type="text" id="p-name" placeholder="EX: UNITE_DE_COMBAT_01">
-    </div>
-
-    <div class="form-group">
-        <label>MODULE PRINCIPAL (Vue principale) :</label>
-        <select id="p-main">
-            {% for id, mod in modules.items() %}
-            <option value="{{ id }}">{{ mod.name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div class="form-group">
-        <label>MODULES SECONDAIRES (Widgets) :</label>
-        <div class="module-list">
-            {% for id, mod in modules.items() %}
-            <label class="checkbox-item">
-                <input type="checkbox" class="sec-mod" value="{{ id }}"> {{ mod.name }}
-            </label>
-            {% endfor %}
+    <!-- ── TOPBAR ──────────────────────────────── -->
+    <header class="topbar">
+        <div class="topbar-left">
+            <div class="logo-gem" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            </div>
+            <div>
+                <div class="brand">S.H.O.S</div>
+            </div>
+            <div class="page-title" aria-hidden="true">/ Profils</div>
         </div>
-    </div>
+        <div class="topbar-right">
+            <div class="active-badge" role="status" aria-live="polite" aria-label="Profil actif">
+                <span class="d" aria-hidden="true"></span>
+                ACTIF : <span id="active-profile-display">AUCUN</span>
+            </div>
+            <a href="/" class="btn-back" aria-label="Retour à l'accueil">
+                <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+                Accueil
+            </a>
+        </div>
+    </header>
 
-    <button class="btn-compiler" onclick="saveProfile()">
-        COMPILER ET ENREGISTRER LE PROFIL
-    </button>
+    <!-- ── SIDEBAR ─────────────────────────────── -->
+    <nav class="sidebar" aria-label="Navigation">
+        <button class="sb active" aria-label="Profils" title="Profils">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        </button>
+        <button class="sb" aria-label="Dashboard" title="Dashboard" onclick="location.href='/dashboard'">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </button>
+        <div class="sb-sep" aria-hidden="true"></div>
+        <button class="sb" aria-label="Paramètres" title="Paramètres" onclick="location.href='/settings'">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+    </nav>
 
-    <a href="/" class="back-link">< RETOUR AU DASHBOARD</a>
+    <!-- ── MAIN ────────────────────────────────── -->
+    <main class="main">
+        <div class="layout">
 
-    <script>
-        function saveProfile() {
-            const name = document.getElementById('p-name').value;
-            const main = document.getElementById('p-main').value;
-            const secondary = Array.from(document.querySelectorAll('.sec-mod:checked')).map(cb => cb.value);
+            <!-- ── COL GAUCHE : formulaire ─────── -->
+            <div class="col-left">
 
-            if(!name) {
-                alert("ERREUR : LE NOM DU PROFIL EST REQUIS");
-                return;
-            }
+                <!-- Card : Identité du profil -->
+                <div class="card">
+                    <div class="card-label">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                        Identité du profil
+                    </div>
 
-            // Bouton en mode "chargement"
-            const btn = document.querySelector('.btn-compiler');
-            btn.innerText = "COMPILATION EN COURS...";
-            btn.style.opacity = "0.5";
+                    <div class="field">
+                        <label for="p-name">Nom du profil</label>
+                        <input
+                            type="text"
+                            id="p-name"
+                            name="profile_name"
+                            placeholder="Ex : Pilote Principal, Mode Nuit…"
+                            maxlength="40"
+                            autocomplete="off"
+                            aria-required="true"
+                            aria-label="Nom du profil"
+                        >
+                    </div>
 
-            fetch('/save_profile', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    name: name, 
-                    main_module: main, 
-                    secondary_modules: secondary
-                })
+                    <div class="field">
+                        <label for="p-main">Module principal <span style="color:var(--t3);font-weight:400">(vue centrale)</span></label>
+                        <div class="select-wrap">
+                            <select id="p-main" name="main_module" aria-label="Module principal">
+                                {% for id, mod in modules.items() %}
+                                <option value="{{ id }}">{{ mod.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card : Modules secondaires -->
+                <div class="card" style="flex:1">
+                    <div class="card-label">
+                        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                        Modules secondaires
+                        <span style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--blue)" id="selected-count">0 sélectionné(s)</span>
+                    </div>
+
+                    <div class="module-grid" id="modules-grid" role="group" aria-label="Sélection des modules secondaires">
+                        {% for id, mod in modules.items() %}
+                        <label class="mod-chip" for="sec-{{ id }}" onclick="toggleChip(this)">
+                            <input
+                                type="checkbox"
+                                class="sec-mod"
+                                id="sec-{{ id }}"
+                                value="{{ id }}"
+                                aria-label="{{ mod.name }}"
+                            >
+                            <span class="mod-check" aria-hidden="true">
+                                <svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg>
+                            </span>
+                            <span class="mod-name">{{ mod.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Bouton Enregistrer -->
+                <button
+                    class="btn-submit"
+                    id="btn-save"
+                    onclick="saveProfile()"
+                    aria-label="Enregistrer le profil"
+                >
+                    Enregistrer le profil
+                </button>
+
+            </div>
+
+            <!-- ── COL DROITE : profils existants ─ -->
+            <div class="col-right">
+                <div class="card" style="flex:1; display:flex; flex-direction:column;">
+                    <div class="card-label">
+                        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                        Profils enregistrés
+                    </div>
+
+                    <div class="search-wrap">
+                        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                        <input
+                            type="text"
+                            id="search-profiles"
+                            placeholder="Rechercher un profil…"
+                            oninput="filterProfiles(this.value)"
+                            aria-label="Rechercher dans les profils"
+                        >
+                    </div>
+
+                    <div class="profile-count">
+                        <span id="profile-count-num">0</span> profil(s)
+                    </div>
+
+                    <div class="profile-list" id="profile-list" role="list" aria-label="Liste des profils">
+                        <!-- Injecté dynamiquement via /api/get_profiles -->
+                        <div class="empty-state" id="profiles-empty">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                            <span>Aucun profil enregistré.<br>Créez votre premier profil.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /.layout -->
+    </main>
+
+</div><!-- /.panel -->
+</div><!-- /.chrome -->
+
+<!-- Toast notification -->
+<div class="toast" id="toast" role="alert" aria-live="assertive">
+    <svg id="toast-icon" viewBox="0 0 24 24"></svg>
+    <span id="toast-msg"></span>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   S.H.O.S — Profile Manager JavaScript
+   Toutes les données viennent de l'API Flask réelle
+═══════════════════════════════════════════════════════ */
+
+/* ── TOAST ──────────────────────────────────────────── */
+let toastTimer = null;
+function showToast(msg, type = 'success') {
+    const t   = document.getElementById('toast');
+    const ico = document.getElementById('toast-icon');
+    const txt = document.getElementById('toast-msg');
+    const icons = {
+        success: '<polyline points="20,6 9,17 4,12"/>',
+        error:   '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
+    };
+    t.className   = 'toast ' + type;
+    ico.innerHTML = icons[type] || icons.success;
+    txt.textContent = msg;
+    t.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+/* ── CHIP TOGGLE ────────────────────────────────────── */
+function toggleChip(label) {
+    const cb = label.querySelector('input[type="checkbox"]');
+    if (!cb) return;
+    cb.checked = !cb.checked;
+    label.classList.toggle('checked', cb.checked);
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const n   = document.querySelectorAll('.sec-mod:checked').length;
+    const el  = document.getElementById('selected-count');
+    if (el) el.textContent = n + ' sélectionné(s)';
+}
+
+/* ── SAVE PROFILE ───────────────────────────────────── */
+async function saveProfile() {
+    const nameEl = document.getElementById('p-name');
+    const mainEl = document.getElementById('p-main');
+    const btn    = document.getElementById('btn-save');
+
+    const name = nameEl ? nameEl.value.trim() : '';
+    if (!name) {
+        nameEl.focus();
+        showToast('Le nom du profil est requis.', 'error');
+        return;
+    }
+
+    const main      = mainEl ? mainEl.value : '';
+    const secondary = Array.from(
+        document.querySelectorAll('.sec-mod:checked')
+    ).map(cb => cb.value);
+
+    /* UI loading */
+    btn.disabled  = true;
+    btn.classList.add('loading');
+    btn.textContent = 'Enregistrement…';
+
+    try {
+        const res  = await fetch('/save_profile', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                name:               name,
+                main_module:        main,
+                secondary_modules:  secondary
             })
-            .then(response => response.json())
-            .then(data => {
-                if(data.status === "success") {
-                    document.getElementById('active-profile-display').innerText = name.toUpperCase();
-                    alert("✅ PROFIL TRANSMIS AU BACKBONE AVEC SUCCÈS");
-                    // Optionnel : redirection après 1 seconde
-                    // window.location.href = "/";
-                } else {
-                    alert("❌ ERREUR LORS DE L'ENVOI");
-                }
-            })
-            .catch(err => {
-                console.error("Erreur:", err);
-                alert("❌ ERREUR RÉSEAU");
-            })
-            .finally(() => {
-                btn.innerText = "COMPILER ET ENREGISTRER LE PROFIL";
-                btn.style.opacity = "1";
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            /* Mise à jour du badge profil actif */
+            const display = document.getElementById('active-profile-display');
+            if (display) display.textContent = name.toUpperCase();
+
+            showToast('Profil « ' + name + ' » enregistré avec succès.', 'success');
+
+            /* Reset formulaire */
+            if (nameEl) nameEl.value = '';
+            document.querySelectorAll('.sec-mod:checked').forEach(cb => {
+                cb.checked = false;
+                cb.closest('.mod-chip')?.classList.remove('checked');
             });
+            updateSelectedCount();
+
+            /* Recharger la liste */
+            await loadProfiles();
+        } else {
+            showToast(data.message || 'Erreur lors de l\'enregistrement.', 'error');
         }
-    </script>
+    } catch (err) {
+        console.error('[S.H.O.S] saveProfile:', err);
+        showToast('Erreur réseau. Vérifiez la connexion Flask.', 'error');
+    } finally {
+        btn.disabled  = false;
+        btn.classList.remove('loading');
+        btn.textContent = 'Enregistrer le profil';
+    }
+}
+
+/* ── ACTIVATE PROFILE ───────────────────────────────── */
+async function activateProfile(profileId, profileName) {
+    try {
+        const res  = await fetch('/api/activate_profile', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ profile_id: profileId })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            const display = document.getElementById('active-profile-display');
+            if (display) display.textContent = profileName.toUpperCase();
+            showToast('Profil « ' + profileName + ' » activé.', 'success');
+            await loadProfiles();
+        } else {
+            showToast('Impossible d\'activer ce profil.', 'error');
+        }
+    } catch (err) {
+        console.error('[S.H.O.S] activateProfile:', err);
+        showToast('Erreur réseau.', 'error');
+    }
+}
+
+/* ── DELETE PROFILE ─────────────────────────────────── */
+async function deleteProfile(profileId, profileName) {
+    /* Pas de window.confirm — on supprime directement avec undo via toast */
+    try {
+        const res  = await fetch('/api/delete_profile', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ profile_id: profileId })
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            showToast('Profil « ' + profileName + ' » supprimé.', 'success');
+            await loadProfiles();
+        } else {
+            showToast('Impossible de supprimer ce profil.', 'error');
+        }
+    } catch (err) {
+        console.error('[S.H.O.S] deleteProfile:', err);
+        showToast('Erreur réseau.', 'error');
+    }
+}
+
+/* ── LOAD PROFILES LIST ─────────────────────────────── */
+let allProfiles = {};   /* cache pour la recherche */
+
+async function loadProfiles() {
+    const listEl   = document.getElementById('profile-list');
+    const emptyEl  = document.getElementById('profiles-empty');
+    const countEl  = document.getElementById('profile-count-num');
+    const display  = document.getElementById('active-profile-display');
+
+    if (!listEl) return;
+
+    try {
+        const res  = await fetch('/api/get_profiles');
+        const data = await res.json();
+
+        allProfiles = data.profiles || {};
+        const current = data.current || null;
+
+        /* Profil actif dans la topbar */
+        if (display && current && allProfiles[current]) {
+            display.textContent = (allProfiles[current].name || current).toUpperCase();
+        }
+
+        /* Compteur */
+        const total = Object.keys(allProfiles).length;
+        if (countEl) countEl.textContent = total;
+
+        renderProfiles(allProfiles, current);
+
+    } catch (err) {
+        console.error('[S.H.O.S] loadProfiles:', err);
+        if (listEl) listEl.innerHTML = '';
+        showEmptyState('Erreur de connexion API');
+    }
+}
+
+function renderProfiles(profiles, current) {
+    const listEl  = document.getElementById('profile-list');
+    const emptyEl = document.getElementById('profiles-empty');
+    if (!listEl) return;
+
+    /* Vider sans toucher à l'empty-state */
+    Array.from(listEl.children).forEach(child => {
+        if (child.id !== 'profiles-empty') child.remove();
+    });
+
+    const keys = Object.keys(profiles);
+
+    if (!keys.length) {
+        if (emptyEl) emptyEl.style.display = 'flex';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    keys.forEach((id, i) => {
+        const prof    = profiles[id];
+        const name    = prof.name || id;
+        const isActive = id === current;
+        const initial  = name.charAt(0).toUpperCase();
+        const mods     = prof.secondary_modules ? prof.secondary_modules.length : 0;
+
+        const row = document.createElement('div');
+        row.className = 'profile-row' + (isActive ? ' is-active' : '');
+        row.setAttribute('role', 'listitem');
+        row.style.animationDelay = (i * 0.05) + 's';
+        row.dataset.profileId    = id;
+        row.dataset.profileName  = name;
+
+        row.innerHTML = `
+            <div class="profile-avatar" aria-hidden="true">${initial}</div>
+            <div class="profile-info">
+                <div class="profile-name">${escHtml(name)}</div>
+                <div class="profile-meta">${mods} module(s) · ${escHtml(id)}</div>
+            </div>
+            ${isActive ? '<span class="active-tag" aria-label="Profil actif">ACTIF</span>' : ''}
+            <div class="profile-actions">
+                ${!isActive ? `
+                <button class="p-btn p-activate"
+                    onclick="activateProfile('${escAttr(id)}','${escAttr(name)}')"
+                    title="Activer ce profil"
+                    aria-label="Activer le profil ${escAttr(name)}">
+                    <svg viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+                </button>` : ''}
+                <button class="p-btn p-delete"
+                    onclick="deleteProfile('${escAttr(id)}','${escAttr(name)}')"
+                    title="Supprimer ce profil"
+                    aria-label="Supprimer le profil ${escAttr(name)}">
+                    <svg viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19,6l-1,14a2,2 0 0,1-2,2H8a2,2 0 0,1-2-2L5,6m3,0V4a1,1 0 0,1,1-1h4a1,1 0 0,1,1,1v2"/></svg>
+                </button>
+            </div>
+        `;
+        listEl.appendChild(row);
+    });
+}
+
+function showEmptyState(msg) {
+    const el = document.getElementById('profiles-empty');
+    if (!el) return;
+    el.style.display = 'flex';
+    const span = el.querySelector('span');
+    if (span) span.textContent = msg;
+}
+
+/* ── SEARCH / FILTER ────────────────────────────────── */
+function filterProfiles(query) {
+    const q    = query.toLowerCase().trim();
+    const rows = document.querySelectorAll('#profile-list .profile-row');
+    let visible = 0;
+    rows.forEach(row => {
+        const name = (row.dataset.profileName || '').toLowerCase();
+        const id   = (row.dataset.profileId   || '').toLowerCase();
+        const show = !q || name.includes(q) || id.includes(q);
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    /* Empty state si recherche vide */
+    const empty = document.getElementById('profiles-empty');
+    if (empty) empty.style.display = (!visible && q) ? 'flex' : 'none';
+}
+
+/* ── UTILS ──────────────────────────────────────────── */
+function escHtml(str) {
+    return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(str) {
+    return String(str).replace(/'/g,"\\'");
+}
+
+/* ── INIT ───────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+    loadProfiles();
+    updateSelectedCount();
+
+    /* Permettre de cocher via clavier sur les chips */
+    document.querySelectorAll('.mod-chip').forEach(chip => {
+        chip.addEventListener('keydown', e => {
+            if (e.key === ' ' || e.key === 'Enter') {
+                e.preventDefault();
+                toggleChip(chip);
+            }
+        });
+        chip.setAttribute('tabindex', '0');
+    });
+});
+</script>
 </body>
 </html>

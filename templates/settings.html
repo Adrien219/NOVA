@@ -3,319 +3,924 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Paramètres - S.H.O.S</title>
+    <title>S.H.O.S — Paramètres</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Courier New', monospace;
-            background: linear-gradient(135deg, #0a0e27 0%, #16213e 50%, #0a0e27 100%);
-            color: #00ff88;
-            padding: 20px;
-            min-height: 100vh;
-        }
-        .container { max-width: 1000px; margin: 0 auto; }
-        .header {
-            text-align: center;
-            margin-bottom: 40px;
-            border-bottom: 2px solid #00ff88;
-            padding-bottom: 20px;
-        }
-        .header h1 {
-            font-size: 2rem;
-            background: linear-gradient(135deg, #00ff88, #00b4ff);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 10px;
-        }
-        .back-link {
-            color: #00b4ff;
-            text-decoration: none;
-            display: inline-block;
-            margin-top: 10px;
-        }
-        .settings-section {
-            background: rgba(20, 50, 80, 0.5);
-            border: 2px solid rgba(0, 255, 136, 0.3);
-            border-radius: 15px;
-            padding: 30px;
-            margin-bottom: 30px;
-        }
-        .section-title {
-            font-size: 1.3rem;
-            color: #00ff88;
-            margin-bottom: 20px;
-            font-weight: bold;
-            text-transform: uppercase;
-            border-bottom: 1px solid #00ff88;
-            padding-bottom: 15px;
-        }
-        .setting-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px;
-            background: rgba(10, 30, 50, 0.5);
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border-left: 3px solid #00ff88;
-        }
-        .setting-label {
-            color: #00ff88;
-            font-weight: bold;
-        }
-        .setting-value {
-            color: #00b4ff;
-            font-size: 0.9rem;
-        }
-        .toggle-switch {
-            width: 50px;
-            height: 24px;
-            background: #ff6666;
-            border-radius: 12px;
-            cursor: pointer;
-            position: relative;
-            transition: all 0.3s;
-        }
-        .toggle-switch.active {
-            background: #00ff88;
-        }
-        .toggle-switch::after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background: white;
-            border-radius: 50%;
-            top: 2px;
-            left: 2px;
-            transition: all 0.3s;
-        }
-        .toggle-switch.active::after {
-            left: 28px;
-        }
-        .input-field {
-            padding: 10px;
-            background: rgba(0, 50, 80, 0.3);
-            border: 1px solid #00ff88;
-            color: #00ff88;
-            border-radius: 5px;
-            font-family: 'Courier New', monospace;
-            min-width: 200px;
-        }
-        .button-group {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin-top: 30px;
-        }
-        .btn {
-            background: linear-gradient(135deg, #00ff88, #00b4ff);
-            color: #0a0e27;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        .btn.danger {
-            background: linear-gradient(135deg, #ff6666, #ff9999);
-        }
+    /* ═══════════════════════════════════════════════════════
+       S.H.O.S SETTINGS  ·  visionOS Control Center Style
+       Warm glassmorphism — beige/taupe translucid panels
+    ═══════════════════════════════════════════════════════ */
+    :root {
+        /* Warm visionOS palette */
+        --bg-warm:   rgba(255,255,255,0.10);
+        --glass:     rgba(255,255,255,0.09);
+        --glass-md:  rgba(255,255,255,0.12);
+        --glass-hi:  rgba(255,255,255,0.18);
+        --glass-btn: rgba(255,255,255,0.14);
+        --border:    rgba(255,255,255,0.13);
+        --border-hi: rgba(255,255,255,0.22);
+        --blur:      blur(30px) saturate(160%);
+        --blur-sm:   blur(18px) saturate(140%);
+
+        /* Accent colors */
+        --blue:      #4da6ff;
+        --blue-on:   rgba(77,166,255,0.90);
+        --teal:      #30d5c8;
+        --green:     #34c759;
+        --red:       #ff453a;
+        --amber:     #ffa340;
+        --purple:    #bf5af2;
+
+        /* Text */
+        --t1: rgba(255,255,255,0.94);
+        --t2: rgba(255,255,255,0.55);
+        --t3: rgba(255,255,255,0.28);
+
+        --font: 'DM Sans', -apple-system, sans-serif;
+        --mono: 'DM Mono', monospace;
+        --r:    18px;
+        --r-sm: 11px;
+        --r-xs:  7px;
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { height:100%; }
+
+    body {
+        font-family: var(--font);
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 20px 16px 40px;
+        /* Warm visionOS room-like background */
+        background:
+            radial-gradient(ellipse 80% 60% at 20% 30%, rgba(180,160,120,0.22) 0%, transparent 60%),
+            radial-gradient(ellipse 70% 80% at 80% 70%, rgba(100,120,160,0.18) 0%, transparent 55%),
+            radial-gradient(ellipse 120% 120% at 50% 50%, #1e1c18 0%, #111015 100%);
+        color: var(--t1);
+        overflow-x: hidden;
+    }
+
+    /* ── MAIN CONTAINER ──────────────────────── */
+    .container {
+        width: 100%;
+        max-width: 860px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        animation: fadeUp .5s cubic-bezier(.34,1.2,.64,1) both;
+    }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+
+    /* ── TOP BAR ─────────────────────────────── */
+    .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 0 18px;
+        gap: 12px;
+    }
+    .topbar-left { display:flex; align-items:center; gap:10px; }
+    .logo-gem {
+        width:34px; height:34px; border-radius:10px;
+        background:var(--glass-md); border:1px solid var(--border-hi);
+        display:flex; align-items:center; justify-content:center;
+    }
+    .logo-gem svg { width:16px; height:16px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .page-name { font-size:22px; font-weight:600; color:var(--t1); letter-spacing:-.01em; }
+
+    .btn-back {
+        display:flex; align-items:center; gap:6px;
+        padding:7px 14px; border-radius:18px;
+        background:var(--glass-btn); border:1px solid var(--border);
+        font-size:12px; font-weight:500; color:var(--t2);
+        text-decoration:none; transition:all .18s;
+    }
+    .btn-back:hover { background:var(--glass-hi); color:var(--t1); border-color:var(--border-hi); }
+    .btn-back svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; }
+
+    /* ── SECTIONS LAYOUT ─────────────────────── */
+    /* visionOS style: grouped sections like iOS Settings */
+    .section { margin-bottom: 22px; }
+
+    .section-label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        color: var(--t3);
+        padding: 0 6px;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+    }
+    .section-label svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; }
+
+    /* Grouped card — mimics iOS Settings grouped list */
+    .group {
+        background: var(--glass);
+        backdrop-filter: var(--blur);
+        -webkit-backdrop-filter: var(--blur);
+        border: 1px solid var(--border);
+        border-radius: var(--r);
+        overflow: hidden;
+        box-shadow:
+            0 8px 32px rgba(0,0,0,.28),
+            0 1px 0 rgba(255,255,255,.10) inset;
+    }
+
+    /* ── SETTING ROW ──────────────────────────── */
+    .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 13px 16px;
+        border-bottom: 1px solid rgba(255,255,255,.06);
+        transition: background .15s;
+        position: relative;
+    }
+    .row:last-child { border-bottom: none; }
+    .row:hover { background: rgba(255,255,255,.04); }
+    .row.row-danger:hover { background: rgba(255,69,58,.07); }
+
+    /* Icon badge — like iOS */
+    .row-icon {
+        width: 32px; height: 32px; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+    }
+    .row-icon svg { width:16px; height:16px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .ic-blue   { background: var(--blue); }
+    .ic-green  { background: var(--green); }
+    .ic-teal   { background: var(--teal); }
+    .ic-amber  { background: var(--amber); }
+    .ic-red    { background: var(--red); }
+    .ic-purple { background: var(--purple); }
+    .ic-grey   { background: rgba(255,255,255,.18); }
+
+    .row-text { flex:1; min-width:0; }
+    .row-title { font-size:14px; font-weight:500; color:var(--t1); }
+    .row-sub   { font-size:11px; color:var(--t3); margin-top:1px; font-family:var(--mono); }
+
+    /* Value badge */
+    .row-value {
+        font-size:13px; font-weight:400; color:var(--t2);
+        font-family:var(--mono);
+        flex-shrink:0;
+    }
+
+    /* ── iOS-STYLE TOGGLE ─────────────────────── */
+    .toggle {
+        width:44px; height:26px; border-radius:13px;
+        background:rgba(255,255,255,.16);
+        position:relative; cursor:pointer; flex-shrink:0;
+        transition:background .22s cubic-bezier(.4,0,.2,1);
+        border:none; outline:none;
+        -webkit-appearance:none;
+    }
+    .toggle::after {
+        content:''; position:absolute;
+        top:3px; left:3px;
+        width:20px; height:20px; border-radius:50%;
+        background:#fff;
+        box-shadow:0 1px 4px rgba(0,0,0,.35);
+        transition:left .22s cubic-bezier(.4,0,.2,1);
+    }
+    .toggle.on { background:var(--green); }
+    .toggle.on::after { left:21px; }
+    .toggle:focus-visible { box-shadow:0 0 0 3px rgba(77,166,255,.4); }
+
+    /* ── TEXT INPUT (iOS style) ───────────────── */
+    .field-input {
+        background:rgba(255,255,255,.08);
+        border:1px solid rgba(255,255,255,.12);
+        border-radius:var(--r-sm);
+        color:var(--t1);
+        font-size:13px; font-family:var(--mono);
+        padding:8px 12px;
+        outline:none;
+        width:180px;
+        transition:border-color .18s, background .18s, box-shadow .18s;
+    }
+    .field-input:focus {
+        border-color:rgba(77,166,255,.5);
+        background:rgba(77,166,255,.08);
+        box-shadow:0 0 0 3px rgba(77,166,255,.12);
+    }
+    .field-input::placeholder { color:var(--t3); }
+
+    /* ── QUICK TILES (Control Center style) ──── */
+    .tiles {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 10px;
+        margin-bottom: 22px;
+    }
+    .tile {
+        background:var(--glass-md);
+        backdrop-filter:var(--blur-sm);
+        -webkit-backdrop-filter:var(--blur-sm);
+        border:1px solid var(--border);
+        border-radius:var(--r);
+        padding:16px 12px 13px;
+        display:flex; flex-direction:column;
+        align-items:flex-start; gap:10px;
+        cursor:pointer; position:relative; overflow:hidden;
+        transition:all .2s cubic-bezier(.34,1.2,.64,1);
+        box-shadow:0 4px 18px rgba(0,0,0,.22), 0 1px 0 rgba(255,255,255,.10) inset;
+    }
+    .tile:hover { transform:translateY(-3px) scale(1.02); border-color:var(--border-hi); }
+    .tile:active { transform:scale(.98); }
+    .tile.tile-on { background:rgba(77,166,255,.18); border-color:rgba(77,166,255,.38); }
+    .tile.tile-on .tile-label { color:var(--blue); }
+
+    .tile-ico {
+        width:36px; height:36px; border-radius:10px;
+        display:flex; align-items:center; justify-content:center;
+    }
+    .tile-ico svg { width:18px; height:18px; fill:none; stroke:#fff; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .tile.tile-on .tile-ico { background:var(--blue); }
+    .tile:not(.tile-on) .tile-ico { background:rgba(255,255,255,.14); }
+
+    .tile-label { font-size:11px; font-weight:500; color:var(--t2); line-height:1.3; }
+    .tile-status { position:absolute; top:10px; right:10px; width:6px; height:6px; border-radius:50%; background:var(--t3); }
+    .tile.tile-on .tile-status { background:var(--blue); box-shadow:0 0 6px var(--blue); }
+
+    /* ── ACTION BUTTONS ───────────────────────── */
+    .action-row {
+        display:flex; gap:8px; flex-wrap:wrap;
+        padding:12px 16px;
+    }
+    .btn-action {
+        display:flex; align-items:center; gap:7px;
+        padding:9px 16px; border-radius:22px;
+        font-size:12px; font-weight:500; font-family:var(--font);
+        border:none; cursor:pointer;
+        transition:all .18s cubic-bezier(.34,1.2,.64,1);
+    }
+    .btn-action svg { width:13px; height:13px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; flex-shrink:0; }
+    .btn-action:hover { transform:translateY(-1px); }
+    .btn-action:active { transform:scale(.97); }
+
+    .btn-primary {
+        background:rgba(77,166,255,.20); border:1px solid rgba(77,166,255,.38);
+        color:var(--blue);
+    }
+    .btn-primary:hover { background:rgba(77,166,255,.28); }
+
+    .btn-secondary {
+        background:var(--glass-btn); border:1px solid var(--border);
+        color:var(--t2);
+    }
+    .btn-secondary:hover { background:var(--glass-hi); color:var(--t1); border-color:var(--border-hi); }
+
+    .btn-danger {
+        background:rgba(255,69,58,.14); border:1px solid rgba(255,69,58,.30);
+        color:var(--red);
+    }
+    .btn-danger:hover { background:rgba(255,69,58,.22); }
+
+    /* ── ABOUT INFO ───────────────────────────── */
+    .about-grid {
+        display:grid;
+        grid-template-columns:1fr 1fr;
+        gap:0;
+    }
+    .about-cell {
+        padding:12px 16px;
+        border-bottom:1px solid rgba(255,255,255,.06);
+        border-right:1px solid rgba(255,255,255,.06);
+        display:flex; flex-direction:column; gap:3px;
+    }
+    .about-cell:nth-child(2n) { border-right:none; }
+    .about-cell:nth-last-child(-n+2) { border-bottom:none; }
+    .about-key { font-size:10px; color:var(--t3); text-transform:uppercase; letter-spacing:.08em; font-family:var(--mono); }
+    .about-val { font-size:13px; font-weight:500; color:var(--t1); font-family:var(--mono); }
+
+    /* ── SAVE BUTTON ──────────────────────────── */
+    .btn-save {
+        width:100%; padding:14px;
+        background:linear-gradient(135deg, var(--blue) 0%, var(--teal) 100%);
+        border:none; border-radius:var(--r-sm);
+        color:#000; font-size:14px; font-weight:600; font-family:var(--font);
+        cursor:pointer; margin-top:4px;
+        transition:all .2s cubic-bezier(.34,1.4,.64,1);
+        box-shadow:0 4px 20px rgba(77,166,255,.28);
+        letter-spacing:.02em;
+    }
+    .btn-save:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(77,166,255,.38); }
+    .btn-save:active { transform:scale(.99); }
+    .btn-save:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+
+    /* ── TOAST ─────────────────────────────────── */
+    .toast {
+        position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(70px);
+        padding:10px 20px; border-radius:14px;
+        font-size:12px; font-weight:500; font-family:var(--font);
+        backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px);
+        z-index:100; opacity:0; pointer-events:none;
+        display:flex; align-items:center; gap:8px;
+        transition:transform .3s cubic-bezier(.34,1.4,.64,1), opacity .25s ease;
+        white-space:nowrap;
+    }
+    .toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+    .toast.ok  { background:rgba(52,199,89,.18); border:1px solid rgba(52,199,89,.35); color:var(--green); }
+    .toast.err { background:rgba(255,69,58,.18);  border:1px solid rgba(255,69,58,.35);  color:var(--red); }
+    .toast svg { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; }
+
+    /* ── RESPONSIVE ───────────────────────────── */
+    @media(max-width:640px) {
+        .tiles { grid-template-columns:repeat(2,1fr); }
+        .about-grid { grid-template-columns:1fr; }
+        .about-cell { border-right:none; }
+        .about-cell:nth-last-child(-n+2) { border-bottom:1px solid rgba(255,255,255,.06); }
+        .about-cell:last-child { border-bottom:none; }
+    }
+    @media(max-width:400px) {
+        .tiles { grid-template-columns:1fr 1fr; }
+    }
     </style>
 </head>
 <body>
-    <div class="container">
-        <a href="/" class="back-link">← Retour à l'accueil</a>
-        <div class="header">
-            <h1>⚙️ Paramètres Système</h1>
+
+<div class="container">
+
+    <!-- ── TOP BAR ─────────────────────────── -->
+    <div class="topbar">
+        <div class="topbar-left">
+            <div class="logo-gem" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="2" y="9" width="8" height="6" rx="2"/><rect x="14" y="9" width="8" height="6" rx="2"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+            </div>
+            <h1 class="page-name">Paramètres</h1>
+        </div>
+        <a href="/" class="btn-back" aria-label="Retour à l'accueil">
+            <svg viewBox="0 0 24 24"><polyline points="15,18 9,12 15,6"/></svg>
+            Accueil
+        </a>
+    </div>
+
+    <!-- ── QUICK TILES (Control Center style) ── -->
+    <div class="section-label" style="margin-bottom:10px;">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Accès rapide
+    </div>
+    <div class="tiles" role="group" aria-label="Contrôles rapides">
+
+        <div class="tile" id="tile-arduino"
+             onclick="toggleTile('tile-arduino','arduino')"
+             role="switch" aria-checked="false" aria-label="Arduino"
+             tabindex="0">
+            <div class="tile-status" aria-hidden="true"></div>
+            <div class="tile-ico">
+                <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            </div>
+            <span class="tile-label">Arduino</span>
         </div>
 
-        <!-- Configuration MQTT -->
-        <div class="settings-section">
-            <div class="section-title">📡 Configuration MQTT</div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Hôte MQTT</div>
-                    <div class="setting-value">Adresse du broker</div>
-                </div>
-                <input type="text" class="input-field" id="mqtt-host" value="localhost" placeholder="localhost">
+        <div class="tile" id="tile-esp32"
+             onclick="toggleTile('tile-esp32','esp32')"
+             role="switch" aria-checked="false" aria-label="ESP32"
+             tabindex="0">
+            <div class="tile-status" aria-hidden="true"></div>
+            <div class="tile-ico">
+                <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Port MQTT</div>
-                    <div class="setting-value">Port de connexion</div>
-                </div>
-                <input type="number" class="input-field" id="mqtt-port" value="1883" placeholder="1883">
-            </div>
+            <span class="tile-label">ESP32</span>
         </div>
 
-        <!-- Configuration Capteurs -->
-        <div class="settings-section">
-            <div class="section-title">🌡️ Capteurs</div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Arduino Activé</div>
-                    <div class="setting-value">Lire les données Arduino</div>
-                </div>
-                <div class="toggle-switch active" onclick="toggleSetting(this)"></div>
+        <div class="tile" id="tile-phone"
+             onclick="toggleTile('tile-phone','phone')"
+             role="switch" aria-checked="false" aria-label="Téléphone"
+             tabindex="0">
+            <div class="tile-status" aria-hidden="true"></div>
+            <div class="tile-ico">
+                <svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">ESP32 Activé</div>
-                    <div class="setting-value">Recevoir ESP32 telemetry</div>
-                </div>
-                <div class="toggle-switch" onclick="toggleSetting(this)"></div>
-            </div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Téléphone Activé</div>
-                    <div class="setting-value">Recevoir capteurs téléphone</div>
-                </div>
-                <div class="toggle-switch" onclick="toggleSetting(this)"></div>
-            </div>
+            <span class="tile-label">Téléphone</span>
         </div>
 
-        <!-- Configuration Plugins -->
-        <div class="settings-section">
-            <div class="section-title">🔌 Plugins</div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Danger Monitor</div>
-                    <div class="setting-value">Surveillance danger</div>
-                </div>
-                <div class="toggle-switch active" onclick="toggleSetting(this)"></div>
+        <div class="tile" id="tile-mediapipe"
+             onclick="toggleTile('tile-mediapipe','mediapipe')"
+             role="switch" aria-checked="false" aria-label="MediaPipe"
+             tabindex="0">
+            <div class="tile-status" aria-hidden="true"></div>
+            <div class="tile-ico">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8-5.6 8-10 8S2 17 2 12z"/></svg>
             </div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Vision Objet</div>
-                    <div class="setting-value">Détection objets IA</div>
-                </div>
-                <div class="toggle-switch active" onclick="toggleSetting(this)"></div>
-            </div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Voice Assistant</div>
-                    <div class="setting-value">Assistant vocal TTS/STT</div>
-                </div>
-                <div class="toggle-switch active" onclick="toggleSetting(this)"></div>
-            </div>
+            <span class="tile-label">MediaPipe</span>
         </div>
 
-        <!-- Stockage Données -->
-        <div class="settings-section">
-            <div class="section-title">💾 Stockage Données</div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Rétention Historique</div>
-                    <div class="setting-value">Nombre de jours</div>
-                </div>
-                <input type="number" class="input-field" id="retention-days" value="7" min="1" max="30" placeholder="7">
-            </div>
-            <div class="button-group">
-                <button class="btn" onclick="exportData()">📥 Exporter Données</button>
-                <button class="btn" onclick="importData()">📤 Importer Données</button>
-                <button class="btn danger" onclick="clearData()">🗑️ Effacer Tout</button>
-            </div>
-        </div>
+    </div>
 
-        <!-- À Propos -->
-        <div class="settings-section">
-            <div class="section-title">ℹ️ À Propos</div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Version S.H.O.S</div>
-                    <div class="setting-value">Système complet</div>
-                </div>
-                <span style="color: #00ff88; font-weight: bold;">V3.0 FINAL</span>
-            </div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Python</div>
-                    <div class="setting-value">Version requise</div>
-                </div>
-                <span style="color: #00ff88;">3.9+</span>
-            </div>
-            <div class="setting-item">
-                <div>
-                    <div class="setting-label">Plateforme</div>
-                    <div class="setting-value">Système d'exploitation</div>
-                </div>
-                <span style="color: #00ff88;">Windows / Raspberry Pi</span>
-            </div>
+    <!-- ── MQTT ──────────────────────────────── -->
+    <div class="section">
+        <div class="section-label">
+            <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><circle cx="12" cy="20" r="1"/></svg>
+            Configuration MQTT
         </div>
-
-        <div class="button-group">
-            <button class="btn" onclick="saveSettings()">💾 Sauvegarder</button>
-            <button class="btn" onclick="location.href='/'">← Retour</button>
+        <div class="group">
+            <div class="row">
+                <div class="row-icon ic-blue">
+                    <svg viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><circle cx="12" cy="20" r="1"/></svg>
+                </div>
+                <div class="row-text">
+                    <div class="row-title">Hôte MQTT</div>
+                    <div class="row-sub">Adresse du broker</div>
+                </div>
+                <input class="field-input" type="text" id="mqtt-host"
+                    placeholder="localhost"
+                    aria-label="Adresse hôte MQTT"
+                    autocomplete="off" spellcheck="false">
+            </div>
+            <div class="row">
+                <div class="row-icon ic-blue">
+                    <svg viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                </div>
+                <div class="row-text">
+                    <div class="row-title">Port MQTT</div>
+                    <div class="row-sub">Port de connexion</div>
+                </div>
+                <input class="field-input" type="number" id="mqtt-port"
+                    placeholder="1883" min="1" max="65535"
+                    aria-label="Port MQTT"
+                    style="width:100px">
+            </div>
+            <div class="row">
+                <div class="row-icon ic-teal">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                </div>
+                <div class="row-text">
+                    <div class="row-title">Statut MQTT</div>
+                    <div class="row-sub">Connexion temps réel</div>
+                </div>
+                <span class="row-value" id="mqtt-status-val">—</span>
+            </div>
         </div>
     </div>
 
-    <script>
-        const socket = io();
+    <!-- ── PLUGINS ───────────────────────────── -->
+    <div class="section">
+        <div class="section-label">
+            <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Plugins
+        </div>
+        <div class="group">
 
-        function toggleSetting(elem) {
-            elem.classList.toggle('active');
+            <div class="row">
+                <div class="row-icon ic-red">
+                    <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <div class="row-text">
+                    <div class="row-title">Danger Monitor</div>
+                    <div class="row-sub">Surveillance gaz, flamme, obstacles</div>
+                </div>
+                <button class="toggle on" id="tog-danger"
+                    onclick="togglePlugin(this,'danger')"
+                    role="switch" aria-checked="true"
+                    aria-label="Activer Danger Monitor"></button>
+            </div>
+
+            <div class="row">
+                <div class="row-icon ic-purple">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8-5.6 8-10 8S2 17 2 12z"/></svg>
+                </div>
+                <div class="row-text">
+                    <div class="row-title">Vision Objet</div>
+                    <div class="row-sub">Détection d'objets par IA</div>
+                </div>
+                <button class="toggle on" id="tog-vision"
+                    onclick="togglePlugin(this,'vision')"
+                    role="switch" aria-checked="true"
+                    aria-label="Activer Vision Objet"></button>
+            </div>
+
+            <div class="row">
+                <div class="row-icon ic-teal">
+                    <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/></svg>
+                </div>
+                <div class="row-text">
+                    <div class="row-title">Voice Assistant</div>
+                    <div class="row-sub">Reconnaissance vocale TTS/STT</div>
+                </div>
+                <button class="toggle on" id="tog-voice"
+                    onclick="togglePlugin(this,'voice')"
+                    role="switch" aria-checked="true"
+                    aria-label="Activer Voice Assistant"></button>
+            </div>
+
+            <div class="row">
+                <div class="row-icon ic-amber">
+                    <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><circle cx="12" cy="14" r="3"/><line x1="7" y1="7" x2="7" y2="4"/><line x1="17" y1="7" x2="17" y2="4"/></svg>
+                </div>
+                <div class="row-text">
+                    <div class="row-title">MediaPipe Gestes</div>
+                    <div class="row-sub">Contrôle par geste de la main</div>
+                </div>
+                <button class="toggle on" id="tog-mediapipe"
+                    onclick="togglePlugin(this,'mediapipe_gesture')"
+                    role="switch" aria-checked="true"
+                    aria-label="Activer MediaPipe Gestes"></button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ── STOCKAGE ───────────────────────────── -->
+    <div class="section">
+        <div class="section-label">
+            <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            Stockage & Données
+        </div>
+        <div class="group">
+            <div class="row">
+                <div class="row-icon ic-green">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+                </div>
+                <div class="row-text">
+                    <div class="row-title">Rétention Historique</div>
+                    <div class="row-sub">Durée de conservation des données</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <input class="field-input" type="number" id="retention-days"
+                        placeholder="7" min="1" max="365"
+                        aria-label="Nombre de jours de rétention"
+                        style="width:70px;text-align:center;">
+                    <span style="font-size:11px;color:var(--t3)">j</span>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn-action btn-primary" onclick="exportData()" aria-label="Exporter les données">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    Exporter
+                </button>
+                <button class="btn-action btn-secondary" onclick="importData()" aria-label="Importer des données">
+                    <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    Importer
+                </button>
+                <button class="btn-action btn-danger" onclick="clearData()" aria-label="Effacer toutes les données">
+                    <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                    Effacer tout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── À PROPOS ───────────────────────────── -->
+    <div class="section">
+        <div class="section-label">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            À propos
+        </div>
+        <div class="group">
+            <div class="about-grid">
+                <div class="about-cell">
+                    <span class="about-key">Version</span>
+                    <span class="about-val" id="about-version">—</span>
+                </div>
+                <div class="about-cell">
+                    <span class="about-key">Python</span>
+                    <span class="about-val" id="about-python">—</span>
+                </div>
+                <div class="about-cell">
+                    <span class="about-key">Plateforme</span>
+                    <span class="about-val" id="about-platform">—</span>
+                </div>
+                <div class="about-cell">
+                    <span class="about-key">Flask</span>
+                    <span class="about-val" id="about-flask">—</span>
+                </div>
+                <div class="about-cell">
+                    <span class="about-key">Socket.IO</span>
+                    <span class="about-val" id="about-socketio">—</span>
+                </div>
+                <div class="about-cell">
+                    <span class="about-key">Paho MQTT</span>
+                    <span class="about-val" id="about-mqtt-lib">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── SAVE BUTTON ────────────────────────── -->
+    <button class="btn-save" id="btn-save" onclick="saveSettings()" aria-label="Sauvegarder les paramètres">
+        Sauvegarder les paramètres
+    </button>
+
+    <div style="height:12px"></div>
+
+</div><!-- /.container -->
+
+<!-- Toast -->
+<div class="toast" id="toast" role="alert" aria-live="assertive">
+    <svg id="toast-ico" viewBox="0 0 24 24"></svg>
+    <span id="toast-msg"></span>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   S.H.O.S SETTINGS — JavaScript
+   Données : /api/get_settings + /api/save_settings
+   Socket.IO pour statut MQTT en temps réel
+═══════════════════════════════════════════════════════ */
+
+const socket = io();
+
+/* ── TOAST ─────────────────────────────────────────── */
+let _toastTimer = null;
+function toast(msg, type = 'ok') {
+    const el  = document.getElementById('toast');
+    const ico = document.getElementById('toast-ico');
+    const txt = document.getElementById('toast-msg');
+    const SVG = {
+        ok:  '<polyline points="20,6 9,17 4,12"/>',
+        err: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
+    };
+    el.className  = 'toast ' + type;
+    ico.innerHTML = SVG[type] || SVG.ok;
+    txt.textContent = msg;
+    el.classList.add('show');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+/* ── SOCKET — MQTT status ───────────────────────────── */
+socket.on('connect',     () => setMqttStatus(true));
+socket.on('disconnect',  () => setMqttStatus(false));
+socket.on('mqtt_status', d  => setMqttStatus(d.connected));
+
+function setMqttStatus(on) {
+    const el = document.getElementById('mqtt-status-val');
+    if (!el) return;
+    if (on !== null) {
+        el.textContent  = on ? 'Connecté' : 'Hors ligne';
+        el.style.color  = on ? 'var(--green)' : 'var(--red)';
+    }
+}
+
+/* ── TILES (hardware toggles) ───────────────────────── */
+/* État interne des tiles */
+const tileState = { arduino:false, esp32:false, phone:false, mediapipe:false };
+
+function toggleTile(tileId, key) {
+    tileState[key] = !tileState[key];
+    const el = document.getElementById(tileId);
+    if (!el) return;
+    el.classList.toggle('tile-on', tileState[key]);
+    el.setAttribute('aria-checked', String(tileState[key]));
+    /* Émet l'état vers Flask via socket */
+    socket.emit('setting_toggle', { key, enabled: tileState[key] });
+}
+
+/* Accessibilité clavier pour les tiles */
+document.querySelectorAll('.tile').forEach(t => {
+    t.addEventListener('keydown', e => {
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); t.click(); }
+    });
+});
+
+/* ── PLUGIN TOGGLES ─────────────────────────────────── */
+function togglePlugin(btn, pluginKey) {
+    const isOn = btn.classList.toggle('on');
+    btn.setAttribute('aria-checked', String(isOn));
+    /* Émet vers Flask */
+    socket.emit('plugin_toggle', { plugin: pluginKey, enabled: isOn });
+}
+
+/* ── LOAD SETTINGS ──────────────────────────────────── */
+async function loadSettings() {
+    try {
+        const res  = await fetch('/api/get_settings');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        /* MQTT */
+        if (data.mqtt_host !== undefined) setVal('mqtt-host', data.mqtt_host);
+        if (data.mqtt_port !== undefined) setVal('mqtt-port', data.mqtt_port);
+
+        /* Rétention */
+        if (data.retention_days !== undefined) setVal('retention-days', data.retention_days);
+
+        /* Tiles hardware */
+        if (data.arduino  !== undefined) applyTile('tile-arduino',  'arduino',  data.arduino);
+        if (data.esp32    !== undefined) applyTile('tile-esp32',    'esp32',    data.esp32);
+        if (data.phone    !== undefined) applyTile('tile-phone',    'phone',    data.phone);
+        if (data.mediapipe!== undefined) applyTile('tile-mediapipe','mediapipe',data.mediapipe);
+
+        /* Plugin toggles */
+        if (data.plugins) {
+            applyToggle('tog-danger',    data.plugins.danger);
+            applyToggle('tog-vision',    data.plugins.vision);
+            applyToggle('tog-voice',     data.plugins.voice);
+            applyToggle('tog-mediapipe', data.plugins.mediapipe_gesture);
         }
 
-        function saveSettings() {
-            const settings = {
-                mqtt_host: document.getElementById('mqtt-host').value,
-                mqtt_port: document.getElementById('mqtt-port').value,
-                retention_days: document.getElementById('retention-days').value
-            };
-            localStorage.setItem('shos_settings', JSON.stringify(settings));
-            alert('✅ Paramètres sauvegardés!');
+        /* À propos */
+        if (data.about) {
+            setTxt('about-version',  data.about.version  || '—');
+            setTxt('about-python',   data.about.python   || '—');
+            setTxt('about-platform', data.about.platform || '—');
+            setTxt('about-flask',    data.about.flask    || '—');
+            setTxt('about-socketio', data.about.socketio || '—');
+            setTxt('about-mqtt-lib', data.about.paho     || '—');
         }
 
-        function exportData() {
-            const data = {
-                timestamp: new Date(),
-                version: 'V3.0',
-                settings: localStorage.getItem('shos_settings'),
-                profiles: localStorage.getItem('shos_profiles')
-            };
-            const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `shos_backup_${new Date().toISOString()}.json`;
-            a.click();
-        }
+    } catch (err) {
+        console.error('[S.H.O.S] loadSettings:', err);
+        /* Pas de toast d'erreur au chargement — l'UI reste en état neutre */
+    }
+}
 
-        function importData() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const data = JSON.parse(event.target.result);
-                    localStorage.setItem('shos_settings', data.settings);
-                    localStorage.setItem('shos_profiles', data.profiles);
-                    alert('✅ Données importées!');
-                };
-                reader.readAsText(file);
-            };
-            input.click();
-        }
+function applyTile(tileId, key, enabled) {
+    tileState[key] = !!enabled;
+    const el = document.getElementById(tileId);
+    if (!el) return;
+    el.classList.toggle('tile-on', !!enabled);
+    el.setAttribute('aria-checked', String(!!enabled));
+}
 
-        function clearData() {
-            if (confirm('⚠️  Êtes-vous sûr? Cela supprimera TOUTES les données!')) {
-                localStorage.clear();
-                alert('✅ Données supprimées!');
+function applyToggle(id, enabled) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('on', !!enabled);
+    el.setAttribute('aria-checked', String(!!enabled));
+}
+
+/* ── SAVE SETTINGS ──────────────────────────────────── */
+async function saveSettings() {
+    const btn = document.getElementById('btn-save');
+    btn.disabled    = true;
+    btn.textContent = 'Sauvegarde…';
+
+    const payload = {
+        mqtt_host:      document.getElementById('mqtt-host')?.value.trim() || '',
+        mqtt_port:      parseInt(document.getElementById('mqtt-port')?.value) || 1883,
+        retention_days: parseInt(document.getElementById('retention-days')?.value) || 7,
+        /* États hardware */
+        arduino:    tileState.arduino,
+        esp32:      tileState.esp32,
+        phone:      tileState.phone,
+        mediapipe:  tileState.mediapipe,
+        /* États plugins */
+        plugins: {
+            danger:             document.getElementById('tog-danger')?.classList.contains('on'),
+            vision:             document.getElementById('tog-vision')?.classList.contains('on'),
+            voice:              document.getElementById('tog-voice')?.classList.contains('on'),
+            mediapipe_gesture:  document.getElementById('tog-mediapipe')?.classList.contains('on'),
+        }
+    };
+
+    try {
+        const res  = await fetch('/api/save_settings', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            toast('Paramètres sauvegardés.', 'ok');
+        } else {
+            toast(data.message || 'Erreur lors de la sauvegarde.', 'err');
+        }
+    } catch (err) {
+        console.error('[S.H.O.S] saveSettings:', err);
+        toast('Erreur réseau. Flask inaccessible.', 'err');
+    } finally {
+        btn.disabled    = false;
+        btn.textContent = 'Sauvegarder les paramètres';
+    }
+}
+
+/* ── EXPORT / IMPORT / CLEAR ────────────────────────── */
+async function exportData() {
+    try {
+        const res  = await fetch('/api/export_data');
+        if (!res.ok) throw new Error('API non disponible');
+        const blob = await res.blob();
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = 'shos_backup_' + new Date().toISOString().slice(0,10) + '.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        toast('Export téléchargé.', 'ok');
+    } catch (err) {
+        console.error('[S.H.O.S] exportData:', err);
+        toast('Export impossible — API indisponible.', 'err');
+    }
+}
+
+function importData() {
+    const input   = document.createElement('input');
+    input.type    = 'file';
+    input.accept  = '.json';
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const text = await file.text();
+        try {
+            const parsed = JSON.parse(text);
+            const res    = await fetch('/api/import_data', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(parsed)
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                toast('Données importées.', 'ok');
+                await loadSettings();
+            } else {
+                toast(data.message || 'Erreur import.', 'err');
             }
+        } catch {
+            toast('Fichier JSON invalide.', 'err');
         }
+    };
+    input.click();
+}
 
-        // Charger les paramètres sauvegardés
-        const saved = localStorage.getItem('shos_settings');
-        if (saved) {
-            const settings = JSON.parse(saved);
-            document.getElementById('mqtt-host').value = settings.mqtt_host || 'localhost';
-            document.getElementById('mqtt-port').value = settings.mqtt_port || '1883';
-            document.getElementById('retention-days').value = settings.retention_days || '7';
+async function clearData() {
+    /* Pas de window.confirm — on demande une confirmation via une UI custom */
+    const ok = await confirmAction('Effacer toutes les données ? Cette action est irréversible.');
+    if (!ok) return;
+    try {
+        const res  = await fetch('/api/clear_data', { method:'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            toast('Données effacées.', 'ok');
+        } else {
+            toast('Erreur lors de l\'effacement.', 'err');
         }
-    </script>
+    } catch {
+        toast('Erreur réseau.', 'err');
+    }
+}
+
+/* ── CONFIRM OVERLAY (remplace window.confirm) ───────── */
+function confirmAction(msg) {
+    return new Promise(resolve => {
+        /* Overlay simple non-bloquant */
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position:fixed;inset:0;z-index:200;
+            display:flex;align-items:center;justify-content:center;
+            background:rgba(0,0,0,.55);
+            backdrop-filter:blur(8px);
+            animation:fadeUp .2s ease;
+        `;
+        overlay.innerHTML = `
+            <div style="
+                background:rgba(30,28,24,.95);
+                border:1px solid rgba(255,255,255,.14);
+                border-radius:20px;
+                padding:24px 28px;
+                max-width:320px;
+                text-align:center;
+                box-shadow:0 20px 60px rgba(0,0,0,.5);
+            ">
+                <div style="font-size:28px;margin-bottom:12px;">⚠️</div>
+                <div style="font-size:14px;color:rgba(255,255,255,.85);margin-bottom:20px;line-height:1.5;">${msg}</div>
+                <div style="display:flex;gap:10px;justify-content:center;">
+                    <button id="_conf-cancel" style="
+                        padding:9px 20px;border-radius:14px;
+                        background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.14);
+                        color:rgba(255,255,255,.7);font-size:13px;cursor:pointer;font-family:inherit;
+                    ">Annuler</button>
+                    <button id="_conf-ok" style="
+                        padding:9px 20px;border-radius:14px;
+                        background:rgba(255,69,58,.85);border:none;
+                        color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;
+                    ">Effacer</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#_conf-cancel').onclick = () => { overlay.remove(); resolve(false); };
+        overlay.querySelector('#_conf-ok').onclick     = () => { overlay.remove(); resolve(true);  };
+    });
+}
+
+/* ── UTILS ───────────────────────────────────────────── */
+function setVal(id, val) {
+    const el = document.getElementById(id);
+    if (el && el.value !== String(val)) el.value = val;
+}
+function setTxt(id, txt) {
+    const el = document.getElementById(id);
+    if (el && el.textContent !== String(txt)) el.textContent = txt;
+}
+
+/* ── INIT ─────────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+    loadSettings();
+    socket.emit('request_status');
+});
+</script>
 </body>
 </html>

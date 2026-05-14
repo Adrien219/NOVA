@@ -34,22 +34,44 @@ class SensorDataNormalizer:
         try:
             normalized = {
                 'timestamp': datetime.now().isoformat(),
-                # Capteurs principaux (correspondance)
-                'temperature': raw_data.get('temp_ext') or raw_data.get('t'),
-                'humidity': raw_data.get('hum') or raw_data.get('h'),
+
+                # Température — ton Arduino envoie 'temp_ext' ou 'temperature'
+                'temperature': raw_data.get('temperature') or raw_data.get('temp_ext') or raw_data.get('t'),
+
+                # Humidité
+                'humidity': raw_data.get('humidity') or raw_data.get('hum') or raw_data.get('h'),
+
+                # Gaz — fonctionne déjà ✓
                 'gas': raw_data.get('gas') or raw_data.get('g'),
-                'flame': raw_data.get('f', 0),
-                'distance': raw_data.get('dist') or raw_data.get('d'),
-                
-                # Capteurs additionnels
-                'sound': raw_data.get('son'),
-                'light': raw_data.get('lum'),
-                'obstacle': raw_data.get('obs'),
-                'joystick_x': raw_data.get('joy_x'),
-                'joystick_y': raw_data.get('joy_y'),
-                'button': raw_data.get('btn'),
+
+                # Flamme — ton Arduino envoie 'flame' pas 'f'
+                'flame': raw_data.get('flame') or raw_data.get('f') or 0,
+
+                # Distance — ton Arduino envoie 'distance' pas 'dist'
+                'distance': raw_data.get('distance') or raw_data.get('dist') or raw_data.get('d'),
+
+                # Son — ton Arduino envoie 'sound' pas 'son'
+                'sound': raw_data.get('sound') or raw_data.get('son'),
+
+                # Lumière — ton Arduino envoie 'light' pas 'lum'
+                'light': raw_data.get('light') or raw_data.get('lum'),
+
+                # Infrarouge et obstacle
+                'obstacle': raw_data.get('obstacle') or raw_data.get('obs'),
+                'infrared': raw_data.get('infrared'),
+
+                # Tilt
+                'tilt': raw_data.get('tilt'),
+
+                # Joystick — fonctionne déjà ✓
+                'joystick_x': raw_data.get('joy_x') or raw_data.get('joystick_x'),
+                'joystick_y': raw_data.get('joy_y') or raw_data.get('joystick_y'),
+
+                # Bouton et potentiomètre
+                'button': raw_data.get('BJ') or raw_data.get('btn') or raw_data.get('button'),
+                'potentiometer': raw_data.get('potentiometer'),
+
                 'sensor_time': raw_data.get('time'),
-                
                 'valid': True
             }
             
@@ -210,8 +232,10 @@ class SHOS_Backbone:
                 self.mqtt_client.publish("shos/sensors/esp32", json.dumps(payload), qos=1)
 
             elif topic == "shos/mobile/sensors":
-                logger.info(f"📱 Téléphone: {payload}")
-                self.mqtt_client.publish("shos/sensors/mobile", json.dumps(payload), qos=1)
+                self.mqtt_client.publish(
+                    "shos/sensors/mobile_normalized",
+                    json.dumps(payload), qos=1
+                )
 
             elif topic == "shos/system/reset":
                 logger.warning("🔄 Reset système demandé")

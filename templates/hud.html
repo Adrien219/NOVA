@@ -491,7 +491,16 @@
 
     <body>
       <div id="bg">
-       <img src="http://10.30.140.246:5001/" style="width: 100%; height: auto;">
+         <img id="video-stream" 
+             src="http://{{ request.host.split(':')[0] }}:5051/video_feed" 
+             alt="En attente du flux NOVA VISION..." 
+             style="width: 100%; height: auto; display: block;"
+             title="Flux IA en temps réel"
+             onclick="this.src='http://{{ request.host.split(':')[0] }}:5050/video_feed?' + new Date().getTime();"
+             onerror="handleVideoError(this)">
+                        
+          <div id="camera-status-badge" style="position: absolute; top: 10px; left: 10px; background: rgba(0,255,0,0.7); color: black; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
+           </div>                                                 onerror="handleVideoError(this)">
     <div id="noise"></div>
 
     <div id="hud">

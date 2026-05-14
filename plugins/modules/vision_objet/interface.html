@@ -1,201 +1,241 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N.O.V.A - {{ config.name }}</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <style>
-        :root {
-            --vision-blue: #00d4ff;
-            --vision-bg: #050a14;
-            --detection-gold: #ffcc00;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.H.O.S · Vision Objet</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════
+   MODULE : VISION OBJET — S.H.O.S design system
+   Logique originale (plugin_data / renderDetections) conservée
+═══════════════════════════════════════════════ */
+:root {
+  --bg:    #0e1117;
+  --glass: rgba(255,255,255,0.055);
+  --border:rgba(255,255,255,0.09);
+  --y:     #e8d44d;
+  --blue:  #4da6ff;
+  --green: #34c759;
+  --red:   #ff453a;
+  --t1:    rgba(255,255,255,0.93);
+  --t2:    rgba(255,255,255,0.52);
+  --t3:    rgba(255,255,255,0.28);
+  --font:  'DM Sans', system-ui, sans-serif;
+  --mono:  'DM Mono', monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--bg);color:var(--t1)}
 
-        body {
-            background: var(--vision-bg);
-            color: white;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            border: 2px solid var(--vision-blue);
-        }
+/* ── LAYOUT PRINCIPAL ── */
+.wrap { height:100vh; display:flex; flex-direction:column; }
 
-        /* En-tête HUD */
-        .header {
-            padding: 15px;
-            background: rgba(0, 212, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--vision-blue);
-        }
+/* ── HEADER ── */
+.hdr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:clamp(7px,1.8vh,12px) clamp(10px,2vw,16px);
+  background:rgba(14,17,23,.97); border-bottom:1px solid var(--border);
+  flex-shrink:0; gap:8px;
+}
+.hdr-l { display:flex; align-items:center; gap:7px; min-width:0; }
+.m-ico { width:20px; height:20px; border-radius:6px; background:rgba(77,166,255,.12); border:1px solid rgba(77,166,255,.25); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
+.m-name { font-size:clamp(9px,1.6vw,11px); font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.spill {
+  display:flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px;
+  background:rgba(255,255,255,.06); border:1px solid var(--border);
+  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px); color:var(--t2); flex-shrink:0;
+}
+.dot { width:5px; height:5px; border-radius:50%; }
+.d-ok { background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 1.5s ease-in-out infinite; }
+.d-w  { background:rgba(255,255,255,.3); }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
 
-        .status-badge {
-            padding: 5px 15px;
-            border-radius: 20px;
-            background: rgba(0, 255, 136, 0.2);
-            border: 1px solid #00ff88;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-        }
+/* ── ZONE CENTRALE ── */
+.main {
+  flex:1; display:grid;
+  grid-template-columns:1fr clamp(100px,28%,180px);
+  overflow:hidden; min-height:0;
+}
 
-        /* Layout Principal */
-        .main-container {
-            display: grid;
-            grid-template-columns: 1fr 300px;
-            flex-grow: 1;
-            overflow: hidden;
-        }
+/* Vidéo */
+.video-zone {
+  position:relative; background:#000;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; border-right:1px solid var(--border);
+}
+.video-zone img { width:100%; height:100%; object-fit:cover; display:block; }
+.video-zone img[src=""] { display:none; }
 
-        /* Section Vidéo */
-        .video-feed {
-            position: relative;
-            background: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-        }
+/* Ligne de scan HUD */
+.scan-line {
+  position:absolute; left:0; right:0; height:1.5px;
+  background:linear-gradient(90deg, transparent, var(--blue), transparent);
+  box-shadow:0 0 8px var(--blue);
+  animation:scan 3s linear infinite; top:0; pointer-events:none;
+}
+@keyframes scan { 0%{top:0} 50%{top:100%} 100%{top:0} }
 
-        .video-feed img {
-            max-width: 100%;
-            height: auto;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
+/* Badge geste overlay */
+.ai-badge {
+  position:absolute; top:8px; left:8px; z-index:5;
+  padding:4px 10px; border-radius:6px;
+  background:rgba(77,166,255,.18); border:1px solid rgba(77,166,255,.35);
+  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px); color:var(--blue);
+  letter-spacing:.08em; transition:all .3s;
+}
+.ai-badge.alert { background:rgba(52,199,89,.18); border-color:rgba(52,199,89,.35); color:var(--green); }
 
-        /* Overlay de détection (Viseur) */
-        .scanner-line {
-            position: absolute;
-            width: 100%;
-            height: 2px;
-            background: var(--vision-blue);
-            box-shadow: 0 0 15px var(--vision-blue);
-            animation: scan 3s infinite linear;
-            top: 0;
-        }
+/* Compteur overlay */
+.count-badge {
+  position:absolute; top:8px; right:8px; z-index:5;
+  padding:3px 8px; border-radius:6px;
+  background:rgba(232,212,77,.14); border:1px solid rgba(232,212,77,.3);
+  font-family:var(--mono); font-size:10px; color:var(--y);
+}
 
-        @keyframes scan {
-            0% { top: 0; }
-            50% { top: 100%; }
-            100% { top: 0; }
-        }
+/* ── SIDEBAR DÉTECTIONS ── */
+.sidebar {
+  display:flex; flex-direction:column;
+  background:rgba(14,17,23,.95); overflow-y:auto; min-width:0;
+}
+.sidebar::-webkit-scrollbar { width:3px; }
+.sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); }
 
-        /* Barre Latérale Detections */
-        .sidebar {
-            background: rgba(0, 0, 0, 0.5);
-            border-left: 1px solid var(--vision-blue);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
+.sb-head {
+  padding:8px 10px 6px; border-bottom:1px solid var(--border);
+  font-family:var(--mono); font-size:9px; letter-spacing:.10em;
+  text-transform:uppercase; color:var(--t3); flex-shrink:0;
+}
 
-        .detection-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(0, 212, 255, 0.3);
-            padding: 15px;
-            border-radius: 8px;
-            transition: all 0.3s;
-        }
+/* Zone des cartes détection */
+#detection-list {
+  flex:1; padding:6px; display:flex; flex-direction:column; gap:5px;
+  overflow-y:auto;
+}
+#detection-list::-webkit-scrollbar { width:3px; }
+#detection-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); }
 
-        .detection-card.active {
-            border-color: var(--detection-gold);
-            background: rgba(255, 204, 0, 0.1);
-            transform: scale(1.02);
-        }
+#no-detection {
+  padding:12px 8px; text-align:center;
+  font-size:10px; color:var(--t3); font-family:var(--mono);
+  line-height:1.5;
+}
 
-        .object-name {
-            font-size: 1.2rem;
-            color: var(--vision-blue);
-            font-weight: bold;
-            text-transform: capitalize;
-        }
+.detection-card {
+  padding:7px 9px; border-radius:8px;
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  transition:all .25s ease; animation:cardIn .25s ease;
+}
+.detection-card.active {
+  background:rgba(52,199,89,.08); border-color:rgba(52,199,89,.3);
+}
+@keyframes cardIn { from{opacity:0;transform:translateX(6px)} to{opacity:1;transform:none} }
 
-        .back-btn {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            padding: 10px 20px;
-            background: transparent;
-            border: 1px solid white;
-            color: white;
-            text-decoration: none;
-            font-size: 0.8rem;
-            transition: 0.3s;
-        }
-
-        .back-btn:hover { background: white; color: black; }
-    </style>
+.det-name {
+  font-size:clamp(10px,1.6vw,12px); font-weight:600; color:var(--t1);
+  text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.det-count {
+  font-family:var(--mono); font-size:9px; color:var(--t3); margin-top:2px;
+}
+.det-bar { height:2px; background:rgba(255,255,255,.08); border-radius:1px; margin-top:5px; overflow:hidden; }
+.det-bar-fill { height:100%; background:var(--green); border-radius:1px; transition:width .4s; }
+</style>
 </head>
 <body>
+<div class="wrap">
 
-    <div class="header">
-        <div>
-            <strong style="color: var(--vision-blue);">MODULE:</strong> {{ config.name }}
-        </div>
-        <div class="status-badge" id="ai-status" style="background: rgba(0, 255, 200, 0.2); border: 1px solid #00ffc8;">MEDIAPIPE ACTIF</div>
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-l">
+      <div class="m-ico">👁</div>
+      <span class="m-name">{{ config.name if config else 'Vision Objet' }}</span>
+    </div>
+    <div class="spill">
+      <div class="dot d-ok" id="ai-dot"></div>
+      <span id="ai-status">MEDIAPIPE</span>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- VIDÉO -->
+    <div class="video-zone">
+      <div class="scan-line"></div>
+      <div class="ai-badge" id="ai-badge">IA ACTIVE</div>
+      <div class="count-badge" id="count-badge" style="display:none">0 obj.</div>
+      <img src="/video_feed" id="video_stream" alt="Vision Objet"
+           onerror="this.style.display='none'">
     </div>
 
-    <div class="main-container">
-        <div class="video-feed">
-            <div class="scanner-line"></div>
-            <img src="/video_feed" id="video_stream" alt="Vision Objet">
-        </div>
-
-        <div class="sidebar" id="detection-list">
-            <h3 style="color: var(--vision-blue); border-bottom: 1px solid; padding-bottom: 5px;">ANALYSE SCÈNE</h3>
-            <div id="no-detection" style="opacity: 0.5; font-style: italic;">Aucun objet détecté...</div>
-            </div>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sb-head">Détections</div>
+      <div id="detection-list">
+        <div id="no-detection">Aucun<br>objet<br>détecté...</div>
+      </div>
     </div>
 
-    <a href="/" class="back-btn">RETOUR ACCUEIL</a>
+  </div>
+</div>
 
-    <script>
-        const socket = io();
-        const detectionList = document.getElementById('detection-list');
-        const noDetection = document.getElementById('no-detection');
+<script>
+const socket = io();
+const detList   = document.getElementById('detection-list');
+const noDet     = document.getElementById('no-detection');
+const aiBadge   = document.getElementById('ai-badge');
+const countBadge= document.getElementById('count-badge');
 
-        // On écoute les données de détection relayées par nova.py (depuis MQTT)
-        socket.on('plugin_data', function(data) {
-            // On vérifie que les données viennent bien de ce plugin
-            if (data.plugin === "vision_objet") {
-                renderDetections(data.found);
-            }
-        });
+/* ── Logique originale conservée ── */
+socket.on('plugin_data', function(data) {
+  if (data.plugin === "vision_objet") {
+    renderDetections(data.found);
+  }
+});
 
-        function renderDetections(objects) {
-            // Nettoyage (sauf titre et message vide)
-            const cards = document.querySelectorAll('.detection-card');
-            cards.forEach(c => c.remove());
+function renderDetections(objects) {
+  // Nettoyage (conserve le no-detection placeholder)
+  const cards = document.querySelectorAll('.detection-card');
+  cards.forEach(c => c.remove());
 
-            if (!objects || objects.length === 0) {
-                noDetection.style.display = 'block';
-                return;
-            }
+  if (!objects || objects.length === 0) {
+    noDet.style.display = 'block';
+    aiBadge.textContent = 'SCAN EN COURS';
+    aiBadge.classList.remove('alert');
+    countBadge.style.display = 'none';
+    return;
+  }
 
-            noDetection.style.display = 'none';
+  noDet.style.display = 'none';
+  aiBadge.textContent = objects.length + ' OBJET' + (objects.length>1?'S':'') + ' D\u00c9TECT\u00c9' + (objects.length>1?'S':'');
+  aiBadge.classList.add('alert');
+  countBadge.textContent = objects.length + ' obj.';
+  countBadge.style.display = 'block';
 
-            // On compte les occurrences (ex: 2 persons)
-            const counts = {};
-            objects.forEach(obj => counts[obj] = (counts[obj] || 0) + 1);
+  // Comptage occurrences (logique originale)
+  const counts = {};
+  objects.forEach(obj => counts[obj] = (counts[obj] || 0) + 1);
+  const maxCount = Math.max(...Object.values(counts));
 
-            for (const [name, count] of Object.entries(counts)) {
-                const card = document.createElement('div');
-                card.className = 'detection-card active';
-                card.innerHTML = `
-                    <div class="object-name">${name}</div>
-                    <div style="font-size: 0.8rem; color: #aaa;">Quantité: ${count}</div>
-                `;
-                detectionList.appendChild(card);
+  for (const [name, count] of Object.entries(counts)) {
+    const card = document.createElement('div');
+    card.className = 'detection-card active';
+    card.innerHTML =
+      '<div class="det-name">' + name + '</div>' +
+      '<div class="det-count">x' + count + '</div>' +
+      '<div class="det-bar"><div class="det-bar-fill" style="width:' + Math.round((count/maxCount)*100) + '%"></div></div>';
+    detList.appendChild(card);
+    setTimeout(() => card.classList.remove('active'), 600);
+  }
+}
 
-                // Petit effet de flash pour montrer la mise à jour
-                setTimeout(() => card.classList.remove('active'), 500);
-            }
-        }
-    </script>
+socket.on('disconnect', () => {
+  document.getElementById('ai-status').textContent = 'HORS LIGNE';
+  document.getElementById('ai-dot').className = 'dot';
+  document.getElementById('ai-dot').style.background = '#ff453a';
+});
+</script>
 </body>
 </html>

@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.O.S FINAL - Accueil</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0e27 0%, #16213e 50%, #0a0e27 100%);
+            color: #00ff88;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container { max-width: 1200px; width: 100%; text-align: center; }
+
+        .header { margin-bottom: 40px; }
+
+        .logo {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: float 3s infinite ease-in-out;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            background: linear-gradient(135deg, #00ff88 0%, #00b4ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+        }
+
+        .subtitle { color: #00b4ff; font-size: 1.2rem; margin-bottom: 30px; opacity: 0.9; }
+
+        .status-line {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            padding: 10px 20px; border-radius: 8px;
+        }
+
+        .status-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: #ff6666; animation: blink 1s infinite;
+        }
+
+        .status-dot.connected { background: #00ff88; animation: none; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        /* --- NOUVELLE SECTION PROFILES --- */
+        .section-title {
+            color: #00b4ff; font-size: 1.1rem; margin-bottom: 20px;
+            text-transform: uppercase; letter-spacing: 3px;
+            border-bottom: 1px solid rgba(0, 180, 255, 0.3);
+            display: inline-block; padding-bottom: 5px;
+        }
+
+        .profiles-grid {
+            display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;
+            margin-bottom: 50px;
+            min-height: 50px;
+        }
+
+        .btn-profile {
+            background: rgba(0, 180, 255, 0.1);
+            border: 1px solid #00b4ff;
+            color: #00b4ff;
+            padding: 12px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: inherit; font-weight: bold;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-profile:hover {
+            background: #00b4ff; color: #000;
+            box-shadow: 0 0 15px rgba(0, 180, 255, 0.5);
+            transform: translateY(-3px);
+        }
+        /* ---------------------------------- */
+
+        .menu {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px; margin-bottom: 40px;
+        }
+
+        .menu-item {
+            background: rgba(20, 50, 80, 0.4); backdrop-filter: blur(20px);
+            border: 2px solid #00ff88; border-radius: 15px;
+            padding: 30px 20px; text-decoration: none; color: #00ff88;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer; display: flex; flex-direction: column;
+            align-items: center; gap: 15px;
+        }
+
+        .menu-item:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.3);
+            border-color: #00b4ff; background: rgba(20, 50, 80, 0.6);
+        }
+
+        .menu-item-icon { font-size: 3rem; display: block; }
+        .menu-item-title { font-size: 1.3rem; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+        .menu-item-desc { font-size: 0.85rem; color: #00b4ff; opacity: 0.8; }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; } .logo { font-size: 50px; } .menu { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">⚡</div>
+            <h1>S.H.O.S FINAL</h1>
+            <p class="subtitle">Système de Surveillance Intelligent Complet</p>
+            
+            <div class="status-line">
+                <div class="status-item">
+                    <span class="status-dot connected" id="mqtt-status"></span>
+                    <span id="mqtt-text">MQTT: Vérification...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-dot connected" id="flask-status"></span>
+                    <span id="flask-text">Flask: En ligne</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-dot" id="arduino-status"></span>
+                    <span id="arduino-text">Arduino: Vérification...</span>
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <h2 class="section-title">DÉPLOIEMENT TACTIQUE (PROFILS)</h2>
+            <div class="profiles-grid" id="dynamic-profiles">
+                <span style="color: gray; font-size: 0.9em;">Chargement des profils...</span>
+            </div>
+        </div>
+
+        <div class="menu">
+            {% for id, mod in modules.items() %}
+            <a href="/module/{{ id }}" class="menu-item module-dynamic">
+                <span class="menu-item-icon">
+                    {% if mod.icon %}<i class="fas fa-{{ mod.icon }}"></i>{% else %}🧩{% endif %}
+                </span>
+                <span class="menu-item-title">{{ mod.name }}</span>
+                <span class="menu-item-desc">{{ mod.description }}</span>
+            </a>
+            {% endfor %}
+
+            <hr style="grid-column: 1/-1; border: 1px dashed rgba(0,255,136,0.2); margin: 10px 0;">
+
+              <a href="/user_interface" class="menu-item">
+                <span class="menu-item-icon">👓</span>
+                <span class="menu-item-title">Interface Utilisateur</span>
+                <span class="menu-item-desc">Contrôle et configuration</span>
+            </a>
+
+            <a href="/dashboard" class="menu-item">
+                <span class="menu-item-icon">📊</span>
+                <span class="menu-item-title">Dashboard</span>
+                <span class="menu-item-desc">Capteurs temps réel</span>
+            </a>
+
+            <a href="/profile_manager" class="menu-item">
+                <span class="menu-item-icon">🆔</span>
+                <span class="menu-item-title">Gestionnaire</span>
+                <span class="menu-item-desc">Admin des profils</span>
+            </a>
+
+            <a href="/mobile" class="menu-item">
+                <span class="menu-item-icon">📱</span>
+                <span class="menu-item-title">Mobile</span>
+                <span class="menu-item-desc">Capteurs du téléphone</span>
+            </a>
+
+            <a href="/diagnostic_ultimate" class="menu-item">
+                <span class="menu-item-icon">🚀</span>
+                <span class="menu-item-title">Diagnostic Pro</span>
+                <span class="menu-item-desc">Analyse profonde IA</span>
+            </a>
+
+            <a href="/hud" class="menu-item">
+                <span class="menu-item-icon">👓</span>
+                <span class="menu-item-title">Mode HUD</span>
+                <span class="menu-item-desc">Affichage tête haute</span>
+            </a>
+
+              <a href="/ESP32" class="menu-item">
+                <span class="menu-item-icon">📷</span>
+                <span class="menu-item-title">Esp32 Cam</span>
+                <span class="menu-item-desc">Caméra ESP32</span>
+            </a>
+
+               <a href="/diagnostic" class="menu-item">
+                <span class="menu-item-icon">🚀</span>
+                <span class="menu-item-title">Diagnostic pro </span>
+                 <span class="menu-item-desc">Analyse profonde IA</span>
+                </span>
+                <span class="menu-item-desc">Capteurs temps réel</span>
+            </a>
+
+            <a href="/settings" class="menu-item">
+                <span class="menu-item-icon">⚙️</span>
+                <span class="menu-item-title">Paramètres</span>
+                <span class="menu-item-desc">Configuration</span>
+            </a>
+        </div>
+
+    <script>
+    const socket = io();
+
+    // --- GESTION DES STATUTS (UNIFIÉE) ---
+    const updateStatus = (id, textId, isConnected, label) => {
+        const elem = document.getElementById(id);
+        const text = document.getElementById(textId);
+        if (!elem || !text) return;
+
+        if (isConnected) {
+            elem.classList.add('connected');
+            text.textContent = `${label}: Connecté`;
+        } else {
+            elem.classList.remove('connected');
+            text.textContent = `${label}: Déconnecté`;
+        }
+    };
+
+    socket.on('connect', () => updateStatus('flask-status', 'flask-text', true, 'Flask'));
+    socket.on('disconnect', () => updateStatus('flask-status', 'flask-text', false, 'Flask'));
+    
+    socket.on('mqtt_status', (data) => updateStatus('mqtt-status', 'mqtt-text', data.connected, 'MQTT'));
+    socket.on('arduino_status', (data) => updateStatus('arduino-status', 'arduino-text', data.connected, 'Arduino'));
+
+    // Demande initiale du statut
+    socket.emit('request_status');
+
+
+    // --- GESTION DYNAMIQUE DES PROFILS ---
+
+    /**
+     * Charge les profils depuis l'API et construit les boutons
+     */
+    async function loadProfiles() {
+        const container = document.getElementById('dynamic-profiles');
+        if (!container) return;
+
+        try {
+            const response = await fetch('/api/get_profiles');
+            const data = await response.json();
+
+            container.innerHTML = ''; // Nettoyage du conteneur
+
+            if (!data.profiles || Object.keys(data.profiles).length === 0) {
+                container.innerHTML = '<span style="color: #666; font-style: italic;">Aucun profil configuré.</span>';
+                return;
+            }
+
+            // Création des boutons
+            Object.entries(data.profiles).forEach(([prof_id, prof_data]) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-profile';
+                btn.innerText = prof_data.name || prof_id;
+                
+                // État actif : on utilise une classe CSS ou un style inline propre
+                if (data.current === prof_id) {
+                    btn.classList.add('active-profile'); // Ajoute une classe pour ton CSS
+                    btn.style.border = "2px solid #00ff88";
+                    btn.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.4)";
+                    btn.style.background = "rgba(0, 255, 136, 0.2)";
+                }
+
+                btn.onclick = () => activateProfile(prof_id, btn);
+                container.appendChild(btn);
+            });
+
+        } catch (err) {
+            console.error("Erreur S.H.O.S (Load):", err);
+            container.innerHTML = '<span style="color: #ff6666;">Erreur de liaison API.</span>';
+        }
+    }
+
+    /**
+     * Envoie l'ordre d'activation au serveur
+     */
+    async function activateProfile(profileId, btnElement) {
+        // Petit effet visuel immédiat (feedback)
+        const originalText = btnElement.innerText;
+        btnElement.innerText = "CHARGEMENT...";
+        btnElement.style.opacity = "0.7";
+
+        try {
+            const response = await fetch('/api/activate_profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profile_id: profileId })
+            });
+            
+            const data = await response.json();
+
+            if (data.status === "success") {
+                // On rafraîchit tout pour mettre à jour les bordures vertes
+                await loadProfiles();
+            } else {
+                throw new Error("Echec serveur");
+            }
+        } catch (err) {
+            console.error("Erreur S.H.O.S (Activation):", err);
+            alert("ERREUR : Impossible de déployer le profil " + profileId);
+            btnElement.innerText = originalText;
+            btnElement.style.opacity = "1";
+        }
+    }
+
+    // Initialisation au chargement de la fenêtre
+    window.addEventListener('DOMContentLoaded', loadProfiles);
+</script>
+</body>
+</html>

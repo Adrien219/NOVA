@@ -1,34 +1,33 @@
 {
     "profiles": {
-        "test_gestu": {
-            "name": "test gestu",
-            "main_module": "hand_control",
+        "stream": {
+            "name": "stream",
+            "main_module": "video_streaming",
             "secondary_modules": [
-                "vision_objet"
+                "danger_monitor"
             ]
         },
-        "vision": {
-            "name": "vision",
-            "main_module": "vision_objet",
+        "test_profil": {
+            "name": "Test_profil",
+            "main_module": "video_streaming",
             "secondary_modules": [
-                "vision_objet",
-                "voice_assistant"
-            ]
-        },
-        "ttttttttttt": {
-            "name": "TTTTTTTTTTT",
-            "main_module": "vision_objet",
-            "secondary_modules": [
+                "voice_assistant",
                 "hand_control"
             ]
         },
-        "test_gestu1": {
-            "name": "test gestu1",
-            "main_module": "vision_objet",
+        "aveugle": {
+            "name": "aveugle",
+            "main_module": null,
+            "secondary_modules": []
+        },
+        "assistant": {
+            "name": "assistant",
+            "main_module": "video_streaming",
             "secondary_modules": [
-                "text_reader"
+                "danger_monitor",
+                "vision_objet"
             ]
         }
     },
-    "current_active_profile": "vision"
+    "current_active_profile": "assistant"
 }

@@ -6,17 +6,24 @@ S.H.O.S V3.0 - Application Flask pour Raspberry Pi 4B
 import subprocess
 import signal
 import sys, os, time, json, logging, psutil
-import cv2
+#import cv2
 import numpy as np
 from pathlib import Path
 from datetime import datetime
 from threading import Lock
 
-from flask import Flask, render_template, Response, jsonify, request, render_template_string
+from flask import Flask, render_template, Response, jsonify, request, render_template_string, stream_with_context
 from flask_socketio import SocketIO, emit
 from paho.mqtt import client as mqtt_client
 from jinja2 import ChoiceLoader, FileSystemLoader
 from utils import ConfigManager
+
+# paho-mqtt API v2 detection
+try:
+    from paho.mqtt.enums import CallbackAPIVersion as _MQTTCallbackAPI
+    _MQTT_V2 = True
+except ImportError:
+    _MQTT_V2 = False
 
 config_manager = ConfigManager()
 
@@ -103,6 +110,39 @@ def load_dynamic_modules():
     print(f"✅ [SCAN] {len(AVAILABLE_MODULES)} modules détectés et prêts.\n")
 
 load_dynamic_modules()
+
+# ── VIDEO STREAMING BLUEPRINT ────────────────────────────────────────────────
+_streaming_mqtt    = None
+_streaming_metrics = None
+_streaming_ok      = False
+
+def _mount_streaming_blueprint():
+    global _streaming_mqtt, _streaming_metrics, _streaming_ok
+    streaming_dir = PLUGINS_BASE_DIR / "video_streaming"
+    if not streaming_dir.exists():
+        logger.warning("⚠  video_streaming/ introuvable dans plugins/modules/")
+        return
+    plugins_str = str(PLUGINS_BASE_DIR)
+    if plugins_str not in sys.path:
+        sys.path.insert(0, plugins_str)
+    try:
+        from video_streaming.main import (
+            streaming_bp,
+            mqtt_handler       as _vs_mqtt,
+            metrics_collector  as _vs_metrics,
+            setup_socketio     as _vs_setup,
+            start_metrics_push as _vs_push,
+        )
+        app.register_blueprint(streaming_bp, url_prefix='/streaming')
+        _streaming_mqtt    = _vs_mqtt
+        _streaming_metrics = _vs_metrics
+        _streaming_ok      = True
+        logger.info("📡 Blueprint /streaming/ monté")
+    except Exception as e:
+        logger.warning("⚠  video_streaming non chargé : %s", e)
+
+_mount_streaming_blueprint()
+
 
 
 # ============================================================================
@@ -560,6 +600,9 @@ def index():
 @app.route('/dashboard')
 def dashboard(): return render_template('dashboard.html')
 
+@app.route('/benchmark')
+def benchmark_ui(): return render_template('benchmark.html')
+
 @app.route('/diagnostic')
 def diagnostic(): return render_template('diagnostic.html')
 
@@ -575,15 +618,39 @@ def diagnostic_ultimate():
 
 @app.route('/profiles')
 def profiles_page():
-    config = config_manager.load_config()
-    return render_template('profiles.html', profiles=config.get("profiles", {}))
+    return render_template('profiles.html')
 
 @app.route('/hud')
 def hud(): return render_template('hud.html', profile=DEFAULT_PROFILE)
 
+def resolve_profile(profile_id: str = "") -> dict:
+    """Charge le profil complet depuis config_manager."""
+    try:
+        config   = config_manager.load_config()
+        profiles = config.get("profiles", {})
+        pid = profile_id.strip() or config.get("current_active_profile", "")
+        data = profiles.get(pid, {})
+        if data:
+            return {
+                "id":               pid,
+                "name":             data.get("name", pid),
+                "icon":             data.get("icon", "\U0001f464"),
+                "main_module":      data.get("main_module", ""),
+                "secondary_modules":data.get("secondary_modules", []),
+                "description":      data.get("description", ""),
+            }
+    except Exception as e:
+        logger.error("resolve_profile : %s", e)
+    return DEFAULT_PROFILE
+
 @app.route('/user_interface')
 def user_interface():
-    return render_template('user_interface.html', profile=DEFAULT_PROFILE)
+    """Interface utilisateur — profil actif chargé dynamiquement."""
+    profile_id = request.args.get('profile', '').strip()
+    profile    = resolve_profile(profile_id)
+    logger.info("\U0001f5a5  user_interface — profil : %s | main : %s | sec : %s",
+                profile['name'], profile['main_module'], profile['secondary_modules'])
+    return render_template('user_interface.html', profile=profile)
 
 # ============================================================================
 # GESTION DES PROFILS (API & MANAGER)
@@ -697,6 +764,30 @@ def universal_module_route(module_id):
         return f"<h2>Erreur de rendu</h2><p>{e}</p>", 500
 
 # ============================================================================
+# API SUPPRESSION PROFIL
+# ============================================================================
+
+@app.route('/api/delete_profile', methods=['POST'])
+def api_delete_profile():
+    """Supprime un profil. Body : { "id": "xxx" }"""
+    try:
+        data = request.get_json(silent=True) or {}
+        pid  = data.get('id', '').strip()
+        if not pid:
+            return jsonify({"status":"error","message":"id manquant"}), 400
+        config = config_manager.load_config()
+        if pid not in config.get("profiles", {}):
+            return jsonify({"status":"error","message":"Profil introuvable"}), 404
+        del config["profiles"][pid]
+        if config.get("current_active_profile") == pid:
+            config["current_active_profile"] = ""
+        config_manager.save_config(config)
+        socketio.emit('profile_deleted', {'profile_id': pid})
+        return jsonify({"status":"success"})
+    except Exception as e:
+        return jsonify({"status":"error","message":str(e)}), 500
+
+# ============================================================================
 # SOCKET.IO EVENTS
 # ============================================================================
 
@@ -708,6 +799,22 @@ def handle_connect():
         'data': 'Connecté à S.H.O.S V3.0',
         'timestamp': datetime.now().isoformat()
     })
+
+@socketio.on('delete_profile')
+def handle_delete_profile_socket(data):
+    pid = (data or {}).get('id', '').strip()
+    if not pid:
+        return
+    try:
+        config = config_manager.load_config()
+        if pid in config.get("profiles", {}):
+            del config["profiles"][pid]
+            if config.get("current_active_profile") == pid:
+                config["current_active_profile"] = ""
+            config_manager.save_config(config)
+            emit('profile_deleted', {'profile_id': pid}, broadcast=True)
+    except Exception as e:
+        logger.error("delete_profile socket : %s", e)
 
 @socketio.on('request_camera_status')
 def handle_camera_status():
@@ -773,29 +880,26 @@ def background_monitoring():
             time.sleep(5)
 
 
+VISION_SERVICE_URL = "http://localhost:5051/video_feed"
+
 def generate_frames():
-    """Récupère les frames reçues via MQTT et les sert au Web"""
-    while True:
-        with frame_lock:
-            frame = global_frame
-
-        if frame is None:
-            time.sleep(0.1)
-            continue
-
-        success, buffer = cv2.imencode('.jpg', frame)
-        if not success:
-            time.sleep(0.1)
-            continue
-
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+    """Proxy MJPEG vers vision_service:5051 via requests streaming."""
+    try:
+        import requests as _req
+        with _req.get(VISION_SERVICE_URL, stream=True, timeout=8) as r:
+            for chunk in r.iter_content(chunk_size=4096):
+                if chunk:
+                    yield chunk
+    except Exception as e:
+        logger.warning("⚠  Proxy MJPEG interrompu : %s", e)
 
 @app.route('/video_feed')
 def video_feed():
-    """Route Flask distribuant le flux vidéo au HUD"""
-    return Response(generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    """Proxy MJPEG → vision_service:5051."""
+    return Response(
+        stream_with_context(generate_frames()),
+        mimetype='multipart/x-mixed-replace; boundary=frame',
+    )
 
 
 # --- GESTION DES SERVICES NOVA ---
@@ -825,11 +929,22 @@ def stop_nova_services(sig, frame):
 # ============================================================================
 
 if __name__ == '__main__':
-    logger.info("="*80)
-    logger.info("🎬 S.H.O.S V3.0 - DÉMARRAGE DU SUPERVISEUR")
-    logger.info("="*80)
+    logger.info("="*70)
+    logger.info("   S.H.O.S V3.0 — Démarrage du superviseur")
+    logger.info("   Modules : %s", list(AVAILABLE_MODULES.keys()))
+    logger.info("   Streaming Blueprint : %s", "OK" if _streaming_ok else "non monté")
+    logger.info("="*70)
 
     start_nova_services()
+
+    # Démarrer les services video_streaming si Blueprint monté
+    if _streaming_ok and _streaming_mqtt and _streaming_metrics:
+        try:
+            _streaming_mqtt.start()
+            _streaming_metrics.start()
+            logger.info("📡 video_streaming services démarrés")
+        except Exception as e:
+            logger.warning("⚠  video_streaming services : %s", e)
 
     signal.signal(signal.SIGINT, stop_nova_services)
 

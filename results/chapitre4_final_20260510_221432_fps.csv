@@ -1,0 +1,7 @@
+Métrique,Valeur,Unité
+FPS observé,,fps
+Frames reçues,,frames
+Durée test,,s
+Topic MQTT,,
+Intervalle inter-frame,,ms
+Jitter,,ms
