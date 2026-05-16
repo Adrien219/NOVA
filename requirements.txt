@@ -1,0 +1,8 @@
+flask
+flask-socketio
+paho-mqtt
+pyserial
+opencv-python
+mediapipe
+ultralytics
+psutil
