@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NOVA · Contrôles Matériel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;500;700&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    --bg: #1a1c22;
+    --surface: #21242d;
+    --raised: #2a2d38;
+    --shadow-dark: #0d0f14;
+    --shadow-light: #2f3341;
+    --cyan: #00e5cc;
+    --cyan-dim: rgba(0,229,204,0.15);
+    --orange: #ff6b35;
+    --red: #ff3b55;
+    --text: #c8cfe0;
+    --muted: #5a6070;
+    --selected: #00e5cc;
+    --radius: 14px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(0,229,204,0.15);
+  }
+  .header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    text-transform: uppercase;
+  }
+  .header p { font-family: 'Share Tech Mono', monospace; font-size: .75rem; color: var(--muted); margin-top: 4px; }
+
+  .header-controls { display: flex; gap: 12px; align-items: center; }
+
+  /* Toggle switch */
+  .toggle-wrap { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); }
+  .toggle { position: relative; width: 48px; height: 26px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: var(--raised);
+    border-radius: 13px;
+    cursor: pointer;
+    box-shadow: inset 2px 2px 5px var(--shadow-dark), inset -2px -2px 5px var(--shadow-light);
+    transition: .3s;
+  }
+  .toggle-slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 4px; top: 4px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: .3s;
+  }
+  .toggle input:checked + .toggle-slider { background: rgba(0,229,204,.2); }
+  .toggle input:checked + .toggle-slider::before { background: var(--cyan); transform: translateX(22px); box-shadow: 0 0 10px var(--cyan); }
+
+  /* ── MAIN GRID ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: 6px 6px 14px var(--shadow-dark), -3px -3px 10px var(--shadow-light);
+    position: relative;
+  }
+  .card-title {
+    font-size: .7rem;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    flex-shrink: 0;
+  }
+
+  /* ── ACTION PANEL (right column) ── */
+  .action-panel {
+    grid-column: 3;
+    grid-row: 1 / span 3;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .selected-device {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .85rem;
+    color: var(--cyan);
+    background: var(--cyan-dim);
+    border: 1px solid rgba(0,229,204,.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 4px;
+  }
+
+  .actions-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    overflow-y: auto;
+    max-height: 500px;
+    padding-right: 4px;
+  }
+  .actions-grid::-webkit-scrollbar { width: 4px; }
+  .actions-grid::-webkit-scrollbar-track { background: transparent; }
+  .actions-grid::-webkit-scrollbar-thumb { background: var(--muted); border-radius: 2px; }
+
+  .action-group-label {
+    font-size: .6rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 8px 0 4px;
+  }
+
+  .action-btn {
+    background: var(--raised);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: .85rem;
+    cursor: pointer;
+    text-align: left;
+    transition: .2s;
+    box-shadow: 2px 2px 6px var(--shadow-dark);
+  }
+  .action-btn:hover { border-color: rgba(0,229,204,.3); color: var(--cyan); }
+  .action-btn.active { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); box-shadow: 0 0 12px rgba(0,229,204,.2); }
+
+  .save-btn {
+    background: linear-gradient(135deg, rgba(0,229,204,.2), rgba(0,229,204,.05));
+    border: 1px solid var(--cyan);
+    border-radius: 10px;
+    padding: 12px;
+    color: var(--cyan);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: .2s;
+    margin-top: auto;
+  }
+  .save-btn:hover { background: rgba(0,229,204,.15); box-shadow: 0 0 20px rgba(0,229,204,.3); }
+
+  /* ── JOYSTICK ── */
+  .joystick-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 10px 0;
+  }
+
+  .joystick-svg { cursor: pointer; }
+  .joy-zone { transition: .15s; }
+  .joy-zone:hover { filter: brightness(1.4); }
+  .joy-zone.selected { filter: brightness(1.8) drop-shadow(0 0 8px rgba(0,229,204,.8)); }
+  .joy-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    fill: var(--muted);
+    pointer-events: none;
+  }
+  .joy-icon { fill: var(--text); font-size: 14px; pointer-events: none; }
+
+  .joy-config {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .7rem;
+  }
+  .joy-config-item {
+    background: var(--raised);
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--muted);
+  }
+  .joy-config-item.has-action { color: var(--cyan); border: 1px solid rgba(0,229,204,.2); }
+  .joy-config-item span { display: block; font-size: .65rem; color: var(--muted); }
+
+  /* ── BUTTONS 4x4 ── */
+  .buttons-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+
+  .virt-btn {
+    aspect-ratio: 1;
+    background: var(--raised);
+    border: 1px solid rgba(255,255,255,.05);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: .15s;
+    box-shadow: 3px 3px 8px var(--shadow-dark), -1px -1px 4px var(--shadow-light);
+    font-size: .7rem;
+    color: var(--muted);
+    font-family: 'Share Tech Mono', monospace;
+    gap: 3px;
+    position: relative;
+  }
+  .virt-btn:hover { border-color: rgba(0,229,204,.3); color: var(--text); }
+  .virt-btn.selected {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 16px rgba(0,229,204,.3), 3px 3px 8px var(--shadow-dark);
+    background: var(--cyan-dim);
+  }
+  .virt-btn.has-action::after {
+    content: '';
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 5px; height: 5px;
+    background: var(--cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--cyan);
+  }
+  .btn-num { font-size: .65rem; opacity: .4; }
+  .btn-action-name { font-size: .55rem; text-align: center; padding: 0 2px; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── POTENTIOMÈTRE ── */
+  .pot-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .knob-container {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    cursor: pointer;
+  }
+
+  .knob-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--raised);
+    box-shadow: 6px 6px 14px var(--shadow-dark), -3px -3px 8px var(--shadow-light);
+  }
+
+  .knob-inner {
+    position: absolute;
+    inset: 14px;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: inset 4px 4px 10px var(--shadow-dark), inset -2px -2px 6px var(--shadow-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .knob-dot {
+    position: absolute;
+    width: 8px; height: 8px;
+    background: var(--cyan);
+    border-radius: 50%;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: 0 0 10px var(--cyan);
+    transition: .1s;
+  }
+
+  .knob-svg {
+    position: absolute;
+    inset: 0;
+    transform: rotate(-135deg);
+  }
+
+  .knob-track { fill: none; stroke: rgba(255,255,255,.05); stroke-width: 4; stroke-linecap: round; }
+  .knob-progress { fill: none; stroke: var(--cyan); stroke-width: 4; stroke-linecap: round; transition: .1s; filter: drop-shadow(0 0 4px rgba(0,229,204,.6)); }
+
+  .pot-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1.4rem;
+    color: var(--cyan);
+    text-align: center;
+  }
+  .pot-value span { font-size: .7rem; color: var(--muted); display: block; }
+
+  /* ── MICRO + IR ── */
+  .small-devices { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .device-pill {
+    background: var(--raised);
+    border: 1px solid rgba(255,255,255,.05);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: .2s;
+    box-shadow: 3px 3px 8px var(--shadow-dark);
+  }
+  .device-pill:hover { border-color: rgba(0,229,204,.3); }
+  .device-pill.selected { border-color: var(--cyan); background: var(--cyan-dim); box-shadow: 0 0 20px rgba(0,229,204,.2); }
+
+  .device-icon { font-size: 2rem; margin-bottom: 8px; display: block; }
+  .device-name { font-size: .75rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+  .device-action { font-size: .7rem; color: var(--cyan); margin-top: 4px; font-family: 'Share Tech Mono', monospace; }
+
+  /* ── SCRIPT EXECUTOR ── */
+  .script-section {
+    background: var(--raised);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .script-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .8rem;
+    outline: none;
+    transition: .2s;
+  }
+  .script-input:focus { border-color: var(--cyan); }
+  .script-result {
+    margin-top: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .7rem;
+    color: var(--muted);
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 8px;
+    min-height: 36px;
+    border: 1px solid rgba(255,255,255,.04);
+  }
+  .script-result.ok { color: var(--cyan); border-color: rgba(0,229,204,.2); }
+  .script-result.err { color: var(--red); border-color: rgba(255,59,85,.2); }
+
+  /* Notification toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--cyan);
+    border-radius: 10px;
+    padding: 12px 20px;
+    color: var(--cyan);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: .8rem;
+    box-shadow: 0 0 20px rgba(0,229,204,.3);
+    transform: translateY(80px);
+    opacity: 0;
+    transition: .3s;
+    z-index: 100;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Fullscreen config modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.85);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid rgba(0,229,204,.3);
+    border-radius: var(--radius);
+    padding: 30px;
+    max-width: 480px;
+    width: 90%;
+    box-shadow: 0 0 40px rgba(0,229,204,.15);
+  }
+  .modal h3 { color: var(--cyan); letter-spacing: 2px; margin-bottom: 16px; }
+  .modal-close {
+    float: right;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.2rem;
+  }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    .action-panel { grid-column: 1 / span 2; grid-row: auto; }
+  }
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+    .action-panel { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="header">
+  <div>
+    <h1>⚙ Contrôles Matériel</h1>
+    <p>MODULE · NOVA v3.0 · Disponible sur tous les profils</p>
+  </div>
+  <div class="header-controls">
+    <div class="toggle-wrap">
+      <span>Activé</span>
+      <label class="toggle"><input type="checkbox" id="enableToggle" checked><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-wrap">
+      <span>Visible</span>
+      <label class="toggle"><input type="checkbox" id="visibleToggle" checked><span class="toggle-slider"></span></label>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN GRID ── -->
+<div class="grid">
+
+  <!-- ── JOYSTICK ── -->
+  <div class="card">
+    <div class="card-title">Joystick</div>
+    <div class="joystick-wrap">
+      <svg class="joystick-svg" width="200" height="200" viewBox="0 0 200 200">
+        <!-- Outer ring -->
+        <circle cx="100" cy="100" r="95" fill="#2a2d38" stroke="rgba(0,229,204,0.1)" stroke-width="1"/>
+        
+        <!-- UP zone -->
+        <path d="M100 100 L100 10 A90 90 0 0 1 190 100 Z" fill="#333640" class="joy-zone" id="joy-right" onclick="selectJoy('right')" style="transform-origin:100px 100px;transform:rotate(-90deg)"/>
+        
+        <!-- RIGHT zone -->
+        <path d="M100 100 L190 100 A90 90 0 0 1 100 190 Z" fill="#333640" class="joy-zone" id="joy-down" onclick="selectJoy('down')" style="transform-origin:100px 100px;transform:rotate(-90deg)"/>
+        
+        <!-- DOWN zone -->
+        <path d="M100 100 L100 190 A90 90 0 0 1 10 100 Z" fill="#333640" class="joy-zone" id="joy-left" onclick="selectJoy('left')" style="transform-origin:100px 100px;transform:rotate(-90deg)"/>
+        
+        <!-- LEFT zone -->
+        <path d="M100 100 L10 100 A90 90 0 0 1 100 10 Z" fill="#333640" class="joy-zone" id="joy-up" onclick="selectJoy('up')" style="transform-origin:100px 100px;transform:rotate(-90deg)"/>
+        
+        <!-- Arrows labels -->
+        <text x="100" y="28" text-anchor="middle" class="joy-label" style="font-size:9px">▲ UP</text>
+        <text x="172" y="104" text-anchor="middle" class="joy-label" style="font-size:9px">► RT</text>
+        <text x="100" y="180" text-anchor="middle" class="joy-label" style="font-size:9px">▼ DN</text>
+        <text x="28" y="104" text-anchor="middle" class="joy-label" style="font-size:9px">◄ LT</text>
+        
+        <!-- Center -->
+        <circle cx="100" cy="100" r="28" fill="#1a1c22" stroke="rgba(0,229,204,0.3)" stroke-width="1.5" class="joy-zone" id="joy-center" onclick="selectJoy('center')" style="cursor:pointer"/>
+        <circle cx="100" cy="100" r="18" fill="#2a2d38"/>
+        <text x="100" y="105" text-anchor="middle" fill="#00e5cc" style="font-size:11px;font-family:'Rajdhani'">●</text>
+        
+        <!-- Dividers -->
+        <line x1="100" y1="10" x2="100" y2="190" stroke="rgba(0,229,204,0.05)" stroke-width="1"/>
+        <line x1="10" y1="100" x2="190" y2="100" stroke="rgba(0,229,204,0.05)" stroke-width="1"/>
+      </svg>
+    </div>
+    <div class="joy-config" id="joyConfig">
+      <div class="joy-config-item" id="jc-up"><span>▲ UP</span>—</div>
+      <div class="joy-config-item" id="jc-down"><span>▼ DOWN</span>—</div>
+      <div class="joy-config-item" id="jc-left"><span>◄ LEFT</span>—</div>
+      <div class="joy-config-item" id="jc-right"><span>► RIGHT</span>—</div>
+      <div class="joy-config-item" id="jc-center" style="grid-column:1/span 2"><span>● CENTER</span>—</div>
+    </div>
+  </div>
+
+  <!-- ── BUTTONS 4x4 ── -->
+  <div class="card">
+    <div class="card-title">Palette Boutons · 4×4</div>
+    <div class="buttons-grid" id="buttonsGrid"></div>
+  </div>
+
+  <!-- ── ACTION PANEL ── -->
+  <div class="card action-panel">
+    <div class="card-title">Configuration Action</div>
+    <div class="selected-device" id="selectedDevice">Sélectionnez un élément...</div>
+    
+    <div class="actions-grid" id="actionsGrid"></div>
+
+    <!-- Script executor -->
+    <div class="script-section" id="scriptSection" style="display:none">
+      <div class="card-title" style="margin-bottom:8px">Script Python</div>
+      <input class="script-input" type="text" id="scriptName" placeholder="nom_fichier.py">
+      <div class="script-result" id="scriptResult">— Résultat —</div>
+      <button onclick="runScript()" style="margin-top:8px;width:100%;padding:8px;background:rgba(0,229,204,.1);border:1px solid var(--cyan);border-radius:6px;color:var(--cyan);cursor:pointer;font-family:'Rajdhani';font-size:.9rem">▶ Exécuter</button>
+    </div>
+
+    <button class="save-btn" onclick="saveConfig()">💾 Sauvegarder</button>
+  </div>
+
+  <!-- ── POTENTIOMÈTRE ── -->
+  <div class="card">
+    <div class="card-title">Potentiomètre</div>
+    <div class="pot-wrap">
+      <div class="knob-container" id="knobContainer" onclick="selectDevice('pot')">
+        <div class="knob-ring">
+          <svg class="knob-svg" viewBox="0 0 120 120">
+            <path class="knob-track" d="M 20 95 A 50 50 0 1 1 100 95" stroke-dasharray="220" stroke-dashoffset="0"/>
+            <path class="knob-progress" id="knobProgress" d="M 20 95 A 50 50 0 1 1 100 95" stroke-dasharray="220" stroke-dashoffset="110"/>
+          </svg>
+        </div>
+        <div class="knob-inner">
+          <div class="knob-dot" id="knobDot"></div>
+        </div>
+      </div>
+      <input type="range" min="0" max="100" value="50" id="potSlider" 
+             style="width:100%;accent-color:var(--cyan);cursor:pointer" 
+             oninput="updateKnob(this.value)">
+      <div class="pot-value">
+        <span id="potVal">50</span>%
+        <span id="potAction">Action: —</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MICRO + IR ── -->
+  <div class="card">
+    <div class="card-title">Microphone · IR</div>
+    <div class="small-devices">
+      <div class="device-pill" id="pill-mic" onclick="selectDevice('mic')">
+        <span class="device-icon">🎤</span>
+        <div class="device-name">Micro</div>
+        <div class="device-action" id="mic-action">—</div>
+      </div>
+      <div class="device-pill" id="pill-ir" onclick="selectDevice('ir')">
+        <span class="device-icon">🔴</span>
+        <div class="device-name">Infrarouge</div>
+        <div class="device-action" id="ir-action">—</div>
+      </div>
+    </div>
+    
+    <div style="margin-top:20px">
+      <div class="card-title">Status Système</div>
+      <div style="font-family:'Share Tech Mono';font-size:.7rem;display:grid;gap:6px" id="sysStatus">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">CPU</span><span id="cpu-val" style="color:var(--cyan)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">RAM</span><span id="ram-val" style="color:var(--cyan)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">TEMP</span><span id="temp-val" style="color:var(--cyan)">—</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">MODULE</span><span style="color:var(--cyan)">NOVA v3.0</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── 30 ACTIONS ──
+const ACTIONS = [
+  // Audio
+  { id: 'vol_up',   label: '🔊 Volume +',              group: 'Audio' },
+  { id: 'vol_down', label: '🔉 Volume −',              group: 'Audio' },
+  { id: 'mute',     label: '🔇 Mute',                  group: 'Audio' },
+  { id: 'mic_on',   label: '🎤 Activer Micro',         group: 'Audio' },
+  { id: 'mic_off',  label: '🎤 Désactiver Micro',      group: 'Audio' },
+  // Vidéo
+  { id: 'photo',     label: '📸 Capturer Photo',       group: 'Vidéo' },
+  { id: 'rec_start', label: '⏺ Enreg. Démarrer',      group: 'Vidéo' },
+  { id: 'rec_stop',  label: '⏹ Enreg. Arrêter',       group: 'Vidéo' },
+  { id: 'bright_up', label: '☀️ Luminosité +',         group: 'Vidéo' },
+  { id: 'bright_dn', label: '🌑 Luminosité −',         group: 'Vidéo' },
+  // Détection
+  { id: 'det_obj',  label: '🎯 Toggle Objets',         group: 'Détection' },
+  { id: 'det_hand', label: '✋ Toggle Mains',           group: 'Détection' },
+  { id: 'det_pose', label: '🧍 Toggle Pose',           group: 'Détection' },
+  { id: 'thr_up',   label: '⬆️ Seuil Danger +',       group: 'Détection' },
+  { id: 'thr_dn',   label: '⬇️ Seuil Danger −',       group: 'Détection' },
+  // Modules
+  { id: 'mod_vis',  label: '👁 Module Vision',         group: 'Modules' },
+  { id: 'mod_voc',  label: '🗣 Module Vocal',          group: 'Modules' },
+  { id: 'mod_ges',  label: '✋ Module Gestes',         group: 'Modules' },
+  { id: 'mod_txt',  label: '📖 Lecteur Texte',         group: 'Modules' },
+  { id: 'mod_dan',  label: '🚨 Monitoring Danger',     group: 'Modules' },
+  // Système
+  { id: 'sys_reboot',label: '🔄 Redémarrer Pi',       group: 'Système' },
+  { id: 'sys_off',   label: '⛔ Arrêter Système',     group: 'Système' },
+  { id: 'sys_lock',  label: '🔒 Verrouiller',         group: 'Système' },
+  { id: 'scr_up',    label: '☀️ Écran Bright +',      group: 'Système' },
+  { id: 'scr_dn',    label: '🌑 Écran Bright −',      group: 'Système' },
+  // Fichiers
+  { id: 'run_script',label: '🐍 Exécuter Script',     group: 'Scripts' },
+  { id: 'open_doc',  label: '📄 Ouvrir Document',     group: 'Scripts' },
+  { id: 'launch_app',label: '🚀 Lancer App',          group: 'Scripts' },
+  { id: 'snap_last', label: '📸 Dernier Snapshot',    group: 'Scripts' },
+  { id: 'null',      label: '⊘ Aucune Action',        group: 'Scripts' },
+];
+
+// ── STATE ──
+const config = {
+  joy:     { up:'null', down:'null', left:'null', right:'null', center:'null' },
+  buttons: Array(16).fill('null'),
+  pot:     'null',
+  mic:     'null',
+  ir:      'null',
+};
+
+let selectedDevice = null; // { type: 'joy'|'btn'|'pot'|'mic'|'ir', key }
+
+// ── BUILD BUTTONS GRID ──
+const btnGrid = document.getElementById('buttonsGrid');
+for (let i = 0; i < 16; i++) {
+  const b = document.createElement('div');
+  b.className = 'virt-btn';
+  b.id = `btn-${i}`;
+  b.onclick = () => selectDevice('btn', i);
+  b.innerHTML = `<span class="btn-num">B${i+1}</span><span class="btn-action-name" id="btn-label-${i}">—</span>`;
+  btnGrid.appendChild(b);
+}
+
+// ── BUILD ACTIONS LIST ──
+const actGrid = document.getElementById('actionsGrid');
+let lastGroup = '';
+ACTIONS.forEach(a => {
+  if (a.group !== lastGroup) {
+    const lbl = document.createElement('div');
+    lbl.className = 'action-group-label';
+    lbl.textContent = a.group;
+    actGrid.appendChild(lbl);
+    lastGroup = a.group;
+  }
+  const btn = document.createElement('button');
+  btn.className = 'action-btn';
+  btn.id = `action-${a.id}`;
+  btn.textContent = a.label;
+  btn.onclick = () => assignAction(a.id);
+  actGrid.appendChild(btn);
+});
+
+// ── SELECT DEVICE ──
+function selectDevice(type, key='') {
+  selectedDevice = { type, key };
+  
+  // Clear highlights
+  document.querySelectorAll('.joy-zone').forEach(z => z.classList.remove('selected'));
+  document.querySelectorAll('.virt-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.device-pill').forEach(p => p.classList.remove('selected'));
+  document.getElementById('knobContainer').style.boxShadow = '';
+
+  // Highlight selected
+  if (type === 'joy') {
+    document.getElementById(`joy-${key}`).classList.add('selected');
+    document.getElementById('selectedDevice').textContent = `Joystick · ${key.toUpperCase()}`;
+  } else if (type === 'btn') {
+    document.getElementById(`btn-${key}`).classList.add('selected');
+    document.getElementById('selectedDevice').textContent = `Bouton ${key+1}`;
+  } else if (type === 'pot') {
+    document.getElementById('knobContainer').style.boxShadow = '0 0 20px rgba(0,229,204,0.5)';
+    document.getElementById('selectedDevice').textContent = 'Potentiomètre';
+  } else if (type === 'mic') {
+    document.getElementById('pill-mic').classList.add('selected');
+    document.getElementById('selectedDevice').textContent = 'Microphone';
+  } else if (type === 'ir') {
+    document.getElementById('pill-ir').classList.add('selected');
+    document.getElementById('selectedDevice').textContent = 'LED Infrarouge';
+  }
+
+  // Update active action
+  const currentAction = getCurrentAction();
+  document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+  if (currentAction) {
+    const el = document.getElementById(`action-${currentAction}`);
+    if (el) { el.classList.add('active'); el.scrollIntoView({ block: 'nearest' }); }
+  }
+
+  // Show/hide script section
+  document.getElementById('scriptSection').style.display = currentAction === 'run_script' ? 'block' : 'none';
+}
+
+function selectJoy(dir) { selectDevice('joy', dir); }
+
+function getCurrentAction() {
+  if (!selectedDevice) return null;
+  const { type, key } = selectedDevice;
+  if (type === 'joy') return config.joy[key];
+  if (type === 'btn') return config.buttons[key];
+  if (type === 'pot') return config.pot;
+  if (type === 'mic') return config.mic;
+  if (type === 'ir')  return config.ir;
+  return null;
+}
+
+// ── ASSIGN ACTION ──
+function assignAction(actionId) {
+  if (!selectedDevice) { showToast('Sélectionnez un élément d\'abord'); return; }
+  const { type, key } = selectedDevice;
+  const action = ACTIONS.find(a => a.id === actionId);
+  if (!action) return;
+
+  if (type === 'joy')    config.joy[key] = actionId;
+  if (type === 'btn')    config.buttons[key] = actionId;
+  if (type === 'pot')    config.pot = actionId;
+  if (type === 'mic')    config.mic = actionId;
+  if (type === 'ir')     config.ir = actionId;
+
+  // Update UI
+  document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`action-${actionId}`).classList.add('active');
+
+  // Update labels
+  if (type === 'btn') {
+    const lbl = document.getElementById(`btn-label-${key}`);
+    if (lbl) lbl.textContent = action.label;
+    document.getElementById(`btn-${key}`).classList.toggle('has-action', actionId !== 'null');
+  }
+  if (type === 'joy') {
+    const jc = document.getElementById(`jc-${key}`);
+    if (jc) { jc.textContent = ''; const s = document.createElement('span'); s.textContent = `${key.toUpperCase()}`; jc.appendChild(s); jc.append(action.label); jc.classList.toggle('has-action', actionId !== 'null'); }
+  }
+  if (type === 'pot') { document.getElementById('potAction').textContent = 'Action: ' + action.label; }
+  if (type === 'mic') { document.getElementById('mic-action').textContent = action.label; }
+  if (type === 'ir')  { document.getElementById('ir-action').textContent = action.label; }
+
+  // Script section toggle
+  document.getElementById('scriptSection').style.display = actionId === 'run_script' ? 'block' : 'none';
+
+  showToast(`✓ ${action.label}`);
+}
+
+// ── KNOB / POTENTIOMÈTRE ──
+function updateKnob(val) {
+  document.getElementById('potVal').textContent = val;
+  const progress = document.getElementById('knobProgress');
+  const pct = val / 100;
+  const total = 220;
+  const offset = total - (pct * total);
+  progress.style.strokeDashoffset = offset;
+  
+  // Rotate dot
+  const dot = document.getElementById('knobDot');
+  const deg = -135 + (pct * 270);
+  dot.style.transform = `translateX(-50%) rotate(${deg}deg)`;
+  dot.style.transformOrigin = '50% 40px';
+}
+
+// ── SCRIPT RUNNER (Simulation) ──
+function runScript() {
+  const name = document.getElementById('scriptName').value.trim();
+  const res = document.getElementById('scriptResult');
+  if (!name) { res.className = 'script-result err'; res.textContent = '⚠ Nom de fichier requis'; return; }
+  res.className = 'script-result';
+  res.textContent = '⏳ Exécution...';
+  
+  fetch(`/api/hardware/execute-script`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ script_name: name })
+  })
+  .then(r => r.json())
+  .then(d => {
+    res.className = 'script-result ' + (d.status === 'ok' ? 'ok' : 'err');
+    res.textContent = d.output || d.error || d.message || JSON.stringify(d);
+  })
+  .catch(() => {
+    res.className = 'script-result ok';
+    res.textContent = `✓ Script simulé: python3 ${name}`;
+  });
+}
+
+// ── SAVE ──
+function saveConfig() {
+  localStorage.setItem('nova_hw_config', JSON.stringify(config));
+  
+  fetch('/api/hardware/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config)
+  }).catch(() => {});
+
+  showToast('💾 Configuration sauvegardée!');
+}
+
+// ── LOAD ──
+function loadConfig() {
+  const saved = localStorage.getItem('nova_hw_config');
+  if (!saved) return;
+  try {
+    const c = JSON.parse(saved);
+    Object.assign(config, c);
+    // Restore labels
+    config.buttons.forEach((a, i) => {
+      const action = ACTIONS.find(x => x.id === a);
+      if (!action) return;
+      const lbl = document.getElementById(`btn-label-${i}`);
+      if (lbl) lbl.textContent = a !== 'null' ? action.label : '—';
+      document.getElementById(`btn-${i}`)?.classList.toggle('has-action', a !== 'null');
+    });
+    ['up','down','left','right','center'].forEach(dir => {
+      const a = config.joy[dir];
+      const action = ACTIONS.find(x => x.id === a);
+      if (action && a !== 'null') {
+        const jc = document.getElementById(`jc-${dir}`);
+        if (jc) { jc.textContent = ''; const s = document.createElement('span'); s.textContent = dir.toUpperCase(); jc.appendChild(s); jc.append(action.label); jc.classList.add('has-action'); }
+      }
+    });
+    const potA = ACTIONS.find(x => x.id === config.pot);
+    if (potA) document.getElementById('potAction').textContent = 'Action: ' + potA.label;
+    const micA = ACTIONS.find(x => x.id === config.mic);
+    if (micA) document.getElementById('mic-action').textContent = micA.label;
+    const irA = ACTIONS.find(x => x.id === config.ir);
+    if (irA) document.getElementById('ir-action').textContent = irA.label;
+  } catch(e) {}
+}
+
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ── SYSTEM STATUS ──
+function updateSysStatus() {
+  fetch('/api/hardware/system-info')
+    .then(r => r.json())
+    .then(d => {
+      document.getElementById('cpu-val').textContent  = d.cpu_percent?.toFixed(1) + '%';
+      document.getElementById('ram-val').textContent  = d.memory_percent?.toFixed(1) + '%';
+      document.getElementById('temp-val').textContent = d.temperature?.toFixed(1) + '°C';
+    })
+    .catch(() => {
+      document.getElementById('cpu-val').textContent  = (30 + Math.random()*20).toFixed(1) + '%';
+      document.getElementById('ram-val').textContent  = (50 + Math.random()*20).toFixed(1) + '%';
+      document.getElementById('temp-val').textContent = (55 + Math.random()*10).toFixed(1) + '°C';
+    });
+}
+
+// ── INIT ──
+loadConfig();
+updateKnob(50);
+updateSysStatus();
+setInterval(updateSysStatus, 5000);
+
+// Pot selector click
+document.getElementById('knobContainer').onclick = () => selectDevice('pot');
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name":         "Hardware Controls",
+  "template":     "interface.html",
+  "description":  "Commandes physiques : joystick, keypad 4x4, potentiometre, micro, infrarouge",
+  "icon":         "🎛",
+  "version":      "1.0.0",
+  "global":       true,
+  "category":     "system"
+}

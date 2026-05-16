@@ -1,430 +1,640 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-NOVA VISION SERVICE - Picamera2 + MediaPipe
-✅ Capture natif libcamera
-✅ Détection main MediaPipe
-✅ Stream MJPEG Flask
-✅ Publish MQTT
+===============================================================================
+ S.H.O.S · VISION SERVICE V2 — MULTI-BACKEND
+===============================================================================
+ 3 backends de vision interchangeables a chaud via API :
+
+   - MEDIAPIPE       : Hands + Pose (rapide, faible CPU, ~15 fps)
+   - YOLO11N_NCNN    : Detection 80 classes COCO (NCNN, ~10-20 fps Pi 4B)
+   - MOONDREAM2      : VLM 0.5B (comprehension scene, 1 image / 5-10s)
+
+ Switch dynamique :
+   POST /api/backend  { "backend": "yolo11n" }
+   GET  /api/backend  -> backend actif + liste disponibles
+
+ Sortie :
+   /video_feed   -> MJPEG annote (boxes + labels overlay)
+   /status       -> JSON metriques (fps, backend, meta)
+   MQTT topic    -> shos/camera/vision
+
+ Modeles attendus dans ~/memoir/NOVA/models/ :
+   models/yolo11n_ncnn_model/      (export NCNN)
+   models/moondream-0_5b-int4.gguf (modele GGUF)
+   models/mmproj.gguf              (projecteur multimodal moondream)
+===============================================================================
 """
 
-import cv2
-import mediapipe as mp
-import threading
-import time
-import logging
-import numpy as np
+import os
+import sys
 import json
-from flask import Flask, Response
+import time
+import threading
+import logging
+from pathlib import Path
+from typing import Optional, Tuple, Dict
+
+import cv2
+import numpy as np
+from flask import Flask, Response, request, jsonify
 import paho.mqtt.client as mqtt
 
-# ============================================================================
+# -----------------------------------------------------------------------------
 # CONFIG
-# ============================================================================
-PORT_WEB = 5051   # 5050 = réservé au service principal SHOS
+# -----------------------------------------------------------------------------
+PORT_WEB    = 5051
 MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
-MQTT_TOPIC = "shos/camera/vision"
+MQTT_PORT   = 1883
+MQTT_TOPIC  = "shos/camera/vision"
 
+PROJECT_ROOT = Path(__file__).resolve().parent
+MODELS_DIR   = PROJECT_ROOT / "models"
+
+YOLO_NCNN_PATH       = MODELS_DIR / "yolo11n_ncnn_model"
+MOONDREAM_MODEL_PATH = MODELS_DIR / "moondream-0_5b-int4.gguf"
+MOONDREAM_MMPROJ     = MODELS_DIR / "mmproj.gguf"
+
+DEFAULT_BACKEND = "mediapipe"
+BACKENDS = ("mediapipe", "yolo11n", "moondream")
+
+# -----------------------------------------------------------------------------
+# LOGGING
+# -----------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s'
+    format='%(asctime)s [%(levelname)s] %(name)s - %(message)s',
+    datefmt='%H:%M:%S',
 )
-logger = logging.getLogger("NOVA_VISION")
+logger = logging.getLogger("VisionService")
 
+# -----------------------------------------------------------------------------
+# FLASK
+# -----------------------------------------------------------------------------
 app = Flask(__name__)
 
-# ============================================================================
-# PICAMERA2 + MEDIAPIPE VISION
-# ============================================================================
-class NovaVision:
+
+# =============================================================================
+# INTERFACE COMMUNE DES BACKENDS
+# =============================================================================
+class VisionBackend:
+    name = "base"
+
+    def is_available(self) -> bool:
+        return False
+
+    def process(self, frame: np.ndarray) -> Tuple[np.ndarray, dict]:
+        return frame, {"backend": self.name, "detections": []}
+
+    def close(self):
+        pass
+
+
+# -----------------------------------------------------------------------------
+# BACKEND 1 : MEDIAPIPE
+# -----------------------------------------------------------------------------
+class MediaPipeBackend(VisionBackend):
+    name = "mediapipe"
+
     def __init__(self):
-        """Initialise Picamera2 et MediaPipe"""
-        
-        # === MEDIAPIPE ===
-        self.mp_hands = mp.solutions.hands
-        self.hands = self.mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=1,
-            min_detection_confidence=0.6,
-            min_tracking_confidence=0.5
-        )
-        self.mp_draw = mp.solutions.drawing_utils
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            static_image_mode=False,
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5
-        )
-        
-        logger.info("✅ MediaPipe initialisé")
-        
-        # === PICAMERA2 (NATIF LIBCAMERA) ===
-        # Pré-initialisation — évite AttributeError si toutes les tentatives échouent
-        self.picam2 = None
-        self.cap = None
-        self.use_picamera2 = False
-
+        self.available = False
         try:
-            from picamera2 import Picamera2, Preview
-
-            self.picam2 = Picamera2()
-            config = self.picam2.create_preview_configuration(
-                main={"format": 'BGR888', "size": (640, 480)},
-                lores={"format": 'YUV420', "size": (320, 240)}
+            import mediapipe as mp
+            self.mp_hands = mp.solutions.hands
+            self.hands = self.mp_hands.Hands(
+                static_image_mode=False, max_num_hands=1,
+                min_detection_confidence=0.6, min_tracking_confidence=0.5,
             )
-            self.picam2.configure(config)
-            self.picam2.start()
-
-            logger.info("✅ Picamera2 initialisée (libcamera natif)")
-            self.use_picamera2 = True
-
-        except ImportError:
-            logger.warning("⚠️ Picamera2 indisponible, fallback cv2.VideoCapture(0)")
-            self._init_opencv_fallback()
-
+            self.mp_pose = mp.solutions.pose
+            self.pose = self.mp_pose.Pose(
+                static_image_mode=False,
+                min_detection_confidence=0.5, min_tracking_confidence=0.5,
+            )
+            self.mp_draw = mp.solutions.drawing_utils
+            self.mp_draw_styles = mp.solutions.drawing_styles
+            self.available = True
+            logger.info("MediaPipe initialise (Hands + Pose)")
         except Exception as e:
-            # Cas fréquent : "Pipeline handler in use by another process"
-            # = ce service tourne déjà dans un autre terminal
-            logger.error(f"❌ Erreur Picamera2 : {e}")
-            if "use by another process" in str(e):
-                logger.warning("💡 La caméra est déjà utilisée par un autre process.")
-                logger.warning("   Ne pas lancer vision_service deux fois en parallèle.")
-                logger.warning("   Vérifier : ps aux | grep vision_service")
-            logger.warning("⚠️ Tentative fallback cv2.VideoCapture(0)...")
-            self._init_opencv_fallback()
-        
-        # === STATE ===
-        self.output_frame = None
-        self.frame_lock = threading.Lock()
-        self.is_running = True
-        self.frame_count = 0
-        self.last_hands = None
-        self.last_pose = None
-        
-        # === MQTT ===
-        self.mqtt_client = self._init_mqtt()
-    
-    def _init_opencv_fallback(self):
-        """Initialise OpenCV comme source caméra de secours."""
+            logger.error("MediaPipe indisponible : %s", e)
+
+    def is_available(self): return self.available
+
+    def process(self, frame):
+        if not self.available:
+            return frame, {"backend": self.name, "error": "not_available"}
+
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        hr  = self.hands.process(rgb)
+        pr  = self.pose.process(rgb)
+
+        annotated = frame.copy()
+        hands_n   = 0
+        pose_ok   = False
+
+        if hr.multi_hand_landmarks:
+            hands_n = len(hr.multi_hand_landmarks)
+            for lm in hr.multi_hand_landmarks:
+                self.mp_draw.draw_landmarks(
+                    annotated, lm, self.mp_hands.HAND_CONNECTIONS,
+                    self.mp_draw_styles.get_default_hand_landmarks_style(),
+                    self.mp_draw_styles.get_default_hand_connections_style(),
+                )
+        if pr.pose_landmarks:
+            pose_ok = True
+            self.mp_draw.draw_landmarks(
+                annotated, pr.pose_landmarks, self.mp_pose.POSE_CONNECTIONS,
+                landmark_drawing_spec=self.mp_draw_styles.get_default_pose_landmarks_style(),
+            )
+
+        return annotated, {
+            "backend": self.name,
+            "hands_detected": hands_n,
+            "pose_detected":  pose_ok,
+            "detections":     [],
+        }
+
+    def close(self):
+        try: self.hands.close(); self.pose.close()
+        except Exception: pass
+
+
+# -----------------------------------------------------------------------------
+# BACKEND 2 : YOLO 11N NCNN
+# -----------------------------------------------------------------------------
+class YoloNcnnBackend(VisionBackend):
+    name = "yolo11n"
+
+    COCO = [
+        "personne","velo","voiture","moto","avion","bus","train","camion","bateau","feu",
+        "panneau stop","parcmetre","banc","oiseau","chat","chien","cheval","mouton","vache","elephant",
+        "ours","zebre","girafe","sac a dos","parapluie","sac","cravate","valise","frisbee","skis",
+        "snowboard","ballon","cerf-volant","batte","gant","skate","surf","raquette","bouteille","verre",
+        "tasse","fourchette","couteau","cuillere","bol","banane","pomme","sandwich","orange","brocoli",
+        "carotte","hot dog","pizza","donut","gateau","chaise","canape","plante","lit","table",
+        "toilettes","TV","laptop","souris","telecommande","clavier","telephone","micro-ondes","four","grille-pain",
+        "evier","frigo","livre","horloge","vase","ciseaux","peluche","seche-cheveux","brosse a dents","_",
+    ]
+
+    def __init__(self, model_path: Path = YOLO_NCNN_PATH):
+        self.model_path = model_path
+        self.model = None
+        self.available = False
+        self._load()
+
+    def _load(self):
+        if not self.model_path.exists():
+            logger.warning("YOLO NCNN : dossier introuvable %s", self.model_path)
+            logger.warning("  Pour activer : yolo export model=yolo11n.pt format=ncnn")
+            return
+        try:
+            from ultralytics import YOLO
+            self.model = YOLO(str(self.model_path), task="detect")
+            self.available = True
+            logger.info("YOLO11n NCNN charge : %s", self.model_path)
+        except ImportError:
+            logger.warning("ultralytics non installe - pip install ultralytics")
+        except Exception as e:
+            logger.error("YOLO load : %s", e)
+
+    def is_available(self): return self.available
+
+    def process(self, frame):
+        if not self.available:
+            return frame, {"backend": self.name, "error": "model_not_loaded"}
+        try:
+            results = self.model(frame, verbose=False, imgsz=320, conf=0.4)
+        except Exception as e:
+            return frame, {"backend": self.name, "error": str(e)}
+
+        annotated = frame.copy()
+        dets = []
+        for r in results:
+            boxes = r.boxes
+            if boxes is None or len(boxes) == 0:
+                continue
+            for box in boxes:
+                cls_id = int(box.cls[0].item())
+                conf   = float(box.conf[0].item())
+                x1,y1,x2,y2 = box.xyxy[0].cpu().numpy().astype(int)
+                label = self.COCO[cls_id] if cls_id < len(self.COCO) else f"cls_{cls_id}"
+
+                cv2.rectangle(annotated, (x1,y1), (x2,y2), (77, 212, 232), 2)
+                txt = f"{label} {conf:.2f}"
+                (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
+                cv2.rectangle(annotated, (x1, y1-th-6), (x1+tw+6, y1), (77, 212, 232), -1)
+                cv2.putText(annotated, txt, (x1+3, y1-4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (12,15,11), 1, cv2.LINE_AA)
+
+                dets.append({
+                    "class": label, "confidence": round(conf, 3),
+                    "bbox": [int(x1), int(y1), int(x2), int(y2)],
+                })
+
+        return annotated, {
+            "backend": self.name, "detections": dets,
+            "objects_count": len(dets),
+            "model": "yolo11n-ncnn",
+        }
+
+
+# -----------------------------------------------------------------------------
+# BACKEND 3 : MOONDREAM 2 (asynchrone)
+# -----------------------------------------------------------------------------
+class MoondreamBackend(VisionBackend):
+    name = "moondream"
+
+    def __init__(self, model_path: Path = MOONDREAM_MODEL_PATH):
+        self.model_path = model_path
+        self.available = False
+        self.model = None
+        self._caption = "Analyse en cours..."
+        self._ts = 0.0
+        self._inflight = False
+        self._lock = threading.Lock()
+        self._load()
+
+    def _load(self):
+        if not self.model_path.exists():
+            logger.warning("Moondream : GGUF introuvable %s", self.model_path)
+            logger.warning("  Telecharger moondream-0_5b-int4.gguf + mmproj.gguf dans models/")
+            return
+        try:
+            from llama_cpp import Llama
+            from llama_cpp.llama_chat_format import MoondreamChatHandler
+            if not MOONDREAM_MMPROJ.exists():
+                logger.warning("Moondream : mmproj.gguf manquant - %s", MOONDREAM_MMPROJ)
+                return
+            self.handler = MoondreamChatHandler(clip_model_path=str(MOONDREAM_MMPROJ))
+            self.model = Llama(
+                model_path=str(self.model_path),
+                chat_handler=self.handler,
+                n_ctx=2048, verbose=False,
+            )
+            self.available = True
+            logger.info("Moondream 2 charge : %s", self.model_path)
+        except ImportError:
+            logger.warning("llama-cpp-python absent - pip install llama-cpp-python")
+        except Exception as e:
+            logger.warning("Moondream load : %s", e)
+
+    def is_available(self): return self.available
+
+    def _analyze_async(self, frame):
+        if self._inflight: return
+        self._inflight = True
+
+        def _run():
+            try:
+                import base64
+                ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                if not ok: return
+                b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+                resp = self.model.create_chat_completion(
+                    messages=[{
+                        "role": "user",
+                        "content": [
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+                            {"type": "text", "text": "Decris brievement la scene en francais (1 phrase)."},
+                        ],
+                    }],
+                    max_tokens=80,
+                )
+                txt = resp["choices"][0]["message"]["content"].strip()
+                with self._lock:
+                    self._caption = txt
+                    self._ts = time.time()
+            except Exception as e:
+                logger.warning("Moondream inference : %s", e)
+            finally:
+                self._inflight = False
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def process(self, frame):
+        if not self.available:
+            return frame, {"backend": self.name, "error": "model_not_loaded"}
+
+        now = time.time()
+        if (now - self._ts) > 5.0:
+            self._analyze_async(frame.copy())
+
+        annotated = frame.copy()
+        h, w = annotated.shape[:2]
+        with self._lock:
+            caption = self._caption
+
+        overlay = annotated.copy()
+        cv2.rectangle(overlay, (0, h-60), (w, h), (12, 15, 11), -1)
+        cv2.addWeighted(overlay, 0.78, annotated, 0.22, 0, annotated)
+
+        cv2.putText(annotated, "MOONDREAM 2", (10, h-38),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (77, 212, 232), 1, cv2.LINE_AA)
+        cap = caption[:90] + ("..." if len(caption) > 90 else "")
+        cv2.putText(annotated, cap, (10, h-15),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (240, 240, 240), 1, cv2.LINE_AA)
+        if self._inflight:
+            cv2.circle(annotated, (w-20, h-30), 5, (77, 166, 255), -1)
+
+        return annotated, {
+            "backend": self.name,
+            "caption": caption,
+            "last_update": self._ts,
+            "inflight": self._inflight,
+            "detections": [],
+        }
+
+
+# =============================================================================
+# CAMERA SOURCE
+# =============================================================================
+class CameraSource:
+    def __init__(self, width=640, height=480):
+        self.width, self.height = width, height
+        self.picam2 = None; self.cap = None
+        self.using_picamera = False
+        self._open()
+
+    def _open(self):
+        try:
+            from picamera2 import Picamera2
+            self.picam2 = Picamera2()
+            cfg = self.picam2.create_preview_configuration(
+                main={"format": "BGR888", "size": (self.width, self.height)},
+            )
+            self.picam2.configure(cfg)
+            self.picam2.start()
+            self.using_picamera = True
+            logger.info("Picamera2 active (%dx%d)", self.width, self.height)
+            return
+        except ImportError:
+            logger.warning("Picamera2 non installe - fallback OpenCV")
+        except Exception as e:
+            logger.error("Picamera2: %s - fallback OpenCV", e)
+
         try:
             self.cap = cv2.VideoCapture(0)
             if self.cap.isOpened():
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                self.use_picamera2 = False
-                logger.info("✅ Fallback OpenCV initialisé (index=0)")
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH,  self.width)
+                self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+                logger.info("OpenCV VideoCapture(0) ouvert")
             else:
+                logger.error("Aucune camera disponible")
                 self.cap = None
-                logger.error("❌ OpenCV : aucune caméra disponible (index=0)")
-                logger.error("   Le service continuera sans flux vidéo.")
         except Exception as e:
+            logger.error("OpenCV fallback: %s", e)
             self.cap = None
-            logger.error(f"❌ Fallback OpenCV échoué : {e}")
+
+    def read(self):
+        if self.using_picamera and self.picam2:
+            try: return self.picam2.capture_array()
+            except Exception: return None
+        if self.cap:
+            ok, f = self.cap.read()
+            return f if ok else None
+        return None
+
+    def is_ready(self):
+        return self.using_picamera or (self.cap is not None and self.cap.isOpened())
+
+    def close(self):
+        try:
+            if self.picam2: self.picam2.stop()
+        except Exception: pass
+        try:
+            if self.cap: self.cap.release()
+        except Exception: pass
+
+
+# =============================================================================
+# VISION SERVICE
+# =============================================================================
+class VisionService:
+    def __init__(self):
+        self.camera = CameraSource()
+
+        logger.info("Initialisation des backends...")
+        self.backends: Dict[str, VisionBackend] = {
+            "mediapipe": MediaPipeBackend(),
+            "yolo11n":   YoloNcnnBackend(),
+            "moondream": MoondreamBackend(),
+        }
+        self.active_name = DEFAULT_BACKEND
+        self._lock = threading.Lock()
+
+        self.output_frame = None
+        self.frame_lock   = threading.Lock()
+        self.is_running   = True
+        self.frame_count  = 0
+        self.last_meta    = {"backend": DEFAULT_BACKEND}
+
+        self._fps = 0.0
+        self._fps_counter = 0
+        self._fps_timer = time.time()
+
+        self.mqtt = self._init_mqtt()
+        self._last_mqtt = 0.0
+
+        avail = [n for n,b in self.backends.items() if b.is_available()]
+        logger.info("Backends disponibles : %s", avail)
 
     def _init_mqtt(self):
-        """Initialise client MQTT"""
         try:
             try:
                 from paho.mqtt.enums import CallbackAPIVersion
-                client = mqtt.Client(CallbackAPIVersion.VERSION2, "NOVA_VISION")
-            except:
-                client = mqtt.Client("NOVA_VISION")
-            
-            client.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
-            client.loop_start()
-            logger.info("✅ MQTT client connecté")
-            return client
+                c = mqtt.Client(CallbackAPIVersion.VERSION2, "NOVA_VISION_V2")
+            except ImportError:
+                c = mqtt.Client("NOVA_VISION_V2")
+            c.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
+            c.loop_start()
+            logger.info("MQTT connecte %s:%d", MQTT_BROKER, MQTT_PORT)
+            return c
         except Exception as e:
-            logger.warning(f"⚠️ MQTT non disponible: {e}")
+            logger.warning("MQTT non disponible : %s", e)
             return None
-    
-    def process_vision(self):
-        """Boucle principale de traitement vidéo"""
-        logger.info("🚀 Traitement vision démarré...")
 
-        # Vérification caméra disponible
-        if not self.use_picamera2 and self.cap is None:
-            logger.error("❌ Aucune caméra disponible — boucle vision annulée.")
-            logger.error("   Causes possibles :")
-            logger.error("   1. vision_service tourne déjà dans un autre process")
-            logger.error("   2. Nappe caméra mal connectée")
-            logger.error("   3. Picamera2 pas installée et webcam USB absente")
+    def publish_meta(self, meta):
+        if not self.mqtt: return
+        now = time.time()
+        if now - self._last_mqtt < 0.2: return
+        self._last_mqtt = now
+        try:
+            payload = {**meta, "fps": round(self._fps, 1), "ts": now}
+            self.mqtt.publish(MQTT_TOPIC, json.dumps(payload), qos=0)
+        except Exception: pass
+
+    def set_backend(self, name):
+        if name not in self.backends:
+            return {"ok": False, "msg": f"Backend inconnu : {name}"}
+        if not self.backends[name].is_available():
+            return {"ok": False, "msg": f"Backend {name} non disponible (modele manquant ?)"}
+        with self._lock:
+            self.active_name = name
+        logger.info("Backend actif -> %s", name)
+        if self.mqtt:
+            try: self.mqtt.publish("shos/camera/backend",
+                                   json.dumps({"backend": name, "ts": time.time()}))
+            except Exception: pass
+        return {"ok": True, "backend": name}
+
+    def get_active(self):
+        with self._lock:
+            return self.backends[self.active_name]
+
+    def run(self):
+        if not self.camera.is_ready():
+            logger.error("Pas de camera - boucle vision annulee")
             return
+        for _ in range(8):
+            self.camera.read(); time.sleep(0.04)
+        logger.info("Vision demarree - backend : %s", self.active_name)
 
-        # Warm-up (laisser la caméra se stabiliser)
-        for _ in range(10):
-            if self.use_picamera2:
-                try:
-                    self.picam2.capture_array()
-                except Exception:
-                    pass
-            elif self.cap is not None:
-                self.cap.read()
-            time.sleep(0.05)
-
-        logger.info("👁️ Analyse MediaPipe active")
-
-        # Variables pour calcul FPS réel
-        fps_counter = 0
-        fps_timer = time.time()
-        current_fps = 0.0
-        
-        # === BOUCLE PRINCIPALE ===
         while self.is_running:
             try:
-                # --- CAPTURE FRAME ---
-                if self.use_picamera2:
-                    try:
-                        frame = self.picam2.capture_array()
-                    except Exception as e:
-                        logger.warning(f"⚠️ Picamera2 read error: {e}")
-                        time.sleep(0.1)
-                        continue
-                elif self.cap is not None:
-                    success, frame = self.cap.read()
-                    if not success or frame is None:
-                        time.sleep(0.1)
-                        continue
-                else:
-                    # Aucune caméra — on sort proprement
-                    logger.error("❌ Aucune source vidéo, arrêt de la boucle.")
-                    break
-                
-                # --- VALIDATION FRAME ---
+                frame = self.camera.read()
                 if frame is None or frame.size == 0:
-                    continue
-                
-                if len(frame.shape) < 2 or frame.shape[0] < 10 or frame.shape[1] < 10:
-                    continue
-                
-                # --- FORMAT FIX ---
+                    time.sleep(0.05); continue
+
                 if frame.dtype != np.uint8:
                     frame = frame.astype(np.uint8)
-                
                 if len(frame.shape) != 3 or frame.shape[2] != 3:
-                    try:
-                        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-                    except:
-                        continue
-                
-                # Ensure contiguous memory
+                    try: frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+                    except Exception: continue
                 frame = np.ascontiguousarray(frame)
-                
-                # --- TRAITEMENT IA ---
-                try:
-                    # Conversion RGB pour MediaPipe
-                    image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    
-                    # Détection mains
-                    hand_results = self.hands.process(image_rgb)
-                    if hand_results.multi_hand_landmarks:
-                        self.last_hands = hand_results.multi_hand_landmarks
-                        for hand_landmarks in hand_results.multi_hand_landmarks:
-                            self.mp_draw.draw_landmarks(
-                                frame, 
-                                hand_landmarks, 
-                                self.mp_hands.HAND_CONNECTIONS,
-                                self.mp_draw.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                                self.mp_draw.DrawingSpec(color=(255, 0, 0), thickness=2)
-                            )
-                    
-                    # Détection pose (corps complet)
-                    pose_results = self.pose.process(image_rgb)
-                    if pose_results.pose_landmarks:
-                        self.last_pose = pose_results.pose_landmarks
-                        self.mp_draw.draw_landmarks(
-                            frame,
-                            pose_results.pose_landmarks,
-                            self.mp_pose.POSE_CONNECTIONS,
-                            self.mp_draw.DrawingSpec(color=(0, 255, 255), thickness=2, circle_radius=2),
-                            self.mp_draw.DrawingSpec(color=(255, 255, 0), thickness=2)
-                        )
-                    
-                    # Ajouter info texte
-                    cv2.putText(frame, f"Hands: {len(hand_results.multi_hand_landmarks or [])}", 
-                               (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                    cv2.putText(frame, f"FPS: {current_fps:.1f}", 
-                               (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                    
-                except cv2.error as e:
-                    logger.debug(f"⚠️ OpenCV error (ignored): {e}")
-                    continue
-                except Exception as e:
-                    logger.debug(f"⚠️ MediaPipe error: {e}")
-                    continue
-                
-                # --- ENCODE & PUBLISH ---
-                try:
-                    # Compression JPEG
-                    ret, buffer = cv2.imencode(
-                        '.jpg', frame, 
-                        [cv2.IMWRITE_JPEG_QUALITY, 60]
-                    )
-                    
-                    if not ret:
-                        continue
-                    
-                    frame_bytes = buffer.tobytes()
-                    
-                    # Mise à jour frame locale
-                    with self.frame_lock:
-                        self.output_frame = frame_bytes
-                        self.frame_count += 1
 
-                    # Calcul FPS réel sur fenêtre 1 seconde
-                    fps_counter += 1
-                    now = time.time()
-                    if now - fps_timer >= 1.0:
-                        current_fps = round(fps_counter / (now - fps_timer), 1)
-                        fps_counter = 0
-                        fps_timer = now
-
-                    # Publish MQTT — payload enrichi pour le benchmark
-                    # Le champ "timestamp" est obligatoire pour mesurer la latence E2E
-                    if self.mqtt_client:
-                        try:
-                            metadata = {
-                                "timestamp": time.time(),        # ← latence E2E benchmark
-                                "frame_id": self.frame_count,
-                                "fps": current_fps,              # ← FPS réel pipeline
-                                "hands_detected": len(hand_results.multi_hand_landmarks or []),
-                                "pose_detected": bool(pose_results.pose_landmarks),
-                                "camera": "picamera2" if self.use_picamera2 else "opencv",
-                            }
-                            self.mqtt_client.publish(
-                                MQTT_TOPIC,
-                                json.dumps(metadata),
-                                qos=0
-                            )
-                        except Exception:
-                            pass
-                
+                backend = self.get_active()
+                try:
+                    annotated, meta = backend.process(frame)
                 except Exception as e:
-                    logger.debug(f"⚠️ Encode error: {e}")
-                    continue
-                
-                # Sleep minimal
-                time.sleep(0.01)
-            
-            except KeyboardInterrupt:
-                break
+                    logger.warning("Backend %s : %s", self.active_name, e)
+                    annotated, meta = frame, {"backend": self.active_name, "error": str(e)}
+
+                self._fps_counter += 1
+                if time.time() - self._fps_timer >= 1.0:
+                    self._fps = self._fps_counter / (time.time() - self._fps_timer)
+                    self._fps_counter = 0
+                    self._fps_timer = time.time()
+
+                hud = f"{self.active_name.upper()} | {self._fps:.1f} fps"
+                cv2.putText(annotated, hud, (8, 18),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (77, 212, 232), 1, cv2.LINE_AA)
+
+                with self.frame_lock:
+                    self.output_frame = annotated.copy()
+                    self.last_meta    = meta
+
+                self.publish_meta(meta)
+                self.frame_count += 1
+
             except Exception as e:
-                logger.error(f"❌ Erreur boucle vision: {e}")
+                logger.error("Erreur boucle : %s", e)
                 time.sleep(0.1)
-    
+
     def generate_frames(self):
-        """Générateur MJPEG pour Flask"""
-        logger.info("📡 Stream vidéo démarré")
-        
-        while self.is_running:
+        while True:
             with self.frame_lock:
-                if self.output_frame is None:
-                    time.sleep(0.05)
-                    continue
-                frame_to_send = self.output_frame
-            
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame_to_send + b'\r\n')
-            time.sleep(0.02)
-    
+                frame = None if self.output_frame is None else self.output_frame.copy()
+            if frame is None:
+                time.sleep(0.03); continue
+            ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+            if not ok: continue
+            yield (b"--frame\r\n"
+                   b"Content-Type: image/jpeg\r\n\r\n" + buf.tobytes() + b"\r\n")
+
     def stop(self):
-        """Arrête les threads"""
         self.is_running = False
-        if self.use_picamera2:
-            try:
-                self.picam2.stop()
-                self.picam2.close()
-            except:
-                pass
-        else:
-            try:
-                self.cap.release()
-            except:
-                pass
-        
-        if self.mqtt_client:
-            try:
-                self.mqtt_client.loop_stop()
-                self.mqtt_client.disconnect()
-            except:
-                pass
+        for b in self.backends.values():
+            try: b.close()
+            except Exception: pass
+        self.camera.close()
+        if self.mqtt:
+            try: self.mqtt.loop_stop(); self.mqtt.disconnect()
+            except Exception: pass
 
-# ============================================================================
-# INSTANCE GLOBALE
-# ============================================================================
-nova_vision = NovaVision()
 
-# ============================================================================
-# FLASK ROUTES
-# ============================================================================
-@app.route('/')
+vision = VisionService()
+
+
+# =============================================================================
+# ROUTES FLASK
+# =============================================================================
+@app.route("/")
 def index():
     return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>NOVA Vision Stream</title>
-        <style>
-            body { background: #1a1a1a; color: #fff; font-family: monospace; text-align: center; }
-            img { max-width: 90%; border: 2px solid #00ff00; border-radius: 10px; margin: 20px; }
-            h1 { color: #00ff00; }
-        </style>
-    </head>
-    <body>
-        <h1>👁️ NOVA VISION STREAM</h1>
-        <img src="/video_feed" alt="Vision Stream">
-        <p>MediaPipe Hand + Pose Detection</p>
-    </body>
-    </html>
+    <!DOCTYPE html><html><head><title>SHOS Vision V2</title>
+    <style>body{background:#0e1117;color:#e8d44d;font-family:monospace;text-align:center;padding:20px}
+    img{max-width:90%;border:2px solid #e8d44d;border-radius:10px;margin:20px}
+    h1{font-weight:400;letter-spacing:.1em}
+    button{background:rgba(232,212,77,.1);border:1px solid #e8d44d;color:#e8d44d;padding:8px 16px;margin:4px;cursor:pointer;border-radius:6px;font-family:inherit}
+    button:hover{background:rgba(232,212,77,.2)}</style></head><body>
+    <h1>S.H.O.S VISION SERVICE V2</h1>
+    <div>
+      <button onclick="setBackend('mediapipe')">MediaPipe</button>
+      <button onclick="setBackend('yolo11n')">YOLO 11n</button>
+      <button onclick="setBackend('moondream')">Moondream 2</button>
+    </div>
+    <img src="/video_feed" alt="Vision Stream">
+    <script>
+    function setBackend(b){fetch('/api/backend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({backend:b})}).then(r=>r.json()).then(d=>console.log(d));}
+    </script></body></html>
     """
 
-@app.route('/video_feed')
+@app.route("/video_feed")
 def video_feed():
-    """Stream MJPEG"""
-    return Response(
-        nova_vision.generate_frames(),
-        mimetype='multipart/x-mixed-replace; boundary=frame'
-    )
+    return Response(vision.generate_frames(),
+                    mimetype="multipart/x-mixed-replace; boundary=frame")
 
-@app.route('/status')
+@app.route("/status")
 def status():
-    """Status JSON"""
-    return {
+    return jsonify({
         "status": "online",
-        "frames": nova_vision.frame_count,
-        "hands_detected": bool(nova_vision.last_hands),
-        "pose_detected": bool(nova_vision.last_pose),
-        "camera": "Picamera2" if nova_vision.use_picamera2 else "OpenCV"
-    }
+        "backend": vision.active_name,
+        "frames": vision.frame_count,
+        "fps": round(vision._fps, 1),
+        "camera": "Picamera2" if vision.camera.using_picamera else "OpenCV",
+        "meta": vision.last_meta,
+    })
 
-# ============================================================================
+@app.route("/api/backend", methods=["GET"])
+def api_get_backend():
+    return jsonify({
+        "active": vision.active_name,
+        "available": {n: b.is_available() for n,b in vision.backends.items()},
+        "all": list(BACKENDS),
+    })
+
+@app.route("/api/backend", methods=["POST"])
+def api_set_backend():
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("backend", "")).strip().lower()
+    if name not in BACKENDS:
+        return jsonify({"ok": False, "msg": f"Backend invalide. Valeurs : {BACKENDS}"}), 400
+    result = vision.set_backend(name)
+    return jsonify(result), (200 if result.get("ok") else 503)
+
+@app.route("/api/last_meta")
+def api_last_meta():
+    with vision.frame_lock:
+        return jsonify(vision.last_meta)
+
+
+# =============================================================================
 # MAIN
-# ============================================================================
+# =============================================================================
 if __name__ == "__main__":
     try:
-        # Démarrer thread vision
-        vision_thread = threading.Thread(
-            target=nova_vision.process_vision, 
-            daemon=True
-        )
-        vision_thread.start()
-        
-        logger.info(f"🚀 Serveur VISION sur http://0.0.0.0:{PORT_WEB}")
-        logger.info(f"📡 Stream: http://0.0.0.0:{PORT_WEB}/video_feed")
-        logger.info(f"📊 Status: http://0.0.0.0:{PORT_WEB}/status")
-        
-        app.run(
-            host='0.0.0.0',
-            port=PORT_WEB,
-            debug=False,
-            threaded=True,
-            use_reloader=False
-        )
-    
+        t = threading.Thread(target=vision.run, name="VisionLoop", daemon=True)
+        t.start()
+
+        logger.info("Serveur Vision V2 sur http://0.0.0.0:%d", PORT_WEB)
+        logger.info("Stream  : http://localhost:%d/video_feed", PORT_WEB)
+        logger.info("Status  : http://localhost:%d/status",     PORT_WEB)
+        logger.info("Backend : POST http://localhost:%d/api/backend", PORT_WEB)
+
+        app.run(host="0.0.0.0", port=PORT_WEB,
+                debug=False, threaded=True, use_reloader=False)
     except KeyboardInterrupt:
-        logger.info("⛔ Arrêt...")
-        nova_vision.stop()
+        logger.info("Arret demande")
+        vision.stop()
     except Exception as e:
-        logger.error(f"❌ Erreur: {e}")
-        nova_vision.stop()
+        logger.error("Erreur fatale : %s", e)
+        vision.stop()

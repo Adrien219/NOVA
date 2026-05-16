@@ -1,781 +1,1191 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>S.MOS SYSTEM v1.0 — SHOS HUD (Socket.IO)</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.H.O.S — NOVA HUD v2.0</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-  <!--
-    Objectif: remplacer TON interface (ancienne) par l'interface HUD "S.MOS" (la plus proche possible des images),
-    tout en gardant EXACTEMENT TA LOGIQUE de fonctionnement :
-      - Fond vidéo: <img src="/video_feed">
-      - Socket.IO: socket.on('full_system_update', data => {...})
-      - data.sensors (Arduino) + data.perf_sys (Pi)
-      - Collision => affiche danger
-
-    Remplacements demandés:
-      - Panel humanoïde => remplacé par un flux "VR" (img snapshot refresh)
-      - "2ème personnage" => remplacé par flux ESP32-CAM (img snapshot refresh)
-      - Ajout widget joystick cercle + point (interactif) + support si data.sensors.joyX / joyY existent
-      - Interface interactive: joystick draggable, pause bouton (visuel), danger animé, barres dynamiques
-
-    Références visuelles suivies:
-    - HUD complet: https://www.genspark.ai/api/files/s/hlczi2UF
-    - Bandeau haut: https://www.genspark.ai/api/files/s/0fWyx41i
-    - Colonne droite: https://www.genspark.ai/api/files/s/JxsIPuJj
-    - Bas + danger: https://www.genspark.ai/api/files/s/XVS1nR70
-    - Panel bas-gauche: https://www.genspark.ai/api/files/s/vEpDXoU5
-    - Joystick cercle: https://www.genspark.ai/api/files/s/hW6SAtnz
-  -->
-
-  <style>
-    :root{
-      --cyan:#36f6ff;
-      --cyan2:#00c7ff;
-      --cyanLine: rgba(54,246,255,.58);
-      --cyanSoft: rgba(54,246,255,.14);
-      --panel: rgba(4,18,24,.26);
-      --txt: rgba(220,255,255,.92);
-      --muted: rgba(220,255,255,.65);
-      --grid: rgba(54,246,255,.10);
-      --red:#ff2b2b;
-      --shadowCi: 0 0 28px rgba(0,199,255,.10) inset;
+    <style>
+    /* ═══════════════════════════════════════════════════════════════
+       S.H.O.S  ·  NOVA HUD  ·  Iron Man Style
+       Palette : Rouge #ff1a1a · Blanc #ffffff · Fond vidéo
+    ═══════════════════════════════════════════════════════════════ */
+    :root {
+        --r:      #ff1a1a;
+        --r2:     #ff4444;
+        --r3:     rgba(255,26,26,0.18);
+        --r4:     rgba(255,26,26,0.08);
+        --w:      rgba(255,255,255,0.92);
+        --w2:     rgba(255,255,255,0.60);
+        --w3:     rgba(255,255,255,0.28);
+        --glow-r: 0 0 12px rgba(255,26,26,0.65), 0 0 30px rgba(255,26,26,0.25);
+        --glow-w: 0 0 8px rgba(255,255,255,0.45);
+        --panel:  rgba(0,0,0,0.45);
+        --border: rgba(255,26,26,0.45);
+        --font:   'Orbitron', 'Share Tech Mono', monospace;
+        --mono:   'Share Tech Mono', monospace;
     }
 
-    *{ box-sizing:border-box; }
-    html,body{ height:100%; margin:0; overflow:hidden; background:#000; }
-    body{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,"Liberation Mono","Courier New", monospace; color:var(--txt); }
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html, body { width:100%; height:100%; overflow:hidden; background:#000; }
+    body { font-family:var(--mono); color:var(--w); }
 
-    /* ===== STAGE / BACKGROUND (ton /video_feed conservé) ===== */
-#stage {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    background: #000;
-}
+    /* ── FOND VIDÉO ─────────────────────────────────── */
+    #bg {
+        position: fixed; inset: 0; z-index: 0;
+        background: #000;
+    }
+    #bg img {
+        width:100%; height:100%; object-fit:cover;
+        opacity: 0.75;
+        filter: contrast(1.1) saturate(0.9);
+    }
+    /* Vignette dramatique */
+    #bg::after {
+        content:''; position:absolute; inset:0;
+        background: radial-gradient(ellipse at center, transparent 35%, rgba(0,0,0,0.72) 100%);
+        pointer-events:none;
+    }
 
-#bg {
-    position: absolute;
-    inset: 0; /* Vérifie que c'est bien 'inset: 0' ou 'top:0; left:0; width:100%; height:100%;' */
-    z-index: 0;
-    overflow: hidden;
-}
-
-#bg img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover; /* Pour que la vidéo remplisse bien l'écran */
-    display: block;
-}
-    #bg::after{
-      content:""; position:absolute; inset:-40px; pointer-events:none;
-      background:
-        repeating-linear-gradient(0deg,
-          rgba(54,246,255,.05) 0px,
-          rgba(54,246,255,.05) 1px,
-          rgba(0,0,0,0) 3px,
-          rgba(0,0,0,0) 7px
+    /* Scanlines overlay */
+    #scanlines {
+        position:fixed; inset:0; z-index:1; pointer-events:none;
+        background: repeating-linear-gradient(
+            0deg,
+            rgba(0,0,0,0) 0px, rgba(0,0,0,0) 3px,
+            rgba(255,26,26,0.03) 3px, rgba(255,26,26,0.03) 4px
         );
-      opacity:.34;
-      mix-blend-mode:screen;
+        animation: scan 8s linear infinite;
     }
-    #noise{
-      position:absolute; inset:0; pointer-events:none; z-index:1;
-      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
-      opacity:.08;
-      mix-blend-mode:overlay;
+    @keyframes scan {
+        0%   { background-position: 0 0; }
+        100% { background-position: 0 100vh; }
     }
 
-    /* ===== HUD ROOT ===== */
-    #hud{ position:absolute; inset:0; z-index:2; }
-    .glow{ text-shadow: 0 0 7px rgba(54,246,255,.55), 0 0 18px rgba(0,199,255,.18); }
+    /* ── HUD ROOT ─────────────────────────────────── */
+    #hud { position:fixed; inset:0; z-index:2; }
 
-    /* ===== OUTER FRAME ===== */
-    #outer{
-      position:absolute; inset:12px;
-      border:1px solid rgba(54,246,255,.22);
-      box-shadow: var(--shadowCi);
-      pointer-events:none;
+    /* ── CADRE EXTÉRIEUR ──────────────────────────── */
+    .frame-border {
+        position:absolute; inset:8px;
+        border:1px solid rgba(255,26,26,0.25);
+        pointer-events:none;
     }
-    .corner{
-      position:absolute; width:32px; height:32px;
-      border:2px solid rgba(54,246,255,.65);
-      filter: drop-shadow(0 0 10px rgba(54,246,255,.20));
-      pointer-events:none;
+    .corner {
+        position:absolute; width:28px; height:28px;
+        pointer-events:none;
     }
-    .corner.tl{ left:12px; top:12px; border-right:none; border-bottom:none; }
-    .corner.tr{ right:12px; top:12px; border-left:none; border-bottom:none; }
-    .corner.bl{ left:12px; bottom:12px; border-right:none; border-top:none; }
-    .corner.br{ right:12px; bottom:12px; border-left:none; border-top:none; }
+    .corner::before, .corner::after {
+        content:''; position:absolute; background:var(--r);
+        box-shadow: var(--glow-r);
+    }
+    .corner.tl { top:8px; left:8px; }
+    .corner.tl::before { top:0; left:0; width:28px; height:2px; }
+    .corner.tl::after  { top:0; left:0; width:2px;  height:28px; }
+    .corner.tr { top:8px; right:8px; }
+    .corner.tr::before { top:0; right:0; width:28px; height:2px; }
+    .corner.tr::after  { top:0; right:0; width:2px;  height:28px; }
+    .corner.bl { bottom:8px; left:8px; }
+    .corner.bl::before { bottom:0; left:0; width:28px; height:2px; }
+    .corner.bl::after  { bottom:0; left:0; width:2px; height:28px; }
+    .corner.br { bottom:8px; right:8px; }
+    .corner.br::before { bottom:0; right:0; width:28px; height:2px; }
+    .corner.br::after  { bottom:0; right:0; width:2px; height:28px; }
 
-    .ear{
-      position:absolute; top:12px; width:120px; height:34px;
-      border:1px solid rgba(54,246,255,.28);
-      background: linear-gradient(90deg, rgba(54,246,255,.12), rgba(0,0,0,0));
-      clip-path: polygon(0 0, 86% 0, 100% 55%, 86% 100%, 0 100%, 10% 50%);
-      box-shadow: 0 0 18px rgba(0,199,255,.10) inset;
-      pointer-events:none;
-      opacity:.95;
-    }
-    .ear.left{ left:84px; }
-    .ear.right{ right:84px; transform: scaleX(-1); }
+    /* ── TEXTE GLOW ───────────────────────────────── */
+    .glow-r { text-shadow: var(--glow-r); color:var(--r); }
+    .glow-w { text-shadow: var(--glow-w); color:#fff; }
 
-    #hdrLeft{
-      position:absolute; left:36px; top:16px;
-      font-size:14px; letter-spacing:.12em;
-      color: rgba(210,255,255,.86);
+    /* ── TOPBAR ───────────────────────────────────── */
+    #topbar {
+        position:absolute; top:0; left:0; right:0; height:44px;
+        display:flex; align-items:center; justify-content:space-between;
+        padding:0 20px;
+        background:linear-gradient(180deg, rgba(0,0,0,0.65) 0%, transparent 100%);
+        border-bottom:1px solid rgba(255,26,26,0.22);
     }
-    #hdrRight{
-      position:absolute; right:28px; top:14px;
-      display:flex; align-items:center; gap:10px;
-      font-size:13px; letter-spacing:.10em;
-      color: rgba(210,255,255,.76);
+    #topbar-left { display:flex; align-items:center; gap:14px; }
+    .sys-name {
+        font-family:var(--font); font-size:13px; font-weight:700;
+        letter-spacing:.22em; color:#fff;
+        text-shadow:var(--glow-r);
     }
-    #hdrRight .ico{
-      width:16px; height:16px;
-      border:1px solid rgba(54,246,255,.25);
-      background: rgba(0,0,0,.18);
-      box-shadow: 0 0 12px rgba(0,199,255,.08) inset;
+    .sys-ver {
+        font-size:10px; letter-spacing:.18em; color:var(--r2);
     }
-    #hdrRight .lg{ font-weight:700; opacity:.85; }
+    .top-status {
+        display:flex; gap:16px;
+    }
+    .ts-item {
+        display:flex; align-items:center; gap:5px;
+        font-size:10px; letter-spacing:.1em; color:var(--w2);
+    }
+    .ts-dot {
+        width:6px; height:6px; border-radius:50%;
+        background:var(--r); box-shadow:var(--glow-r);
+        animation:pulse-dot 1.5s ease-in-out infinite;
+    }
+    .ts-dot.ok  { background:var(--r); }
+    .ts-dot.off { background:#555; box-shadow:none; animation:none; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-    /* ===== PANELS ===== */
-    .panel{
-      position:absolute;
-      background: var(--panel);
-      border:1px solid rgba(54,246,255,.28);
-      box-shadow: 0 0 22px rgba(0,199,255,.10) inset;
-      backdrop-filter: blur(2px);
+    #topbar-right { display:flex; align-items:center; gap:16px; }
+    #clock {
+        font-family:var(--font); font-size:14px; font-weight:700;
+        color:#fff; letter-spacing:.15em;
+        text-shadow:var(--glow-r);
     }
-    .panel::before{
-      content:""; position:absolute; inset:8px;
-      border:1px solid rgba(54,246,255,.12);
-      pointer-events:none;
+    .back-btn {
+        font-size:10px; letter-spacing:.14em; color:var(--r2);
+        text-decoration:none; border:1px solid rgba(255,26,26,0.35);
+        padding:4px 10px; transition:all .2s;
     }
-    .ticks{
-      position:absolute; left:10px; top:10px; bottom:10px; width:10px;
-      display:flex; flex-direction:column; gap:6px;
-      opacity:.85;
-      pointer-events:none;
-    }
-    .ticks i{
-      height:10px; border-left:3px solid rgba(54,246,255,.65);
-      filter: drop-shadow(0 0 8px rgba(54,246,255,.12));
-    }
+    .back-btn:hover { background:var(--r3); color:#fff; }
 
-    /* ===== VR PANEL (haut gauche) ===== */
-    #vrPanel{
-      left:20px; top:48px; width:290px; height:330px;
-      clip-path: polygon(0 0, 93% 0, 100% 12%, 100% 100%, 0 100%);
+    /* ── RÉTICULE CENTRAL ─────────────────────────── */
+    #reticle {
+        position:absolute;
+        left:50%; top:50%; transform:translate(-50%,-50%);
+        width:280px; height:280px;
+        pointer-events:none;
     }
-    #vrFrameTitle{
-      position:absolute; left:18px; top:14px;
-      font-size:10px; letter-spacing:.14em; color:rgba(210,255,255,.72);
+    .ring {
+        position:absolute; border-radius:50%;
+        border:1px solid rgba(255,26,26,0.30);
     }
-    #vrSideTicks{
-      position:absolute; left:10px; top:52px; bottom:18px; width:8px;
-      display:flex; flex-direction:column; justify-content:space-between;
-      opacity:.75;
-      pointer-events:none;
-    }
-    #vrSideTicks b{ height:12px; border-left:3px solid rgba(54,246,255,.55); }
-    #vrFeed{
-      position:absolute; left:18px; right:18px; top:34px; bottom:18px;
-      border:1px solid rgba(54,246,255,.18);
-      background: rgba(0,0,0,.22);
-      overflow:hidden;
-    }
-    #vrFeed img{
-      width:100%; height:100%; object-fit:cover;
-      filter: contrast(1.05) saturate(1.05) brightness(.95);
-      opacity:.96;
-    }
+    .ring-1 { inset:0; border-width:2px; border-color:rgba(255,26,26,0.50); box-shadow:0 0 20px rgba(255,26,26,0.15) inset; }
+    .ring-2 { inset:28px; border-color:rgba(255,26,26,0.25); }
+    .ring-3 { inset:56px; border-color:rgba(255,255,255,0.15); }
+    .ring-4 { inset:90px; border-width:2px; border-color:rgba(255,26,26,0.40); }
 
-    /* ===== CENTER RETICLE ===== */
-    #reticle{
-      position:absolute; left:50%; top:78px;
-      width:320px; height:320px;
-      transform: translateX(-50%);
-      pointer-events:none;
-      filter: drop-shadow(0 0 18px rgba(54,246,255,.18));
+    .arc {
+        position:absolute; border-radius:50%;
+        border:2px solid transparent;
     }
-    .ring{ position:absolute; inset:0; border-radius:50%; border:2px solid rgba(54,246,255,.28); }
-    .ring.r2{ inset:22px; border-color: rgba(54,246,255,.18); }
-    .ring.r3{ inset:58px; border-width:1px; border-color: rgba(54,246,255,.14); }
-    .ring.r4{ inset:92px; border-color: rgba(54,246,255,.22); }
-    .arc{
-      position:absolute; inset:0; border-radius:50%;
-      border:6px solid transparent;
-      border-top-color: rgba(54,246,255,.72);
-      border-right-color: rgba(54,246,255,.22);
-      opacity:.9;
+    .arc-1 {
+        inset:8px;
+        border-top-color:var(--r); border-right-color:var(--r);
+        box-shadow:0 0 12px rgba(255,26,26,0.4);
+        animation:spin 4s linear infinite;
     }
-    .arc.a2{ inset:22px; border-width:6px; opacity:.7; }
-    .arc.a3{ inset:58px; border-width:5px; opacity:.55; }
-    .spin1{ animation: spin 7.2s linear infinite; }
-    .spin2{ animation: spin 3.6s linear infinite reverse; }
-    .spin3{ animation: spin 11.8s linear infinite; }
-    @keyframes spin{ to{ transform: rotate(360deg);} }
-    #scaleBar{
-      position:absolute; left:50%; top:34px;
-      width:210px; height:70px;
-      transform: translateX(-50%);
-      border-top:10px solid rgba(54,246,255,.72);
-      border-left:10px solid transparent;
-      border-right:10px solid transparent;
-      border-radius: 200px 200px 0 0;
-      filter: drop-shadow(0 0 10px rgba(54,246,255,.18));
-      opacity:.9;
-      clip-path: polygon(10% 0, 90% 0, 100% 50%, 0 50%);
+    .arc-2 {
+        inset:18px;
+        border-bottom-color:rgba(255,255,255,0.5);
+        border-left-color:rgba(255,255,255,0.5);
+        animation:spin 7s linear infinite reverse;
     }
+    .arc-3 {
+        inset:60px;
+        border-top-color:rgba(255,26,26,0.6);
+        animation:spin 3s linear infinite;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
 
-    /* ===== RIGHT TOP ENV ===== */
-    #envPanel{
-      right:20px; top:68px; width:310px; height:240px;
-      clip-path: polygon(10% 0, 100% 0, 100% 100%, 0 100%, 0 16%);
+    /* Croix centrale */
+    .cross-h, .cross-v {
+        position:absolute; background:rgba(255,26,26,0.6);
+        box-shadow:var(--glow-r);
     }
-    #envGrid{
-      position:absolute; left:18px; right:18px; top:18px; bottom:18px;
-      display:grid;
-      grid-template-columns: 1fr auto;
-      row-gap:8px; column-gap:10px;
-      font-size:18px;
-    }
-    #envGrid .k{ font-size:16px; color:rgba(210,255,255,.78); }
-    #envGrid .v{ font-size:18px; color:rgba(230,255,255,.95); }
-    #envGrid .v small{ font-size:12px; color:rgba(220,255,255,.65); margin-left:6px; }
-    #envGrid .divider{ grid-column:1/-1; height:1px; background: rgba(54,246,255,.14); margin:2px 0 6px; }
-    #envGrid .subk{ font-size:16px; color:rgba(210,255,255,.72); }
-    #envGrid .subv{ font-size:16px; color:rgba(230,255,255,.92); }
+    .cross-h { top:50%; left:50%; width:60px; height:1px; transform:translate(-50%,-50%); }
+    .cross-v { top:50%; left:50%; width:1px; height:60px; transform:translate(-50%,-50%); }
+    .cross-dot { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:6px; height:6px; border-radius:50%; background:var(--r); box-shadow:var(--glow-r); }
 
-    /* ===== LEFT MID BARS (CPU/RAM/pi temp etc via perf_sys) ===== */
-    #barsPanel{
-      left:40px; top:404px; width:270px; height:250px;
+    /* Marqueurs angulaires sur les bords du réticule */
+    .tick-mark {
+        position:absolute; width:14px; height:2px;
+        background:rgba(255,26,26,0.7);
+        box-shadow:var(--glow-r);
     }
-    #barsPanel .rows{
-      position:absolute; left:18px; right:18px; top:22px; bottom:18px;
-      display:grid;
-      grid-template-columns: 1fr 160px;
-      row-gap:12px; column-gap:12px;
-      align-content:start;
-    }
-    #barsPanel .lab{ font-size:15px; color: rgba(210,255,255,.80); letter-spacing:.06em; }
-    .hbar{
-      height:10px;
-      border:1px solid rgba(54,246,255,.22);
-      background: rgba(0,0,0,.22);
-      box-shadow: 0 0 12px rgba(0,199,255,.08) inset;
-      position:relative;
-    }
-    .hbar i{
-      position:absolute; left:0; top:0; bottom:0;
-      width:0%;
-      background: linear-gradient(90deg, rgba(54,246,255,.95), rgba(0,199,255,.32));
-      box-shadow: 0 0 14px rgba(54,246,255,.18);
-      transition: width .18s ease;
-    }
+    .tm-t { top:0; left:50%; transform:translateX(-50%) rotate(90deg); }
+    .tm-b { bottom:0; left:50%; transform:translateX(-50%) rotate(90deg); }
+    .tm-l { left:0; top:50%; transform:translateY(-50%); }
+    .tm-r { right:0; top:50%; transform:translateY(-50%); }
 
-    /* ===== RIGHT MID GRAPH + VISION TEXT ===== */
-    #rightMid{
-      right:32px; top:350px; width:300px; height:290px;
-      clip-path: polygon(6% 0, 100% 0, 100% 100%, 0 100%, 0 12%);
+    /* Brackets de ciblage rouges */
+    #target-brackets {
+        position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+        width:120px; height:90px; pointer-events:none;
     }
-    #rightMid .graph{
-      position:absolute; left:16px; right:16px; top:16px; height:110px;
-      border:1px solid rgba(54,246,255,.18);
-      background:
-        linear-gradient(0deg, rgba(54,246,255,.06), rgba(0,0,0,.10)),
-        repeating-linear-gradient(90deg, rgba(54,246,255,.10) 0px, rgba(54,246,255,.10) 1px, transparent 1px, transparent 18px),
-        repeating-linear-gradient(0deg, rgba(54,246,255,.08) 0px, rgba(54,246,255,.08) 1px, transparent 1px, transparent 18px);
-      overflow:hidden;
-    }
-    #rightMid .graph svg{ width:100%; height:100%; }
-    #rightMid .t1{ position:absolute; left:20px; top:140px; font-size:20px; color: rgba(210,255,255,.85); }
-    #rightMid .t2{ position:absolute; left:20px; top:178px; font-size:14px; color: rgba(210,255,255,.78); letter-spacing:.08em; }
-    #rightMid .t3{ position:absolute; left:20px; top:202px; font-size:14px; color: rgba(210,255,255,.78); letter-spacing:.08em; }
+    .rb { position:absolute; width:20px; height:20px; }
+    .rb::before, .rb::after { content:''; position:absolute; background:var(--r); box-shadow:var(--glow-r); }
+    .rb.tl { top:0; left:0; }
+    .rb.tl::before { top:0; left:0; width:100%; height:2px; }
+    .rb.tl::after  { top:0; left:0; width:2px; height:100%; }
+    .rb.tr { top:0; right:0; }
+    .rb.tr::before { top:0; right:0; width:100%; height:2px; }
+    .rb.tr::after  { top:0; right:0; width:2px; height:100%; }
+    .rb.bl { bottom:0; left:0; }
+    .rb.bl::before { bottom:0; left:0; width:100%; height:2px; }
+    .rb.bl::after  { bottom:0; left:0; width:2px; height:100%; }
+    .rb.br { bottom:0; right:0; }
+    .rb.br::before { bottom:0; right:0; width:100%; height:2px; }
+    .rb.br::after  { bottom:0; right:0; width:2px; height:100%; }
 
-    /* ===== BOTTOM LEFT ESP32CAM ===== */
-    #espPanel{
-      left:20px; bottom:84px; width:360px; height:250px;
-      clip-path: polygon(0 0, 100% 0, 100% 84%, 94% 100%, 0 100%);
+    /* ── PANELS GÉNÉRIQUES ────────────────────────── */
+    .panel {
+        position:absolute;
+        background:var(--panel);
+        backdrop-filter:blur(8px);
+        -webkit-backdrop-filter:blur(8px);
+        border:1px solid rgba(255,26,26,0.35);
+        box-shadow:0 0 24px rgba(255,26,26,0.08) inset, 0 4px 20px rgba(0,0,0,0.5);
     }
-    #espPanel .inner{
-      position:absolute; left:16px; right:16px; top:16px; bottom:16px;
-      display:grid;
-      grid-template-columns: 160px 1fr;
-      gap:12px;
-    }
-    #espFeed{
-      border:1px solid rgba(54,246,255,.20);
-      background: rgba(0,0,0,.22);
-      overflow:hidden;
-      position:relative;
-    }
-    #espFeed img{ width:100%; height:100%; object-fit:cover; opacity:.96; filter: contrast(1.05) saturate(1.05) brightness(.98); }
-    #espFeed .cap{
-      position:absolute; left:8px; bottom:8px;
-      font-size:10px; letter-spacing:.14em;
-      color: rgba(220,255,255,.70);
-      background: rgba(0,0,0,.30);
-      border:1px solid rgba(54,246,255,.18);
-      padding:3px 6px;
-    }
-    #espStats{
-      border:1px solid rgba(54,246,255,.18);
-      background: rgba(0,0,0,.16);
-      padding:10px;
-      position:relative;
-    }
-    #espStats .hdr{ font-size:12px; letter-spacing:.14em; color:rgba(210,255,255,.76); margin-bottom:8px; }
-    #espStats .row{
-      display:flex; justify-content:space-between; gap:10px;
-      font-size:12px; color: rgba(220,255,255,.66);
-      border-bottom:1px solid rgba(54,246,255,.10);
-      padding:6px 0;
-    }
-    #espStats .row b{ color: rgba(230,255,255,.92); font-weight:600; }
-    #espStats .miniPills{ position:absolute; right:10px; top:10px; display:flex; gap:6px; }
-    #espStats .miniPills i{ width:12px; height:12px; border:1px solid rgba(54,246,255,.25); background: rgba(0,0,0,.18); }
+    /* Clip polygonal style Iron Man */
+    .panel-tl { clip-path:polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); }
+    .panel-tr { clip-path:polygon(16px 0, 100% 0, 100% 100%, 0 100%, 0 16px); }
+    .panel-br { clip-path:polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%); }
+    .panel-bl { clip-path:polygon(0 0, 100% 0, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
 
-    /* ===== BOTTOM RIGHT SPECTRUM ===== */
-    #brPanel{
-      right:20px; bottom:84px; width:350px; height:270px;
-      clip-path: polygon(6% 0, 100% 0, 100% 100%, 0 100%, 0 14%);
+    .panel-title {
+        font-family:var(--font); font-size:9px; font-weight:700;
+        letter-spacing:.20em; color:var(--r);
+        text-shadow:var(--glow-r);
+        padding:8px 12px 4px;
+        border-bottom:1px solid rgba(255,26,26,0.20);
+        margin-bottom:6px;
     }
-    #brPanel .inner{ position:absolute; left:16px; right:16px; top:16px; bottom:16px; }
-    #pause{
-      position:absolute; right:28px; top:26px;
-      width:54px; height:54px; border-radius:50%;
-      border:1px solid rgba(54,246,255,.30);
-      background: rgba(0,0,0,.20);
-      box-shadow: 0 0 18px rgba(0,199,255,.10) inset;
-      display:flex; align-items:center; justify-content:center;
-      cursor:pointer;
+    .panel-body { padding:6px 12px 10px; }
+
+    /* ── LIGNES DE DONNÉES ────────────────────────── */
+    .data-row {
+        display:flex; align-items:center; justify-content:space-between;
+        padding:3px 0;
+        border-bottom:1px solid rgba(255,255,255,0.04);
     }
-    #pause i{ width:18px; height:22px; border-left:4px solid rgba(54,246,255,.75); border-right:4px solid rgba(54,246,255,.75); }
-    #specGrid{
-      position:absolute; left:16px; right:16px; bottom:16px; top:64px;
-      border:1px solid rgba(54,246,255,.18);
-      background:
-        linear-gradient(0deg, rgba(54,246,255,.06), rgba(0,0,0,.10)),
-        repeating-linear-gradient(90deg, rgba(54,246,255,.10) 0px, rgba(54,246,255,.10) 1px, transparent 1px, transparent 18px),
-        repeating-linear-gradient(0deg, rgba(54,246,255,.08) 0px, rgba(54,246,255,.08) 1px, transparent 1px, transparent 18px);
-      overflow:hidden;
-      padding:10px 10px 14px;
+    .data-row:last-child { border-bottom:none; }
+    .dr-key {
+        font-size:9px; letter-spacing:.12em; color:var(--w2); text-transform:uppercase;
     }
-    #specBars{
-      position:absolute; left:10px; right:10px; bottom:12px; top:12px;
-      display:flex; align-items:flex-end; gap:8px;
+    .dr-val {
+        font-size:13px; font-weight:700; color:#fff; letter-spacing:.08em;
+        font-family:var(--font);
+        text-shadow:var(--glow-w);
+        transition:color .3s ease;
     }
-    #specBars b{
-      flex:1;
-      background: linear-gradient(180deg, rgba(54,246,255,.95), rgba(0,199,255,.22));
-      box-shadow: 0 0 16px rgba(54,246,255,.14);
-      height:40%;
-      transition: height .18s ease;
+    .dr-val.alert { color:var(--r); text-shadow:var(--glow-r); animation:flash .6s ease-in-out infinite; }
+    .dr-val.warn  { color:#ffaa00; text-shadow:0 0 8px rgba(255,170,0,.5); }
+    @keyframes flash { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* ── BARRES DE RESSOURCES ─────────────────────── */
+    .bar-row {
+        display:flex; align-items:center; gap:8px; margin-bottom:5px;
     }
-    #specBars b.r{
-      background: linear-gradient(180deg, rgba(255,43,43,.95), rgba(255,43,43,.22));
-      box-shadow: 0 0 16px rgba(255,43,43,.12);
+    .bar-lbl {
+        font-size:9px; letter-spacing:.10em; color:var(--w2); width:52px; flex-shrink:0;
+    }
+    .bar-track {
+        flex:1; height:5px; background:rgba(255,255,255,0.08);
+        border-radius:2px; overflow:hidden;
+        border:1px solid rgba(255,26,26,0.15);
+    }
+    .bar-fill {
+        height:100%; width:0%;
+        background:linear-gradient(90deg, var(--r), #ff6666);
+        box-shadow:0 0 8px rgba(255,26,26,0.5);
+        border-radius:2px;
+        transition:width .6s ease;
+    }
+    .bar-fill.ok   { background:linear-gradient(90deg,#fff,rgba(255,255,255,0.6)); box-shadow:var(--glow-w); }
+    .bar-fill.warn { background:linear-gradient(90deg,#ffaa00,#ffcc44); }
+    .bar-pct { font-size:9px; color:var(--r2); width:28px; text-align:right; font-family:var(--font); }
+
+    /* ── CAPTEURS — PANEL HAUT DROITE ─────────────── */
+    #panel-env {
+        top:54px; right:16px; width:210px;
     }
 
-    /* ===== CENTER BOTTOM LABEL + DANGER ===== */
-    #centerLabel{
-      position:absolute; left:50%; bottom:146px;
-      transform: translateX(-50%);
-      width:360px; height:40px;
-      border:1px solid rgba(54,246,255,.22);
-      background: rgba(0,0,0,.16);
-      clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);
-      box-shadow: 0 0 20px rgba(0,199,255,.10) inset;
-      display:flex; align-items:center; justify-content:center;
-      font-size:13px; letter-spacing:.16em;
-      color: rgba(220,255,255,.74);
+    /* ── RESSOURCES PI — PANEL MILIEU GAUCHE ─────── */
+    #panel-sys {
+        top:50%; left:16px; transform:translateY(-50%);
+        width:186px;
     }
 
-    /* ton ancien #danger était display none/block => on conserve la logique mais en style reference */
-    #danger{
-      position:absolute; left:50%; bottom:78px;
-      transform: translateX(-50%);
-      text-align:center;
-      letter-spacing:.14em;
-      text-transform:uppercase;
-      color: rgba(255,43,43,.92);
-      text-shadow: 0 0 12px rgba(255,43,43,.20);
-      font-size:18px;
-      display:none; /* important: contrôlé par logique obs/dist */
-      pointer-events:none;
+    /* ── VIDÉO Pi Cam — PANEL HAUT GAUCHE ─────────── */
+    #panel-cam {
+        top:54px; left:16px; width:230px; height:200px;
     }
-    #danger small{ display:block; font-size:16px; margin-top:8px; opacity:.90; }
-
-    /* ===== RED TARGET BRACKETS (center) ===== */
-    #redTarget{
-      position:absolute; left:50%; top:57%;
-      transform: translate(-50%,-50%);
-      width:320px; height:180px;
-      pointer-events:none;
-      opacity:.95;
+    #cam-feed {
+        width:100%; height:calc(100% - 36px);
+        background:#000;
+        overflow:hidden; position:relative;
     }
-    .rb{
-      position:absolute; width:18px; height:18px;
-      border:2px solid rgba(255,43,43,.78);
-      box-shadow: 0 0 16px rgba(255,43,43,.14);
+    #cam-img {
+        width:100%; height:100%; object-fit:cover;
+        filter:contrast(1.1) saturate(0.8);
+        display:none;
     }
-    .rb.tl{ left:-2px; top:-2px; border-right:none; border-bottom:none; }
-    .rb.tr{ right:-2px; top:-2px; border-left:none; border-bottom:none; }
-    .rb.bl{ left:-2px; bottom:-2px; border-right:none; border-top:none; }
-    .rb.br{ right:-2px; bottom:-2px; border-left:none; border-top:none; }
-
-    /* ===== JOYSTICK ===== */
-    #joy {
-      position: absolute;
-      left: 420px;       /* Décalé vers la droite pour laisser la place au panel ESP */
-      bottom: 84px;      /* Aligné sur le bas des autres panels */
-      width: 140px; height: 140px;
-      border-radius: 50%;
-      border: 2px solid rgba(54,246,255,.65);
-      box-shadow: 0 0 18px rgba(54,246,255,.14);
-      background: rgba(0,0,0,.18);
-      display: block;
-      pointer-events: auto;
-      z-index: 10;
+    .cam-placeholder {
+        position:absolute; inset:0;
+        display:flex; align-items:center; justify-content:center;
+        font-size:9px; color:var(--r2); letter-spacing:.1em;
     }
-    #joyDot{
-      position:absolute; left:50%; top:50%;
-      width:10px; height:10px;
-      margin-left:-5px; margin-top:-5px;
-      border-radius:50%;
-      background: rgba(240,255,255,.92);
-      box-shadow: 0 0 14px rgba(54,246,255,.18);
-    }
-    #joyLabel{
-      position:absolute; left:50%; top:100%;
-      transform: translate(-50%, 10px);
-      font-size:11px; letter-spacing:.12em;
-      color: rgba(220,255,255,.70);
-      background: rgba(0,0,0,.30);
-      border:1px solid rgba(54,246,255,.18);
-      padding:4px 8px;
-      white-space:nowrap;
+    .cam-live-dot {
+        position:absolute; top:6px; right:8px; width:7px; height:7px;
+        border-radius:50%; background:var(--r); box-shadow:var(--glow-r);
+        animation:pulse-dot 1s infinite;
+        display:none;
     }
 
-    /* ===== MOVING SCANLINE ===== */
-    #scanline{
-      position:absolute; left:0; right:0; height:2px;
-      background: linear-gradient(90deg, transparent, rgba(54,246,255,.92), transparent);
-      opacity:.55;
-      box-shadow: 0 0 18px rgba(54,246,255,.22);
-      mix-blend-mode:screen;
-      animation: scan 2.8s linear infinite;
-      pointer-events:none;
-    }
-    @keyframes scan{
-      0%{ top:15%; }
-      50%{ top:84%; }
-      100%{ top:15%; }
+    /* ── STATS ESP32 — PANEL BAS GAUCHE ───────────── */
+    #panel-esp {
+        bottom:54px; left:16px; width:200px;
     }
 
-    /* responsive */
-    @media (max-width: 1100px){
-      #vrPanel{ transform: scale(.92); transform-origin: top left; }
-      #envPanel{ transform: scale(.92); transform-origin: top right; }
-      #rightMid{ transform: scale(.92); transform-origin: top right; }
-      #barsPanel{ transform: scale(.92); transform-origin: top left; }
-      #espPanel{ transform: scale(.92); transform-origin: bottom left; }
-      #brPanel{ transform: scale(.92); transform-origin: bottom right; }
-      #reticle{ transform: translateX(-50%) scale(.90); transform-origin: top center; }
-      #joy{ transform: translate(-50%,-50%) scale(.9); }
+    /* ── GRAPHIQUE + ANALYSE IA — PANEL HAUT CENTRE-DROIT */
+    #panel-analysis {
+        top:54px; right:240px; width:200px;
     }
-  </style>
+    .graph-area {
+        height:60px; width:100%;
+        border:1px solid rgba(255,26,26,0.18);
+        background:rgba(0,0,0,0.3);
+        overflow:hidden; position:relative; margin-bottom:6px;
+    }
+    .graph-area svg { width:100%; height:100%; }
+
+    /* ── SPECTRE SONORE — PANEL BAS DROITE ─────────── */
+    #panel-spectrum {
+        bottom:54px; right:16px; width:200px;
+    }
+    #spec-bars {
+        display:flex; align-items:flex-end; gap:3px;
+        height:60px; padding:4px 0;
+    }
+    #spec-bars span {
+        flex:1; background:linear-gradient(180deg,var(--r),rgba(255,26,26,0.3));
+        border-radius:1px 1px 0 0;
+        box-shadow:0 0 6px rgba(255,26,26,0.4);
+        transition:height .12s ease;
+        min-height:4px;
+    }
+    #spec-bars span.w { background:linear-gradient(180deg,#fff,rgba(255,255,255,0.3)); }
+
+    /* ── JOYSTICK ─────────────────────────────────── */
+    #panel-joy {
+        bottom:54px; left:220px; width:130px; height:130px;
+        border-radius:50%; display:flex; align-items:center; justify-content:center;
+        clip-path:none;
+    }
+    #joy-inner {
+        width:110px; height:110px; border-radius:50%;
+        border:2px solid rgba(255,26,26,0.5);
+        background:rgba(0,0,0,0.5);
+        position:relative;
+        box-shadow:0 0 20px rgba(255,26,26,0.15) inset;
+    }
+    #joy-rings { position:absolute; inset:0; border-radius:50%; border:1px solid rgba(255,26,26,0.20); }
+    #joy-rings::after { content:''; position:absolute; inset:14px; border-radius:50%; border:1px solid rgba(255,255,255,0.10); }
+    #joy-dot {
+        position:absolute; width:12px; height:12px; border-radius:50%;
+        background:var(--r); box-shadow:var(--glow-r);
+        top:50%; left:50%; transform:translate(-50%,-50%);
+        transition:left .1s ease, top .1s ease;
+    }
+    #joy-cross-h, #joy-cross-v {
+        position:absolute; background:rgba(255,26,26,0.25);
+    }
+    #joy-cross-h { top:50%; left:0; right:0; height:1px; transform:translateY(-50%); }
+    #joy-cross-v { left:50%; top:0; bottom:0; width:1px; transform:translateX(-50%); }
+    #joy-lbl {
+        position:absolute; bottom:-22px; left:50%; transform:translateX(-50%);
+        font-size:8px; color:var(--r2); letter-spacing:.1em; white-space:nowrap;
+    }
+
+    /* ── NOVA VOCAL BAR ───────────────────────────── */
+    #nova-bar {
+        position:absolute; bottom:44px; left:50%; transform:translateX(-50%);
+        width:440px; height:40px;
+        display:flex; align-items:center; justify-content:space-between;
+        padding:0 16px;
+        background:rgba(0,0,0,0.55);
+        border:1px solid rgba(255,26,26,0.45);
+        clip-path:polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+        box-shadow:var(--glow-r);
+    }
+    #nova-name {
+        font-family:var(--font); font-size:12px; font-weight:900;
+        color:var(--r); letter-spacing:.3em; text-shadow:var(--glow-r);
+    }
+    #nova-msg {
+        font-size:10px; color:#fff; letter-spacing:.12em; text-align:center; flex:1; padding:0 10px;
+        animation:typeFlash 4s ease-in-out infinite;
+    }
+    @keyframes typeFlash { 0%,95%{opacity:1} 97%,100%{opacity:.6} }
+    #nova-wave {
+        display:flex; align-items:center; gap:2px; height:24px;
+    }
+    #nova-wave span {
+        width:3px; border-radius:2px;
+        background:var(--r);
+        box-shadow:var(--glow-r);
+        animation:wave 1.2s ease-in-out infinite;
+    }
+    #nova-wave span:nth-child(1){ height:6px;  animation-delay:0s; }
+    #nova-wave span:nth-child(2){ height:14px; animation-delay:.1s; }
+    #nova-wave span:nth-child(3){ height:20px; animation-delay:.2s; }
+    #nova-wave span:nth-child(4){ height:14px; animation-delay:.3s; }
+    #nova-wave span:nth-child(5){ height:8px;  animation-delay:.4s; }
+    #nova-wave span:nth-child(6){ height:18px; animation-delay:.5s; }
+    #nova-wave span:nth-child(7){ height:10px; animation-delay:.6s; }
+    @keyframes wave { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(.3)} }
+
+    /* ── ALERTE DANGER ────────────────────────────── */
+    #danger-alert {
+        position:absolute; bottom:92px; left:50%; transform:translateX(-50%);
+        padding:8px 32px 6px;
+        background:rgba(255,0,0,0.15);
+        border:2px solid var(--r);
+        box-shadow:var(--glow-r), 0 0 60px rgba(255,0,0,0.3);
+        text-align:center;
+        display:none;
+        clip-path:polygon(16px 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 16px 100%, 0 50%);
+        animation:danger-pulse .4s ease-in-out infinite;
+    }
+    @keyframes danger-pulse { 0%,100%{opacity:1; box-shadow:var(--glow-r)} 50%{opacity:.7; box-shadow:0 0 30px rgba(255,0,0,0.6)} }
+    #danger-alert .d1 {
+        font-family:var(--font); font-size:13px; font-weight:900;
+        color:var(--r); letter-spacing:.3em; text-shadow:var(--glow-r);
+    }
+    #danger-alert .d2 {
+        font-size:10px; color:#fff; letter-spacing:.2em;
+    }
+
+    /* ── ALERTE GÉNÉRALE ──────────────────────────── */
+    #alert-feed {
+        position:absolute; bottom:100px; right:16px; width:210px;
+        display:flex; flex-direction:column; gap:4px;
+        pointer-events:none;
+    }
+    .alert-chip {
+        padding:5px 10px; font-size:9px; letter-spacing:.1em;
+        animation:slideLeft .3s ease;
+        border-left:3px solid var(--r);
+    }
+    @keyframes slideLeft { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:none} }
+    .ac-crit { background:rgba(255,26,26,0.18); color:var(--r); }
+    .ac-warn { background:rgba(255,170,0,0.15); color:#ffaa00; border-color:#ffaa00; }
+
+    /* ── BOTTOM STATUS BAR ────────────────────────── */
+    #statusbar {
+        position:absolute; bottom:0; left:0; right:0; height:44px;
+        display:flex; align-items:center; justify-content:space-between;
+        padding:0 20px;
+        background:linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+        border-top:1px solid rgba(255,26,26,0.22);
+    }
+    #statusbar-left { display:flex; gap:20px; font-size:9px; letter-spacing:.12em; color:var(--w2); }
+    #statusbar-right { display:flex; gap:16px; align-items:center; }
+    .sb-val { color:#fff; font-family:var(--font); font-size:9px; }
+    #hw-indicator {
+        font-size:9px; letter-spacing:.12em; padding:3px 8px;
+        border:1px solid rgba(255,26,26,0.35);
+        color:var(--r); font-family:var(--font);
+    }
+    #hw-indicator.online { border-color:rgba(255,255,255,0.35); color:#fff; }
+
+    /* ── DÉCO LIGNES ──────────────────────────────── */
+    .deco-line-h {
+        position:absolute; height:1px;
+        background:linear-gradient(90deg,transparent,rgba(255,26,26,0.4),transparent);
+        pointer-events:none;
+    }
+    .deco-line-v {
+        position:absolute; width:1px;
+        background:linear-gradient(180deg,transparent,rgba(255,26,26,0.3),transparent);
+        pointer-events:none;
+    }
+    .deco-triangle {
+        position:absolute; width:0; height:0; pointer-events:none;
+        border-left:8px solid transparent;
+        border-right:8px solid transparent;
+        border-bottom:12px solid rgba(255,26,26,0.45);
+        filter:drop-shadow(0 0 4px rgba(255,26,26,0.5));
+    }
+
+    /* ── WATCHDOG BARRE ───────────────────────────── */
+    #watchdog-strip {
+        position:absolute; bottom:44px; left:0; right:0; height:2px;
+        background:rgba(255,255,255,0.06);
+    }
+    #watchdog-fill {
+        height:100%; width:100%;
+        background:linear-gradient(90deg,var(--r),#ff6666);
+        box-shadow:var(--glow-r);
+        transition:width 1s linear, background .5s;
+    }
+    </style>
 </head>
+<body>
 
-    <body>
-      <div id="bg">
-         <img id="video-stream" 
-             src="http://{{ request.host.split(':')[0] }}:5051/video_feed" 
-             alt="En attente du flux NOVA VISION..." 
-             style="width: 100%; height: auto; display: block;"
-             title="Flux IA en temps réel"
-             onclick="this.src='http://{{ request.host.split(':')[0] }}:5050/video_feed?' + new Date().getTime();"
-             onerror="handleVideoError(this)">
-                        
-          <div id="camera-status-badge" style="position: absolute; top: 10px; left: 10px; background: rgba(0,255,0,0.7); color: black; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">
-           </div>                                                 onerror="handleVideoError(this)">
-    <div id="noise"></div>
+<!-- ── FOND VIDÉO ──────────────────────────────────── -->
+<div id="bg">
+    <img src="/video_feed"
+         alt="Flux vidéo principal"
+         onerror="this.style.opacity='0.3'">
+</div>
+<div id="scanlines" aria-hidden="true"></div>
 
-    <div id="hud">
-      <!--div id="scanline"></div-->
+<!-- ── HUD PRINCIPAL ──────────────────────────────── -->
+<div id="hud" role="main" aria-label="Interface NOVA HUD">
 
-      <div id="outer"></div>
-      <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
-      <div class="ear left"></div><div class="ear right"></div>
+    <!-- Cadre + coins -->
+    <div class="frame-border" aria-hidden="true"></div>
+    <div class="corner tl" aria-hidden="true"></div>
+    <div class="corner tr" aria-hidden="true"></div>
+    <div class="corner bl" aria-hidden="true"></div>
+    <div class="corner br" aria-hidden="true"></div>
 
-      <div id="hdrLeft" class="glow">S.MOS SYSTEM V1.0</div>
-      <div id="profile-name">MODE: {{ profile.name }}</div>
-      <div id="hdrRight">
-        <div class="ico"></div><div class="ico"></div><div class="ico"></div>
-        <div class="lg glow">LQ</div>
-      </div>
+    <!-- Lignes déco -->
+    <div class="deco-line-h" style="top:44px;left:16px;right:16px" aria-hidden="true"></div>
+    <div class="deco-line-h" style="bottom:44px;left:16px;right:16px" aria-hidden="true"></div>
 
-      <!-- VR PANEL -->
-      <div id="vrPanel" class="panel">
-        <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div id="vrFrameTitle" class="glow">VR HEADSET VIEW</div>
-        <div id="vrSideTicks" aria-hidden="true"><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div>
-        <div id="vrFeed">
-          <!-- URL configurable en JS (snapshot refresh). Si vide => placeholder -->
-          <img id="vrImg" alt="vr_feed"
-               src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='480'%3E%3Crect width='640' height='480' fill='%23000'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2336f6ff' font-family='monospace' font-size='22'%3EVR FEED%3C/text%3E%3C/svg%3E">
-        </div>
-      </div>
-
-      <!-- RETICLE -->
-      <div id="reticle" aria-hidden="true">
-        <div id="scaleBar"></div>
-        <div class="ring spin1"></div>
-        <div class="ring r2 spin2"></div>
-        <div class="ring r3 spin3"></div>
-        <div class="ring r4 spin2"></div>
-        <div class="arc spin2" style="transform: rotate(22deg);"></div>
-        <div class="arc a2 spin1" style="transform: rotate(190deg);"></div>
-        <div class="arc a3 spin3" style="transform: rotate(40deg);"></div>
-        <div class="ring r3" style="inset:122px; border-color: rgba(54,246,255,.22);"></div>
-        <div class="ring r3" style="inset:142px; border-color: rgba(54,246,255,.18);"></div>
-      </div>
-
-      <!-- RIGHT TOP ENV (utilise data.sensors.temp_ext & data.sensors.gas + GPS factice) -->
-      <div id="envPanel" class="panel">
-        <div class="ticks" aria-hidden="true" style="left:auto; right:10px;"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div id="envGrid">
-          <div class="k glow">TEMP :</div><div class="v glow"><span id="tempVal">0.0</span><small>°C</small></div>
-          <div class="k glow">GAZ&nbsp;&nbsp;:</div><div class="v glow"><span id="gazVal">0</span><small>°C</small></div>
-          <div class="k glow">GAZ&nbsp;&nbsp;:</div><div class="v glow"><span id="gazPpmVal">0</span><small>PPM</small></div>
-          <div class="k glow">MIDS :</div><div class="v glow"><span id="midsVal">----</span></div>
-          <div class="divider"></div>
-          <div class="subk glow">GPS</div><div class="subv glow" id="gpsDir">INDE&nbsp;&nbsp;E</div>
-          <div class="subk glow">LAT :</div><div class="subv glow"><span id="latVal">48.85</span>,&nbsp;&nbsp;<span id="lonVal">2.35</span></div>
-        </div>
-      </div>
-
-      <!-- LEFT BARS PANEL (perf_sys cpu/ram/pi_temp + wifi/lum/hum => recyclés) -->
-      <div id="barsPanel" class="panel">
-        <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="rows">
-          <div class="lab glow">BATTERIE</div><div class="hbar"><i id="batBar"></i></div>
-          <div class="lab glow">WIFI</div><div class="hbar"><i id="wifiBar"></i></div>
-          <div class="lab glow">CPU</div><div class="hbar"><i id="cpuBar"></i></div>
-          <div class="lab glow">RAM</div><div class="hbar"><i id="ramBar"></i></div>
-          <div class="lab glow">PI TEMP</div><div class="hbar"><i id="piTempBar"></i></div>
-          <div class="lab glow">LUM</div><div class="hbar"><i id="lumBar"></i></div>
-        </div>
-      </div>
-
-      <!-- RIGHT MID (graph + text: on mappe HUM/DIST/TIME) -->
-      <div id="rightMid" class="panel">
-        <div class="ticks" aria-hidden="true" style="left:auto; right:10px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="graph">
-          <svg viewBox="0 0 100 40" preserveAspectRatio="none">
-            <polyline id="line1" fill="none" stroke="rgba(54,246,255,.9)" stroke-width="1.5" points=""></polyline>
-            <polyline id="line2" fill="none" stroke="rgba(54,246,255,.55)" stroke-width="1.2" points=""></polyline>
-          </svg>
-        </div>
-        <div class="t1 glow">TEMPÉRATURE CRTINS</div>
-        <div class="t2 glow">VISION&nbsp;&nbsp;<span id="visionLbl">PEASONE</span></div>
-        <div class="t3 glow">REBAcert&nbsp;&nbsp;<span id="rebaLbl">CRMONE</span></div>
-      </div>
-
-      <!-- BOTTOM LEFT (ESP32-CAM feed) -->
-      <div id="espPanel" class="panel">
-        <div class="ticks" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="inner">
-          <div id="espFeed">
-            <img id="espImg" alt="esp32cam_feed"
-                 src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='480'%3E%3Crect width='640' height='480' fill='%23000'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%2336f6ff' font-family='monospace' font-size='22'%3EESP32-CAM%3C/text%3E%3C/svg%3E">
-            <div class="cap glow">ESP32CAM / LIVE</div>
-          </div>
-
-          <div id="espStats">
-            <div class="miniPills" aria-hidden="true"><i></i><i></i><i></i></div>
-            <div class="hdr glow">RDI GLF8OOAHS</div>
-            <div class="row"><span>DIST</span> <b id="sDist">0 cm</b></div>
-            <div class="row"><span>TIME</span> <b id="sTime">00:00</b></div>
-            <div class="row"><span>HUM</span>  <b id="sHum">0%</b></div>
-            <div class="row"><span>GAS</span>  <b id="sGas">0</b></div>
-            <div class="row"><span>LUM</span>  <b id="sLum">--</b></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- BOTTOM RIGHT (spectrum) -->
-      <div id="brPanel" class="panel">
-        <div class="ticks" aria-hidden="true" style="left:auto; right:10px;"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="inner">
-          <div id="pause" title="pause"><i></i></div>
-          <div id="specGrid">
-            <div id="specBars" aria-label="spectrum bars">
-              <b style="height:44%"></b>
-              <b style="height:60%"></b>
-              <b style="height:52%"></b>
-              <b style="height:68%"></b>
-              <b style="height:46%"></b>
-              <b style="height:78%"></b>
-              <b class="r" style="height:64%"></b>
-              <b class="r" style="height:82%"></b>
-              <b style="height:58%"></b>
-              <b style="height:74%"></b>
+    <!-- ── TOPBAR ─────────────────────────────────── -->
+    <div id="topbar">
+        <div id="topbar-left">
+            <span class="sys-name">S.H.O.S SYSTEM</span>
+            <span class="sys-ver">NOVA v2.0 · HUD</span>
+            <div class="top-status">
+                <div class="ts-item">
+                    <span class="ts-dot" id="dot-socket"></span>
+                    <span id="txt-socket">SOCKET</span>
+                </div>
+                <div class="ts-item">
+                    <span class="ts-dot" id="dot-mqtt"></span>
+                    <span>MQTT</span>
+                </div>
+                <div class="ts-item">
+                    <span class="ts-dot ok" id="dot-hw"></span>
+                    <span id="txt-hw">ARDUINO</span>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
-
-
-<!--div id="module-panel" class="panel">
-    <h3>SYSTEM MODULES</h3>
-    <div class="module-item">
-        <span>NIGHT VISION</span>
-        <button onclick="toggleModule('night_vision')">ACTIVATE</button>
+        <div id="topbar-right">
+            <span id="clock">--:--:--</span>
+            <a href="/" class="back-btn" aria-label="Retour accueil">← HOME</a>
+        </div>
     </div>
-    <div class="module-item">
-        <span>OBJECT SCAN</span>
-        <button onclick="toggleModule('object_scan')">ACTIVATE</button>
+
+    <!-- ── RÉTICULE CENTRAL ───────────────────────── -->
+    <div id="reticle" aria-hidden="true">
+        <div class="ring ring-1"></div>
+        <div class="ring ring-2"></div>
+        <div class="ring ring-3"></div>
+        <div class="ring ring-4"></div>
+        <div class="arc arc-1"></div>
+        <div class="arc arc-2"></div>
+        <div class="arc arc-3"></div>
+        <div class="cross-h"></div>
+        <div class="cross-v"></div>
+        <div class="cross-dot"></div>
+        <div class="tick-mark tm-t"></div>
+        <div class="tick-mark tm-b"></div>
+        <div class="tick-mark tm-l"></div>
+        <div class="tick-mark tm-r"></div>
     </div>
-</div-->
 
-
-      <!-- CENTER BOTTOM LABEL -->
-      <div id="centerLabel" class="glow">RAGE WEIGHT CRTIOR</div>
-
-      <!-- DANGER: on conserve TA logique (obs==0 ou dist<20) -->
-      <div id="danger">
-        <div id="dangerTop">! COLLISION DETECTED !</div>
-        <small id="dangerBot">DANGER CALRTION</small>
-      </div>
-
-      <!-- Center red brackets (visuel) -->
-      <div id="redTarget" aria-hidden="true">
-        <div class="rb tl"></div><div class="rb tr"></div><div class="rb bl"></div><div class="rb br"></div>
-      </div>
-
-      <!-- JOYSTICK widget -->
-      <div id="joy" aria-label="joystick">
-        <div id="joyDot"></div>
-        <div id="joyLabel" class="glow">JOYSTICK: <span id="joyXY">0.00, 0.00</span></div>
-      </div>
+    <!-- Brackets de ciblage -->
+    <div id="target-brackets" aria-hidden="true">
+        <div class="rb tl"></div><div class="rb tr"></div>
+        <div class="rb bl"></div><div class="rb br"></div>
     </div>
-  </div>
 
-  <!-- CONSERVE TON SOCKET.IO -->
-  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-  <script>
-    const socket = io(); 
-    const $ = (id) => document.getElementById(id);
+    <!-- ── PANEL : CAMÉRA PI (haut gauche) ───────── -->
+    <div class="panel panel-tl" id="panel-cam" role="region" aria-label="Flux caméra Pi">
+        <div class="panel-title">▶ PI CAM · FLUX DIRECT</div>
+        <div id="cam-feed">
+            <div class="cam-placeholder" id="cam-ph">CAM OFFLINE</div>
+            <img id="cam-img" alt="Pi Cam flux"
+                 src="/video_feed"
+                 onload="camOnline()"
+                 onerror="camOffline()">
+            <div class="cam-live-dot" id="cam-dot"></div>
+        </div>
+    </div>
 
-    // --- 1. RECEPTION DES DONNÉES CAPTEURS (ARDUINO via MQTT) ---
-    socket.on('sensor_update', (s) => {
-        if (!s) return;
+    <!-- ── PANEL : CAPTEURS ENV (haut droite) ─────── -->
+    <div class="panel panel-tr" id="panel-env" role="region" aria-label="Capteurs environnement">
+        <div class="panel-title">⬡ ENVIRONNEMENT · ARDUINO</div>
+        <div class="panel-body">
+            <div class="data-row">
+                <span class="dr-key">TEMP</span>
+                <span class="dr-val" id="v-temp">— <span style="font-size:10px">°C</span></span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">HUMIDITÉ</span>
+                <span class="dr-val" id="v-hum">— <span style="font-size:10px">%</span></span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">GAZ</span>
+                <span class="dr-val" id="v-gas">— <span style="font-size:10px">PPM</span></span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">DISTANCE</span>
+                <span class="dr-val" id="v-dist">— <span style="font-size:10px">CM</span></span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">FLAMME</span>
+                <span class="dr-val" id="v-flame">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">IR OBSTACLE</span>
+                <span class="dr-val" id="v-ir">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">SON</span>
+                <span class="dr-val" id="v-son">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">LUMINOSITÉ</span>
+                <span class="dr-val" id="v-lum">—</span>
+            </div>
+        </div>
+    </div>
 
-        // Panel Environnement (Haut Droite)
-        if ($('tempVal')) $('tempVal').innerText = s.temp_ext || "0.0";
-        if ($('gazVal')) $('gazVal').innerText = s.gas || "0";
-        if ($('gazPpmVal')) $('gazPpmVal').innerText = s.gas || "0";
-        
-        // Panel ESP32 / Stats (Bas Gauche)
-        if ($('sDist')) $('sDist').innerText = (s.dist || 0) + " cm";
-        if ($('sTime')) $('sTime').innerText = s.time || "00:00";
-        if ($('sHum')) $('sHum').innerText = (s.hum || 0) + "%";
-        if ($('sGas')) $('sGas').innerText = s.gas || "0";
-        if ($('sLum')) $('sLum').innerText = (s.lum == 1) ? "SOMBRE" : "OK";
+    <!-- ── PANEL : SYSTÈME PI (milieu gauche) ─────── -->
+    <div class="panel panel-bl" id="panel-sys" role="region" aria-label="Ressources système Raspberry Pi">
+        <div class="panel-title">⬡ RASPBERRY PI · SYSTÈME</div>
+        <div class="panel-body">
+            <div class="bar-row">
+                <span class="bar-lbl">BATTERIE</span>
+                <div class="bar-track"><div class="bar-fill ok" id="bar-bat" style="width:0%"></div></div>
+                <span class="bar-pct" id="pct-bat">—</span>
+            </div>
+            <div class="bar-row">
+                <span class="bar-lbl">WIFI</span>
+                <div class="bar-track"><div class="bar-fill ok" id="bar-wifi" style="width:0%"></div></div>
+                <span class="bar-pct" id="pct-wifi">—</span>
+            </div>
+            <div class="bar-row">
+                <span class="bar-lbl">CPU</span>
+                <div class="bar-track"><div class="bar-fill" id="bar-cpu" style="width:0%"></div></div>
+                <span class="bar-pct" id="pct-cpu">—</span>
+            </div>
+            <div class="bar-row">
+                <span class="bar-lbl">RAM</span>
+                <div class="bar-track"><div class="bar-fill" id="bar-ram" style="width:0%"></div></div>
+                <span class="bar-pct" id="pct-ram">—</span>
+            </div>
+            <div class="bar-row">
+                <span class="bar-lbl">TEMP PI</span>
+                <div class="bar-track"><div class="bar-fill" id="bar-tmp" style="width:0%"></div></div>
+                <span class="bar-pct" id="pct-tmp">—</span>
+            </div>
+            <div class="bar-row">
+                <span class="bar-lbl">DISK</span>
+                <div class="bar-track"><div class="bar-fill ok" id="bar-dsk" style="width:0%"></div></div>
+                <span class="bar-pct" id="pct-dsk">—</span>
+            </div>
+            <div style="margin-top:8px;padding-top:6px;border-top:1px solid rgba(255,26,26,0.12)">
+                <div class="data-row">
+                    <span class="dr-key">UPTIME</span>
+                    <span class="dr-val" id="v-uptime" style="font-size:11px">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        // Joystick (Conversion 0-1023 vers -1.0 / 1.0)
-        if (s.joy_x !== undefined && s.joy_y !== undefined) {
-            let jX = (s.joy_x - 512) / 512;
-            let jY = (s.joy_y - 512) / 512;
-            joySetNormalized(jX, jY);
-        }
+    <!-- ── PANEL : ANALYSE / GRAPH (centre droit) ─── -->
+    <div class="panel panel-tr" id="panel-analysis" role="region" aria-label="Analyse IA NOVA">
+        <div class="panel-title">⬡ ANALYSE · NOVA AI</div>
+        <div class="panel-body" style="padding-top:4px">
+            <div class="graph-area" aria-label="Graphique historique température et gaz">
+                <svg id="graph-svg" viewBox="0 0 200 60" preserveAspectRatio="none">
+                    <polyline id="gline-t" fill="none" stroke="rgba(255,26,26,0.9)" stroke-width="1.5" points=""></polyline>
+                    <polyline id="gline-g" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1" points=""></polyline>
+                </svg>
+            </div>
+            <div class="data-row" style="margin-top:4px">
+                <span class="dr-key">VISION</span>
+                <span class="dr-val" id="v-vision" style="font-size:10px">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">GESTE</span>
+                <span class="dr-val" id="v-gesture" style="font-size:10px">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">FPS</span>
+                <span class="dr-val" id="v-fps" style="font-size:10px">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">LATENCE</span>
+                <span class="dr-val" id="v-latency" style="font-size:10px">— ms</span>
+            </div>
+        </div>
+    </div>
 
-        // Alerte Danger (Collision)
-        if (s.obs == 0 || (s.dist > 0 && s.dist < 20)) {
-            $('danger').style.display = "block";
-        } else {
-            $('danger').style.display = "none";
-        }
-        
-        // Simulation Spectrum (Si du son est détecté)
-        if (s.son > 10) animateSpectrum(s.son);
-    });
+    <!-- ── PANEL : STATS ESP32 (bas gauche) ──────── -->
+    <div class="panel panel-bl" id="panel-esp" role="region" aria-label="Données ESP32">
+        <div class="panel-title">⬡ ESP32 · TÉLÉMÉTRIE</div>
+        <div class="panel-body">
+            <div class="data-row">
+                <span class="dr-key">JOY X</span>
+                <span class="dr-val" id="v-jx" style="font-size:11px">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">JOY Y</span>
+                <span class="dr-val" id="v-jy" style="font-size:11px">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">BOUTON</span>
+                <span class="dr-val" id="v-btn" style="font-size:11px">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">POTENT.</span>
+                <span class="dr-val" id="v-pot" style="font-size:11px">—</span>
+            </div>
+            <div class="data-row">
+                <span class="dr-key">PAQUETS</span>
+                <span class="dr-val" id="v-pkts" style="font-size:11px">0</span>
+            </div>
+        </div>
+    </div>
 
-    // --- 2. RECEPTION DES PERFORMANCES SYSTÈME (RASPBERRY PI) ---
-    socket.on('sys_update', (p) => {
-        if (!p) return;
+    <!-- ── JOYSTICK VISUEL ────────────────────────── -->
+    <div class="panel" id="panel-joy" role="img" aria-label="Position joystick">
+        <div id="joy-inner">
+            <div id="joy-rings"></div>
+            <div id="joy-cross-h"></div>
+            <div id="joy-cross-v"></div>
+            <div id="joy-dot"></div>
+        </div>
+        <div id="joy-lbl">JOY: <span id="joy-xy">0.00, 0.00</span></div>
+    </div>
 
-        // Panel Bars (Milieu Gauche) - On mappe p.cpu, p.ram, p.temp
-        setBar($('cpuBar'), p.cpu);
-        setBar($('ramBar'), p.ram);
-        setBar($('piTempBar'), (p.temp / 80) * 100); // Ratio sur 80°C max
-        
-        // Valeurs simulées si non fournies par le serveur
-        setBar($('batBar'), p.bat || 85); 
-        setBar($('wifiBar'), p.wifi || 90);
-        setBar($('lumBar'), 70); // Exemple statique
-        
-        // Mise à jour du texte de température Pi si existant
-        if ($('temp-val')) $('temp-val').innerText = Math.round(p.temp) + "°C";
-    });
+    <!-- ── SPECTRE SONORE (bas droite) ───────────── -->
+    <div class="panel panel-br" id="panel-spectrum" role="region" aria-label="Spectre sonore">
+        <div class="panel-title">⬡ SPECTRE SONORE</div>
+        <div class="panel-body" style="padding-top:4px">
+            <div id="spec-bars" aria-hidden="true">
+                <span></span><span></span><span class="w"></span>
+                <span></span><span></span><span class="w"></span>
+                <span></span><span></span><span class="w"></span>
+                <span></span><span></span><span></span>
+            </div>
+            <div class="data-row" style="margin-top:6px">
+                <span class="dr-key">TILT</span>
+                <span class="dr-val" id="v-tilt" style="font-size:10px">—</span>
+            </div>
+        </div>
+    </div>
 
-    // --- 3. FONCTIONS UTILITAIRES (CONSERVÉES) ---
+    <!-- ── NOVA VOCAL BAR ─────────────────────────── -->
+    <div id="nova-bar" role="status" aria-live="polite">
+        <span id="nova-name">NOVA</span>
+        <span id="nova-msg">SYSTÈME OPÉRATIONNEL · EN ATTENTE</span>
+        <div id="nova-wave" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span>
+        </div>
+    </div>
 
-    function setBar(el, pct) {
-        if (!el) return;
-        const fill = el.querySelector('i') || el; // Supporte <i> ou la div directement
-        if (fill) fill.style.width = Math.min(100, Math.max(0, pct)) + '%';
-    }
+    <!-- ── ALERTE DANGER ──────────────────────────── -->
+    <div id="danger-alert" role="alert" aria-live="assertive">
+        <div class="d1" id="danger-title">! COLLISION DÉTECTÉE !</div>
+        <div class="d2" id="danger-sub">DANGER — OBSTACLE CRITIQUE</div>
+    </div>
 
-    function joySetNormalized(nx, ny) {
-        const joyEl = $('joy');
-        if (!joyEl) return;
-        const r = joyEl.getBoundingClientRect();
-        const maxR = r.width / 2 - 10;
-        const px = nx * maxR;
-        const py = ny * maxR;
-        if ($('joyDot')) {
-            $('joyDot').style.left = `calc(50% + ${px}px)`;
-            $('joyDot').style.top = `calc(50% + ${py}px)`;
-        }
-        if ($('joyXY')) $('joyXY').textContent = `${nx.toFixed(2)}, ${ny.toFixed(2)}`;
-    }
+    <!-- ── ALERTES LATÉRALES ──────────────────────── -->
+    <div id="alert-feed" role="log" aria-live="polite"></div>
 
-    function animateSpectrum(val) {
-        const bars = document.querySelectorAll('#specBars b');
-        bars.forEach(bar => {
-            if (!spectrumPaused) {
-                let h = Math.random() * (val / 10); 
-                bar.style.height = Math.min(100, h + 20) + '%';
-            }
-        });
-    }
+    <!-- ── WATCHDOG BARRE ────────────────────────── -->
+    <div id="watchdog-strip" aria-hidden="true">
+        <div id="watchdog-fill"></div>
+    </div>
 
-    let spectrumPaused = false;
-    if ($('pause')) {
-        $('pause').addEventListener('click', () => {
-            spectrumPaused = !spectrumPaused;
-            $('pause').style.opacity = spectrumPaused ? .4 : 1;
-        });
-    }
-    
-    
-     // ---function toggleModule(name) {
-    const btn = event.target;
-    const isActivating = btn.innerText === "ACTIVATE";
-    
-    socket.emit('toggle_module', {
-        name: name,
-        action: isActivating ? 'start' : 'stop'
-    });
+    <!-- ── STATUSBAR ──────────────────────────────── -->
+    <div id="statusbar">
+        <div id="statusbar-left">
+            <span>PROFIL : <span class="sb-val" id="sb-profile">—</span></span>
+            <span>MODULE : <span class="sb-val" id="sb-module">—</span></span>
+            <span>PAQUETS : <span class="sb-val" id="sb-pkts">0</span></span>
+        </div>
+        <div id="statusbar-right">
+            <span id="hw-indicator">HW : OFFLINE</span>
+            <a href="/dashboard" style="font-size:9px;color:var(--r2);text-decoration:none;letter-spacing:.12em;border:1px solid rgba(255,26,26,0.25);padding:3px 8px;">DASHBOARD</a>
+            <a href="/settings"  style="font-size:9px;color:var(--w2);text-decoration:none;letter-spacing:.12em;border:1px solid rgba(255,255,255,0.14);padding:3px 8px;">SETTINGS</a>
+        </div>
+    </div>
 
-    // Changement visuel immédiat
-    btn.innerText = isActivating ? "DEACTIVATE" : "ACTIVATE";
-    btn.style.color = isActivating ? "#ff3636" : "#36f6ff";---
+</div><!-- /#hud -->
+
+<!-- ─────────────────────────────────────────────────── -->
+<!-- PROFIL JINJA2 -->
+<!-- ─────────────────────────────────────────────────── -->
+<script id="profile-data" type="application/json">
+{
+    "name":        "{{ profile.name        | default('NOVA') | e }}",
+    "main_module": "{{ profile.main_module | default('')     | e }}"
 }
+</script>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   S.H.O.S NOVA HUD — JavaScript
+   Logique : sensor_update + sys_update + plugin_update
+═══════════════════════════════════════════════════════ */
+
+/* ── PROFIL ──────────────────────────────────────────── */
+let PROFILE = { name:'NOVA', main_module:'' };
+try { PROFILE = JSON.parse(document.getElementById('profile-data').textContent); } catch(e){}
+document.getElementById('sb-profile').textContent = PROFILE.name  || '—';
+document.getElementById('sb-module').textContent  = PROFILE.main_module || '—';
+
+/* ── HORLOGE ─────────────────────────────────────────── */
+setInterval(() => {
+    const n   = new Date();
+    const pad = x => String(x).padStart(2,'0');
+    document.getElementById('clock').textContent =
+        pad(n.getHours())+':'+pad(n.getMinutes())+':'+pad(n.getSeconds());
+}, 1000);
+
+/* ── HELPERS ─────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+function setTxt(id, v) {
+    const el = $(id);
+    if (el && el.textContent !== String(v)) el.textContent = v;
+}
+function setVal(id, v, unit='') {
+    const el = $(id);
+    if (!el) return;
+    const txt = v !== undefined && v !== null ? String(v) + (unit ? ' '+unit : '') : '—';
+    /* On ne touche que le premier nœud texte pour ne pas détruire les <span> de l'unité */
+    const first = el.childNodes[0];
+    if (first && first.nodeType === 3) {
+        if (first.textContent !== txt) first.textContent = txt;
+    } else {
+        el.textContent = txt;
+    }
+}
+function setAlert(id, isAlert, isWarn) {
+    const el = $(id);
+    if (!el) return;
+    el.classList.toggle('alert', !!isAlert);
+    el.classList.toggle('warn',  !!isWarn && !isAlert);
+}
+function setBar(id, pct, mode) {
+    const fill = $(id);
+    if (!fill) return;
+    const v = Math.min(100, Math.max(0, pct || 0));
+    fill.style.width = v + '%';
+    if (mode === 'auto') {
+        fill.className = 'bar-fill' + (v > 85 ? ' alert' : v > 60 ? '' : ' ok');
+    }
+}
+function setDot(id, on) {
+    const el = $(id);
+    if (!el) return;
+    el.className = 'ts-dot ' + (on ? 'ok' : 'off');
+}
+
+/* ── NOVA MESSAGES ───────────────────────────────────── */
+const NOVA_MSGS = [
+    'SYSTÈME OPÉRATIONNEL · TOUS MODULES ACTIFS',
+    'ANALYSE ENVIRONNEMENTALE EN COURS',
+    'CAPTEURS ARDUINO · SIGNAL NOMINAL',
+    'SURVEILLANCE PÉRIPHÉRIQUE ACTIVE',
+    'TRAITEMENT IA EN COURS · NOVA v2.0',
+    'PROTOCOLE DE SÉCURITÉ ENGAGÉ',
+    'FLUX VIDÉO STABLE · QUALITÉ OPTIMALE',
+];
+let novaIdx = 0;
+function rotateNova() {
+    document.getElementById('nova-msg').textContent = NOVA_MSGS[novaIdx++ % NOVA_MSGS.length];
+}
+rotateNova();
+setInterval(rotateNova, 5000);
+
+function novaSay(msg) {
+    document.getElementById('nova-msg').textContent = msg.toUpperCase();
+}
+
+/* ── CAMÉRA ──────────────────────────────────────────── */
+function camOnline() {
+    $('cam-ph').style.display    = 'none';
+    $('cam-img').style.display   = 'block';
+    $('cam-dot').style.display   = 'block';
+}
+function camOffline() {
+    $('cam-ph').style.display    = 'flex';
+    $('cam-img').style.display   = 'none';
+    $('cam-dot').style.display   = 'none';
+}
+
+/* ── GRAPHIQUE HISTORIQUE ────────────────────────────── */
+const graphMax   = 30;
+const graphHist  = { t:[], g:[] };
+function pushGraph(temp, gas) {
+    graphHist.t.push(temp); graphHist.g.push(gas);
+    if (graphHist.t.length > graphMax) { graphHist.t.shift(); graphHist.g.shift(); }
+    renderGraph();
+}
+function renderGraph() {
+    const w = 200, h = 60;
+    const n = graphHist.t.length;
+    if (n < 2) return;
+
+    function toPoints(arr, minV, maxV) {
+        return arr.map((v, i) => {
+            const x = (i / (n - 1)) * w;
+            const y = h - ((v - minV) / Math.max(1, maxV - minV)) * h;
+            return x.toFixed(1) + ',' + y.toFixed(1);
+        }).join(' ');
+    }
+
+    const minT = Math.min(...graphHist.t), maxT = Math.max(...graphHist.t);
+    const minG = Math.min(...graphHist.g), maxG = Math.max(...graphHist.g);
+    $('gline-t').setAttribute('points', toPoints(graphHist.t, minT, maxT));
+    $('gline-g').setAttribute('points', toPoints(graphHist.g, minG, maxG));
+}
+
+/* ── SPECTRE SONORE ──────────────────────────────────── */
+let specPaused = false;
+function animateSpectrum(val) {
+    if (specPaused) return;
+    const bars = document.querySelectorAll('#spec-bars span');
+    bars.forEach(b => {
+        const h = Math.max(8, Math.random() * Math.min(100, (val / 1024) * 100 + 20));
+        b.style.height = h + '%';
+    });
+}
+/* Animation idle */
+setInterval(() => {
+    if (specPaused) return;
+    const bars = document.querySelectorAll('#spec-bars span');
+    bars.forEach(b => {
+        const cur  = parseFloat(b.style.height) || 30;
+        const next = Math.max(8, Math.min(95, cur + (Math.random() - 0.5) * 18));
+        b.style.height = next + '%';
+    });
+}, 200);
+
+/* ── JOYSTICK VISUEL ─────────────────────────────────── */
+function joySet(nx, ny) {
+    const inner   = $('joy-inner');
+    if (!inner) return;
+    const r       = inner.offsetWidth / 2 - 10;
+    const px      = nx * r;
+    const py      = ny * r;
+    $('joy-dot').style.left = `calc(50% + ${px}px)`;
+    $('joy-dot').style.top  = `calc(50% + ${py}px)`;
+    setTxt('joy-xy', nx.toFixed(2) + ', ' + ny.toFixed(2));
+}
+
+/* ── DANGER ──────────────────────────────────────────── */
+let dangerVisible = false;
+function showDanger(title, sub) {
+    const el = $('danger-alert');
+    if (!el) return;
+    $('danger-title').textContent = title || '! COLLISION DÉTECTÉE !';
+    $('danger-sub').textContent   = sub   || 'DANGER — OBSTACLE CRITIQUE';
+    el.style.display = 'block';
+    dangerVisible    = true;
+    novaSay('⚠ ALERTE — ' + (title || 'DANGER CRITIQUE'));
+}
+function hideDanger() {
+    $('danger-alert').style.display = 'none';
+    dangerVisible = false;
+}
+
+/* ── ALERTES LATÉRALES ───────────────────────────────── */
+let alertCount = 0;
+function addAlertChip(msg, type = 'crit') {
+    const feed = $('alert-feed');
+    if (!feed) return;
+    const el   = document.createElement('div');
+    el.className = 'alert-chip ac-' + type;
+    el.textContent = '[' + new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) + '] ' + msg;
+    feed.insertBefore(el, feed.firstChild);
+    while (feed.children.length > 5) feed.lastChild.remove();
+    alertCount++;
+    setTxt('sb-pkts', alertCount);
+    setTimeout(() => el.remove(), 10000);
+}
+
+/* ── WATCHDOG ────────────────────────────────────────── */
+let lastData   = 0;
+const WD_MS    = 10000;
+const hwInd    = $('hw-indicator');
+setInterval(() => {
+    if (!lastData) return;
+    const age = Date.now() - lastData;
+    const pct = Math.max(0, 100 - (age / WD_MS) * 100);
+    $('watchdog-fill').style.width = pct + '%';
+    if (age > WD_MS) {
+        $('watchdog-fill').style.background = '#555';
+        hwInd.className = ''; hwInd.textContent = 'HW : OFFLINE';
+        setDot('dot-hw', false);
+    }
+}, 500);
+
+/* ── LATENCE INTER-PAQUETS ───────────────────────────── */
+let pktCount = 0, lastPkt = Date.now();
+
+/* ── SOCKET.IO ───────────────────────────────────────── */
+const socket = io();
+
+socket.on('connect', () => {
+    setDot('dot-socket', true);
+    setTxt('txt-socket', 'SOCKET');
+    novaSay('NOVA ONLINE · CONNEXION SERVEUR ÉTABLIE');
+});
+socket.on('disconnect', () => {
+    setDot('dot-socket', false);
+    novaSay('CONNEXION PERDUE · NOVA EN ATTENTE');
+});
+socket.on('mqtt_status', d => setDot('dot-mqtt', d.connected));
+
+/* ── SENSOR UPDATE ───────────────────────────────────── */
+socket.on('sensor_update', (s) => {
+    if (!s) return;
+    lastData = Date.now();
+    pktCount++;
+
+    /* Latence */
+    const now     = Date.now();
+    const latency = now - lastPkt;
+    lastPkt       = now;
+    if (latency < 5000) setTxt('v-latency', latency + ' ms');
+    setTxt('sb-pkts', pktCount);
+    setTxt('v-pkts', pktCount);
+
+    /* HW indicator */
+    hwInd.className = 'online'; hwInd.textContent = 'HW : ONLINE';
+    setDot('dot-hw', true);
+
+    /* Température */
+    const temp = s.temperature ?? s.temp_ext ?? s.temp;
+    if (temp !== undefined) {
+        const v = +temp;
+        setTxt('v-temp', v.toFixed(1) + ' °C');
+        setAlert('v-temp', v > 50, v > 40);
+        pushGraph(v, s.gas ?? s.gaz ?? 0);
+    }
+    /* Humidité */
+    const hum = s.humidity ?? s.hum;
+    if (hum !== undefined) setTxt('v-hum', (+hum).toFixed(0) + ' %');
+    /* Gaz */
+    const gas = s.gas ?? s.gaz;
+    if (gas !== undefined) {
+        const v = +gas;
+        setTxt('v-gas', v.toFixed(0) + ' PPM');
+        setAlert('v-gas', v > 400, v > 200);
+    }
+    /* Distance */
+    const dist = s.distance ?? s.dist;
+    if (dist !== undefined) {
+        const v = +dist;
+        setTxt('v-dist', v.toFixed(0) + ' CM');
+        setAlert('v-dist', v < 20, v < 40);
+    }
+    /* Flamme */
+    if (s.flame !== undefined) {
+        const f = s.flame === 1;
+        setTxt('v-flame', f ? '🔥 FLAMME!' : 'RAS');
+        setAlert('v-flame', f, false);
+        if (f) { showDanger('! FLAMME DÉTECTÉE !', 'DANGER FEU — PROTOCOLE SÉCURITÉ'); addAlertChip('FLAMME DÉTECTÉE', 'crit'); }
+    }
+    /* Infrarouge */
+    if (s.infrared !== undefined) {
+        const obs = s.infrared === 0;
+        setTxt('v-ir', obs ? 'OBSTACLE' : 'LIBRE');
+        setAlert('v-ir', obs, false);
+    }
+    /* Son */
+    const son = s.sound ?? s.son;
+    if (son !== undefined) { setTxt('v-son', (+son).toFixed(0)); animateSpectrum(+son); }
+    /* Luminosité */
+    if (s.light !== undefined) setTxt('v-lum', s.light === 1 ? 'SOMBRE' : 'OK');
+    else if (s.lum !== undefined) setTxt('v-lum', s.lum === 1 ? 'SOMBRE' : 'OK');
+    /* Tilt */
+    if (s.tilt !== undefined) { setTxt('v-tilt', s.tilt === 1 ? 'INCLINÉ!' : 'STABLE'); setAlert('v-tilt', s.tilt===1, false); }
+    /* Joystick */
+    const jx = s.joy_x ?? s.joyX;
+    const jy = s.joy_y ?? s.joyY;
+    if (jx !== undefined && jy !== undefined) {
+        const nx = (+jx - 512) / 512;
+        const ny = (+jy - 512) / 512;
+        joySet(nx, ny);
+        setTxt('v-jx', nx.toFixed(2));
+        setTxt('v-jy', ny.toFixed(2));
+    }
+    /* Bouton joystick */
+    if (s.BJ !== undefined) setTxt('v-btn', s.BJ === 0 ? '● APPUYÉ' : 'RELÂCHÉ');
+    /* Potentiomètre */
+    if (s.potentiometer !== undefined) setTxt('v-pot', s.potentiometer);
+    /* Danger obstacle/collision */
+    const dng = s.obs === 0 || (dist !== undefined && +dist < 20) || (gas !== undefined && +gas > 400);
+    if (dng) {
+        const msg  = +gas > 400 ? '! GAZ CRITIQUE !' : '! COLLISION DÉTECTÉE !';
+        const sub  = +gas > 400 ? 'NIVEAU GAZ DANGEREUX — EVACUER' : 'OBSTACLE IMMINENT';
+        showDanger(msg, sub);
+        addAlertChip(sub, 'crit');
+    } else if (dangerVisible) {
+        hideDanger();
+    }
+});
+
+/* ── SYS UPDATE ──────────────────────────────────────── */
+socket.on('sys_update', (p) => {
+    if (!p) return;
+
+    const cpu  = p.cpu  ?? 0;
+    const ram  = p.ram  ?? 0;
+    const tmp  = p.temp ?? 0;
+    const bat  = p.bat  ?? p.battery ?? null;
+    const wifi = p.wifi ?? null;
+    const disk = p.disk ?? null;
+    const up   = p.uptime ?? null;
+
+    setBar('bar-cpu', cpu, 'auto');   setTxt('pct-cpu', cpu.toFixed(0) + '%');
+    setBar('bar-ram', ram, 'auto');   setTxt('pct-ram', ram.toFixed(0) + '%');
+    setBar('bar-tmp', (tmp/85)*100);  setTxt('pct-tmp', tmp.toFixed(0) + '°C');
+
+    if (bat  !== null) { setBar('bar-bat',  bat,  'auto'); setTxt('pct-bat',  bat + '%'); }
+    if (wifi !== null) { setBar('bar-wifi', wifi, 'auto'); setTxt('pct-wifi', wifi + '%'); }
+    if (disk !== null) { setBar('bar-dsk',  disk, 'auto'); setTxt('pct-dsk',  disk.toFixed(0) + '%'); }
+    if (up   !== null) {
+        const h = Math.floor(up/3600), m = Math.floor((up%3600)/60);
+        setTxt('v-uptime', h + 'h ' + m + 'm');
+    }
+});
+
+/* ── PLUGIN UPDATE ───────────────────────────────────── */
+socket.on('plugin_update', (d) => {
+    const topic = (d.topic || '').toLowerCase();
+    const data  = d.data  || {};
+
+    if (topic.includes('vision')) {
+        if (data.label   ) setTxt('v-vision',  data.label);
+        if (data.fps     ) setTxt('v-fps',     (+data.fps).toFixed(1) + ' FPS');
+    }
+    if (topic.includes('mediapipe') || topic.includes('gesture')) {
+        if (data.gesture ) setTxt('v-gesture', data.gesture);
+        if (data.fps     ) setTxt('v-fps',     (+data.fps).toFixed(1) + ' FPS');
+    }
+    if (topic.includes('voice')) {
+        if (data.command ) novaSay('COMMANDE : ' + data.command);
+    }
+    if (topic.includes('danger')) {
+        if (data.alert   ) { showDanger(); addAlertChip(data.message || 'DANGER', 'crit'); }
+    }
+});
+
+/* ── ALERTES SOCKET ──────────────────────────────────── */
+socket.on('alert_critical', d => {
+    addAlertChip(d.message || 'ALERTE CRITIQUE', 'crit');
+    showDanger(d.message, d.sub);
+    novaSay('⚠ ALERTE CRITIQUE · ' + (d.message || ''));
+});
+socket.on('alert_warning', d => {
+    addAlertChip(d.message || 'AVERTISSEMENT', 'warn');
+    novaSay('⚠ ATTENTION · ' + (d.message || ''));
+});
+
+/* ── INIT ────────────────────────────────────────────── */
+socket.emit('request_status');
+socket.emit('request_data');
 </script>
 </body>
 </html>

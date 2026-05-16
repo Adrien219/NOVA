@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S.H.O.S · Commandes</title>
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════
+   HARDWARE_CONTROLS · WIDGET COMPACT
+   Affiche les commandes physiques configurées + switch IA
+═══════════════════════════════════════════════════════ */
+:root {
+  --bg:rgba(14,17,23,0.55); --panel:rgba(255,255,255,0.06);
+  --border:rgba(255,255,255,0.10); --borderH:rgba(255,255,255,0.22);
+  --y:#e8d44d; --y2:rgba(232,212,77,0.15);
+  --blue:#4da6ff; --green:#34c759; --red:#ff453a;
+  --t1:rgba(255,255,255,0.95); --t2:rgba(255,255,255,0.55); --t3:rgba(255,255,255,0.30);
+  --font:'DM Sans',sans-serif; --mono:'DM Mono',monospace;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:var(--font);color:var(--t1);background:transparent}
+
+.wrap{
+  height:100vh;display:grid;
+  grid-template-columns:auto 1fr auto auto auto;
+  gap:10px;padding:8px 12px;align-items:center;
+  background:var(--bg);backdrop-filter:blur(20px) saturate(150%);
+}
+
+/* ── JOYSTICK VIRTUEL ── */
+.joy{position:relative;width:64px;height:64px;flex-shrink:0}
+.joy-base{
+  width:100%;height:100%;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,0.04),rgba(0,0,0,0.18));
+  border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:inset 2px 2px 6px rgba(0,0,0,.4),inset -2px -2px 6px rgba(255,255,255,.03);
+}
+.joy-stick{
+  width:24px;height:24px;border-radius:50%;
+  background:radial-gradient(circle at 30% 30%,#3a3f50,#1a1d24);
+  border:1px solid var(--borderH);
+  box-shadow:0 2px 4px rgba(0,0,0,.4);
+  transition:transform .15s ease;
+}
+.joy-zone{
+  position:absolute;width:18px;height:18px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;color:var(--t3);cursor:pointer;
+  transition:all .15s;
+}
+.joy-zone:hover{color:var(--y)}
+.joy-zone.has{color:var(--y);background:var(--y2);border:1px solid rgba(232,212,77,0.3)}
+.joy-zone[data-dir="N"]{top:-2px;left:50%;transform:translateX(-50%)}
+.joy-zone[data-dir="S"]{bottom:-2px;left:50%;transform:translateX(-50%)}
+.joy-zone[data-dir="E"]{right:-2px;top:50%;transform:translateY(-50%)}
+.joy-zone[data-dir="W"]{left:-2px;top:50%;transform:translateY(-50%)}
+.joy-zone[data-dir="C"]{top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;font-size:8px}
+
+/* ── KEYPAD 4×4 ── */
+.keypad{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:3px;
+  width:120px;height:60px;
+}
+.kbtn{
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:5px;cursor:pointer;font-size:9px;color:var(--t3);
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;font-family:var(--mono);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px;
+}
+.kbtn:hover{border-color:var(--borderH);color:var(--t2)}
+.kbtn.has{background:var(--y2);border-color:rgba(232,212,77,0.35);color:var(--y)}
+.kbtn:active{transform:scale(0.95);background:rgba(232,212,77,0.25)}
+
+/* ── POTENTIOMÈTRE ── */
+.pot{
+  position:relative;width:56px;height:56px;flex-shrink:0;cursor:pointer;
+}
+.pot svg{width:100%;height:100%;transform:rotate(-135deg)}
+.pot circle.track{fill:none;stroke:rgba(255,255,255,0.08);stroke-width:3}
+.pot circle.prog{fill:none;stroke:var(--y);stroke-width:3;stroke-linecap:round;
+  stroke-dasharray:138;stroke-dashoffset:55;transition:stroke-dashoffset .3s}
+.pot-val{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:13px;font-weight:600;color:var(--t1);
+}
+.pot-label{
+  font-family:var(--mono);font-size:8px;color:var(--t3);
+  text-align:center;letter-spacing:.06em;text-transform:uppercase;
+  margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;
+}
+.pot-wrap{display:flex;flex-direction:column;align-items:center}
+
+/* ── MIC + IR ── */
+.io-btn{
+  width:38px;height:38px;border-radius:50%;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .15s;font-size:16px;
+}
+.io-btn:hover{border-color:var(--borderH)}
+.io-btn.has{background:var(--y2);border-color:rgba(232,212,77,0.35);color:var(--y)}
+.io-btn.active{background:rgba(52,199,89,0.20);border-color:rgba(52,199,89,0.5);
+  box-shadow:0 0 12px rgba(52,199,89,.4);animation:pulse 1.5s ease infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 8px rgba(52,199,89,.3)}50%{box-shadow:0 0 16px rgba(52,199,89,.5)}}
+
+/* ── SWITCH MODELE VISION ── */
+.ai-switch{display:flex;gap:4px;align-items:center;padding:5px 8px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  border-radius:8px}
+.ai-btn{
+  padding:5px 10px;border-radius:6px;cursor:pointer;
+  font-family:var(--mono);font-size:9px;font-weight:500;
+  color:var(--t3);background:transparent;border:1px solid transparent;
+  transition:all .15s;letter-spacing:.04em;text-transform:uppercase;
+}
+.ai-btn:hover{color:var(--t1)}
+.ai-btn.active{
+  background:var(--y2);border-color:rgba(232,212,77,0.3);
+  color:var(--y);box-shadow:0 0 8px rgba(232,212,77,.15);
+}
+
+/* ── LABELS ── */
+.sec-label{
+  font-family:var(--mono);font-size:8px;letter-spacing:.10em;
+  text-transform:uppercase;color:var(--t3);margin-bottom:4px;text-align:center;
+}
+.sec-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
+
+/* ── CONFIG LINK ── */
+.cfg-btn{
+  width:30px;height:30px;border-radius:6px;
+  background:rgba(255,255,255,0.04);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;transition:all .15s;color:var(--t2);text-decoration:none;font-size:14px;
+}
+.cfg-btn:hover{border-color:var(--borderH);color:var(--y)}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  padding:8px 16px;border-radius:8px;
+  background:rgba(20,23,18,0.95);border:1px solid var(--borderH);
+  font-family:var(--mono);font-size:11px;color:var(--y);
+  pointer-events:none;opacity:0;transition:opacity .25s;z-index:100;
+}
+.toast.show{opacity:1}
+
+@media(max-width:700px){
+  .keypad{width:80px}
+  .joy{width:48px;height:48px}
+  .pot{width:44px;height:44px}
+  .ai-switch{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- JOYSTICK -->
+  <div class="sec-wrap">
+    <div class="sec-label">Joy<a href="/module/hardware_controls/config" class="cfg-btn" title="Configurer">⚙</a></div>
+    <div class="joy">
+      <div class="joy-base"><div class="joy-stick"></div></div>
+      <div class="joy-zone" data-dir="N" onclick="trigger('joy','N')" title="Nord"></div>
+      <div class="joy-zone" data-dir="S" onclick="trigger('joy','S')" title="Sud"></div>
+      <div class="joy-zone" data-dir="E" onclick="trigger('joy','E')" title="Est"></div>
+      <div class="joy-zone" data-dir="W" onclick="trigger('joy','W')" title="Ouest"></div>
+      <div class="joy-zone" data-dir="C" onclick="trigger('joy','C')" title="Center"></div>
+    </div>
+    
+  </div>
+
+  <!-- KEYPAD 4×4 -->
+  <div class="sec-wrap">
+    <div class="sec-label">Pad 4×4</div>
+    <div class="keypad" id="kp"></div>
+  </div>
+    
+  <!-- POT -->
+  <div class="pot-wrap">
+    <div class="sec-label">Pot</div>
+    <div class="pot" id="pot">
+      <svg viewBox="0 0 60 60">
+        <circle class="track" cx="30" cy="30" r="22"></circle>
+        <circle class="prog"  cx="30" cy="30" r="22" id="potProg"></circle>
+      </svg>
+      <div class="pot-val" id="potVal">60</div>
+    </div>
+    <div class="pot-label" id="potLbl">—</div>
+  </div>
+
+  <!-- MIC + IR -->
+  <div style="display:flex;gap:8px;align-items:center">
+    <div class="sec-wrap">
+      <div class="sec-label">Mic</div>
+      <div class="io-btn" id="micBtn" onclick="trigger('mic')" title="Microphone">🎙</div>
+    </div>
+    <div class="sec-wrap">
+      <div class="sec-label">IR</div>
+      <div class="io-btn" id="irBtn" onclick="trigger('ir')" title="LED Infrarouge">💡</div>
+    </div>
+  </div>
+
+  <!-- SWITCH MODÈLE VISION -->
+  <div class="sec-wrap">
+    <div class="sec-label">Vision IA</div>
+    <div class="ai-switch">
+      <button class="ai-btn active" id="ai-mp"   onclick="setVisionBackend('mediapipe')">MP</button>
+      <button class="ai-btn"        id="ai-yolo" onclick="setVisionBackend('yolo11n')">YOLO</button>
+      <button class="ai-btn"        id="ai-moon" onclick="setVisionBackend('moondream')">MOON</button>
+    </div>
+  </div>
+
+  <!-- CONFIG -->
+  <a href="/module/hardware_controls/config" class="cfg-btn" title="Configurer">⚙</a>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const socket = io({transports:['websocket','polling']});
+
+// État local
+let CONFIG = { joy:{}, buttons:Array(16).fill('null'),
+               pot:'volume_up', mic:'launch_voice', ir:'screenshot' };
+
+// Labels courts pour affichage
+const SHORT = {
+  launch_voice:'Voice', launch_vision:'Vision', launch_ocr:'OCR',
+  launch_streaming:'Stream', launch_danger:'Danger', launch_hand:'Hand',
+  launch_joystick:'Joy', kill_module:'Kill',
+  reboot:'Reboot', shutdown:'OFF', screenshot:'Snap', snapshot_video:'Vid',
+  restart_nova:'Nova', sync_time:'Time', mute_system:'Mute',
+  volume_up:'Vol+', volume_down:'Vol-',
+  brightness_up:'Lum+', brightness_down:'Lum-',
+  gas_threshold_up:'Gaz+', gas_threshold_down:'Gaz-',
+  distance_threshold_up:'Dst+', distance_threshold_down:'Dst-',
+  run_python_file:'Py', run_shell_cmd:'Sh', run_benchmark:'Bench',
+  mqtt_publish:'Pub', mqtt_alert:'Alert', mqtt_info:'Info', mqtt_ping:'Ping',
+};
+function short(id){ return id && id!=='null' ? (SHORT[id]||id.slice(0,5)) : '—'; }
+
+// Charger config depuis l'API
+async function loadConfig() {
+  try {
+    const r = await fetch('/module/hardware_controls/api/config');
+    if (r.ok) {
+      const d = await r.json();
+      CONFIG = { ...CONFIG, ...d };
+    }
+  } catch(e) { /* fallback config par défaut */ }
+  render();
+}
+
+// Rendu keypad 4x4
+function renderKeypad() {
+  const kp = document.getElementById('kp');
+  kp.innerHTML = '';
+  for (let i=0; i<16; i++) {
+    const b = document.createElement('div');
+    b.className = 'kbtn';
+    const a = CONFIG.buttons[i];
+    if (a && a !== 'null') b.classList.add('has');
+    b.textContent = short(a);
+    b.onclick = () => trigger('btn', i);
+    kp.appendChild(b);
+  }
+}
+
+// Rendu joystick (highlight zones avec actions)
+function renderJoy() {
+  ['N','S','E','W','C'].forEach(dir => {
+    const z = document.querySelector(`.joy-zone[data-dir="${dir}"]`);
+    if (!z) return;
+    const a = CONFIG.joy[dir];
+    z.classList.toggle('has', a && a !== 'null');
+    z.title = `${dir} : ${short(a)}`;
+  });
+}
+
+// Rendu pot
+function renderPot() {
+  document.getElementById('potLbl').textContent = short(CONFIG.pot);
+  const pot = document.getElementById('potProg');
+  const pct = 60; // valeur courante par défaut
+  const dash = 138 - (pct/100)*138;
+  pot.style.strokeDashoffset = dash;
+}
+
+// Rendu mic / IR
+function renderIO() {
+  const mic = document.getElementById('micBtn');
+  const ir  = document.getElementById('irBtn');
+  mic.classList.toggle('has', CONFIG.mic && CONFIG.mic !== 'null');
+  ir.classList.toggle('has',  CONFIG.ir  && CONFIG.ir  !== 'null');
+  mic.title = `Micro : ${short(CONFIG.mic)}`;
+  ir.title  = `IR : ${short(CONFIG.ir)}`;
+}
+
+function render() { renderKeypad(); renderJoy(); renderPot(); renderIO(); }
+
+// ── Exécution d'une commande ──
+function trigger(type, key) {
+  let action = null;
+  if (type === 'joy') action = CONFIG.joy[key];
+  if (type === 'btn') action = CONFIG.buttons[key];
+  if (type === 'pot') action = CONFIG.pot;
+  if (type === 'mic') action = CONFIG.mic;
+  if (type === 'ir')  action = CONFIG.ir;
+
+  if (!action || action === 'null') {
+    showToast('Non configuré');
+    return;
+  }
+
+  // Animation joystick stick
+  if (type === 'joy') {
+    const stick = document.querySelector('.joy-stick');
+    const offsets = {N:[0,-8], S:[0,8], E:[8,0], W:[-8,0], C:[0,0]};
+    const [x,y] = offsets[key]||[0,0];
+    stick.style.transform = `translate(${x}px, ${y}px)`;
+    setTimeout(() => stick.style.transform = '', 200);
+  }
+
+  // Animation mic/ir
+  if (type === 'mic' || type === 'ir') {
+    const el = document.getElementById(type+'Btn');
+    el.classList.add('active');
+    setTimeout(() => el.classList.remove('active'), 1500);
+  }
+
+  // Exécuter via API
+  fetch('/module/hardware_controls/api/execute', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action_id: action, source: type+':'+(key||'')})
+  })
+  .then(r => r.json())
+  .then(d => showToast(d.msg || ('✓ ' + short(action))))
+  .catch(() => showToast('Erreur'));
+}
+
+// ── Switch backend vision ──
+async function setVisionBackend(b) {
+  document.querySelectorAll('.ai-btn').forEach(x => x.classList.remove('active'));
+  const map = { mediapipe:'ai-mp', yolo11n:'ai-yolo', moondream:'ai-moon' };
+  const btn = document.getElementById(map[b]);
+  if (btn) btn.classList.add('active');
+
+  try {
+    const r = await fetch('http://' + location.hostname + ':5051/api/backend', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({backend: b})
+    });
+    const d = await r.json();
+    showToast(d.ok ? `✓ ${b}` : (d.msg || 'Erreur'));
+  } catch(e) {
+    showToast('Vision service hors ligne');
+  }
+}
+
+// État initial du backend vision
+async function initVisionState() {
+  try {
+    const r = await fetch('http://' + location.hostname + ':5051/api/backend');
+    const d = await r.json();
+    if (d.active) setVisionBackendUI(d.active);
+  } catch(e) {}
+}
+function setVisionBackendUI(b) {
+  document.querySelectorAll('.ai-btn').forEach(x => x.classList.remove('active'));
+  const map = { mediapipe:'ai-mp', yolo11n:'ai-yolo', moondream:'ai-moon' };
+  const btn = document.getElementById(map[b]);
+  if (btn) btn.classList.add('active');
+}
+
+// ── Toast ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// SocketIO : sync si config change ailleurs
+socket.on('hardware_config_updated', d => { CONFIG = {...CONFIG, ...d}; render(); });
+socket.on('vision_backend_changed',  d => { if (d.backend) setVisionBackendUI(d.backend); });
+
+loadConfig();
+initVisionState();
+</script>
+</body>
+</html>

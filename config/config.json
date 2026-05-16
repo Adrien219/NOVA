@@ -27,7 +27,16 @@
                 "danger_monitor",
                 "vision_objet"
             ]
+        },
+        "vprof": {
+            "name": "Vprof",
+            "main_module": "vision_objet",
+            "secondary_modules": [
+                "voice_assistant",
+                "danger_monitor",
+                "hardware_controls"
+            ]
         }
     },
-    "current_active_profile": "assistant"
+    "current_active_profile": "vprof"
 }

@@ -56,13 +56,50 @@ html, body {
   background:var(--bg); color:var(--t1);
 }
 
+/* ── IMAGE DE FOND IMMERSIVE ─────────────────────────────────── */
+body::before {
+  content:''; position:fixed; inset:0; z-index:-2;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 30%, rgba(77,166,255,0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 80% at 80% 70%, rgba(232,212,77,0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 100% 100% at 50% 100%, rgba(52,199,89,0.04) 0%, transparent 70%),
+    linear-gradient(180deg, #0a0d12 0%, #0e1117 50%, #050709 100%);
+  background-attachment:fixed;
+}
+body::after {
+  content:''; position:fixed; inset:0; z-index:-1;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+  background-size:48px 48px;
+  pointer-events:none;
+}
+
 /* ── ROOT ──────────────────────────────────────────────────── */
 .root {
   display:grid;
   grid-template-columns: var(--sidebar-w) 1fr;
-  grid-template-rows: var(--topbar-h) 1fr var(--footer-h);
+  grid-template-rows: var(--topbar-h) 1fr var(--hw-h) var(--footer-h);
   height:100vh;
 }
+
+/* ── HARDWARE BAR (en bas, sur toute la largeur) ────────────── */
+.hw-bar {
+  grid-column:1/3; grid-row:3;
+  border-top:1px solid var(--border);
+  background:rgba(14,17,23,0.45);
+  backdrop-filter:blur(20px) saturate(150%);
+  -webkit-backdrop-filter:blur(20px) saturate(150%);
+  display:block;
+  position:relative;
+  overflow:hidden;
+  transition:height .25s ease;
+}
+.hw-bar.hidden { display:none; }
+.hw-bar iframe {
+  width:100%; height:100%; border:none; background:transparent;
+}
+:root { --hw-h:80px; }
 
 /* ══════════════════════════════════════════════════════════════
    TOPBAR
@@ -71,7 +108,9 @@ html, body {
   grid-column:1/3;
   display:flex; align-items:center; justify-content:space-between;
   padding:0 18px;
-  background:rgba(14,17,23,0.97);
+  background:rgba(14,17,23,0.65);
+  backdrop-filter:blur(20px) saturate(160%);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);
   border-bottom:1px solid var(--border);
   gap:12px; z-index:100;
 }
@@ -167,15 +206,15 @@ html, body {
 
 /* ── BLOC COMMUN ───────────────────────────────────────────── */
 .bloc {
-  background:var(--glass);
+  background:rgba(20,24,32,0.45);
   border:1px solid var(--border);
   border-radius:var(--r);
-  backdrop-filter:var(--blur);
-  -webkit-backdrop-filter:var(--blur);
+  backdrop-filter:blur(28px) saturate(160%);
+  -webkit-backdrop-filter:blur(28px) saturate(160%);
   display:flex; flex-direction:column;
   overflow:hidden; position:relative;
   min-height:0;
-  box-shadow:0 2px 20px rgba(0,0,0,.30), 0 1px 0 rgba(255,255,255,.06) inset;
+  box-shadow:0 4px 32px rgba(0,0,0,.40), 0 1px 0 rgba(255,255,255,.06) inset;
   transition:border-color .25s;
 }
 /* Ligne lumineuse top */
@@ -305,7 +344,7 @@ html, body {
    FOOTER
 ══════════════════════════════════════════════════════════════ */
 .footer {
-  grid-column:1/3;
+  grid-column:1/3; grid-row:4;
   display:flex; align-items:center; justify-content:space-between;
   padding:0 16px;
   background:rgba(255,255,255,.018);
@@ -421,6 +460,15 @@ html, body {
     <svg viewBox="0 0 16 16">
       <circle cx="8" cy="8" r="2.5"/>
       <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4"/>
+    </svg>
+  </button>
+  <div class="sb-sep"></div>
+  <button class="sb on" id="toggle-hw" onclick="toggleHardwareBar()" title="Afficher/masquer commandes" aria-label="Toggle Hardware">
+    <svg viewBox="0 0 16 16">
+      <rect x="1" y="6" width="14" height="4" rx="1.5"/>
+      <circle cx="4" cy="8" r="1"/>
+      <circle cx="8" cy="8" r="1"/>
+      <circle cx="12" cy="8" r="1"/>
     </svg>
   </button>
 </nav>
@@ -540,6 +588,16 @@ html, body {
 
   </div><!-- /.col-sec -->
 </main>
+
+<!-- ══════════════════════════════ HARDWARE BAR ══════════════════════════════ -->
+<aside class="hw-bar" id="hw-bar" aria-label="Commandes matériel">
+  <iframe
+    src="/module/hardware_controls"
+    title="Hardware Controls"
+    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+    allow="microphone"
+  ></iframe>
+</aside>
 
 <!-- ══════════════════════════════ FOOTER ══════════════════════════════ -->
 <footer class="footer" role="contentinfo">
@@ -797,6 +855,46 @@ setInterval(() => {
   if (el) el.textContent = new Date().toLocaleTimeString('fr-FR',
     { hour:'2-digit', minute:'2-digit', second:'2-digit' });
 }, 1000);
+
+/* ── HARDWARE BAR TOGGLE ────────────────────────────────────── */
+function toggleHardwareBar() {
+  const bar = document.getElementById('hw-bar');
+  const btn = document.getElementById('toggle-hw');
+  const hidden = bar.classList.toggle('hidden');
+  btn.classList.toggle('on', !hidden);
+  try {
+    localStorage.setItem('shos_hw_hidden', hidden ? '1' : '0');
+  } catch(e) {}
+}
+
+/* Restaurer état au chargement */
+try {
+  if (localStorage.getItem('shos_hw_hidden') === '1') {
+    document.getElementById('hw-bar').classList.add('hidden');
+    document.getElementById('toggle-hw').classList.remove('on');
+  }
+} catch(e) {}
+
+/* ── ÉCOUTE CHANGEMENT DE BACKEND VISION ─────────────────────
+   Le widget hardware envoie un postMessage quand le backend change.
+   On recharge les iframes des modules pour qu'ils prennent
+   le nouveau flux annoté (boxes YOLO ou caption Moondream).
+─────────────────────────────────────────────────────────────── */
+window.addEventListener('message', (ev) => {
+  if (!ev.data || ev.data.type !== 'vision_backend_changed') return;
+  console.info('[SHOS] Backend changé →', ev.data.backend, '— rechargement des modules');
+
+  // Forcer rechargement des 3 iframes principales
+  ['iframe-main', 'iframe-s1', 'iframe-s2'].forEach(id => {
+    const iframe = document.getElementById(id);
+    if (iframe && iframe.src && iframe.src !== 'about:blank') {
+      // Astuce : ajouter/changer un paramètre pour forcer rechargement
+      const url = new URL(iframe.src, location.href);
+      url.searchParams.set('_v', Date.now());
+      iframe.src = url.toString();
+    }
+  });
+});
 
 /* ── INIT ───────────────────────────────────────────────────── */
 applyProfile();
