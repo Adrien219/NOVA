@@ -709,22 +709,45 @@ a.card:hover .c-ico { transform:scale(1.08); }
                 </div>
             </a>
 
-            <!-- ── CARD 5 : Dashboard ── -->
-            <a href="/dashboard" class="card c-r2b" aria-label="Dashboard capteurs">
-                <span class="c-arr" aria-hidden="true">↗</span>
-                <div class="card-head">
-                    <div class="card-head-l">
-                        <div class="c-ico ico-y" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                        </div>
-                        <div>
-                            <div class="card-title" style="font-size:13px">Dashboard</div>
-                            <div class="card-sub">Capteurs temps réel</div>
-                        </div>
+
+
+
+
+
+
+
+
+            <div class="card c-r3a1" role="region" aria-label="Orchestrateur IA">
+                <div class="card-lbl">Orchestrateur IA</div>
+                <div class="q-grid">
+                    <div class="q-item" aria-label="Statut IA">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                        <span id="mini-orch-status" style="color: rgba(255,255,255,0.5);">Attente</span>
                     </div>
-                    <button class="ios-toggle on" role="switch" aria-checked="true" aria-label="Module actif" onclick="event.preventDefault()"></button>
+                    <div class="q-item" aria-label="Énergie">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        <span id="mini-orch-energy">—</span>
+                    </div>
+                    <div class="q-item" aria-label="Modules">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        <span id="mini-orch-mods">— Mods</span>
+                    </div>
+                    <div class="q-item" aria-label="Profil">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                        <span id="mini-orch-prof">Profil —</span>
+                    </div>
                 </div>
-            </a>
+            </div>
+
+
+
+
+
+
+
+
+
+           
 
             <!-- ── CARD 6 : Lighting / Luminosité ── -->
             <div class="card c-r2c" role="region" aria-label="Luminosité capteur">
@@ -844,6 +867,37 @@ a.card:hover .c-ico { transform:scale(1.08); }
    S.H.O.S INDEX — JavaScript · Zéro donnée fictive
    Socket.IO · /api/get_profiles · /api/system_status
 ═══════════════════════════════════════════════════════ */
+document.addEventListener("DOMContentLoaded", () => {
+    if (typeof socket !== 'undefined') {
+      socket.on('relay_decision', (data) => {
+        if (!data) return;
+        
+        // 1. Statut (Passe au vert si actif)
+        const statusEl = document.getElementById('mini-orch-status');
+        statusEl.textContent = 'En ligne';
+        statusEl.style.color = '#30d158'; 
+
+        // 2. Énergie (ex: "MED | 20fps")
+        const e = data.energy || {};
+        const cpu = (e.cpu_freq || '—').replace('GHz', 'G'); // Raccourci pour l'affichage
+        document.getElementById('mini-orch-energy').textContent = `${cpu} | ${e.fps_target || '-'}fps`;
+
+        // 3. Modules (ex: "3 Actifs")
+        const mods = data.active_modules || [];
+        document.getElementById('mini-orch-mods').textContent = `${mods.length} Actif${mods.length > 1 ? 's' : ''}`;
+
+        // 4. Profil (ex: "P_1")
+        const p = data.profile || {};
+        let profName = p.suggested ? p.suggested.replace('profile_', 'P_') : '—';
+        document.getElementById('mini-orch-prof').textContent = `${profName}`;
+      });
+    }
+  });
+
+
+
+
+
 
 /* ── CLOCK ─────────────────────────────────────────── */
 function tick() {

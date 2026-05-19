@@ -547,6 +547,11 @@ class MQTTHandler:
             ("shos/camera/processed", 1),
             ("shos/benchmark/ping", 1),
             ("shos/plugins/+/data", 1)
+
+            ("shos/orchestrator/decision",  1),
+            ("shos/orchestrator/modules",   1),
+            ("shos/orchestrator/energy",    1),
+            ("shos/orchestrator/profile",   1),
         ])
         print("📡 [MQTT] Écoute active : Vidéo IA + Capteurs")
 
@@ -579,6 +584,10 @@ class MQTTHandler:
                 mod_name = parts[2]
                 socketio.emit('module_update', {'module': mod_name, 'data': payload})
                 socketio.emit('plugin_data', payload)
+
+            elif topic.startswith("shos/orchestrator/"):
+                kind = topic.split("/")[-1]
+                socketio.emit(f'orchestrator_{kind}', payload)
 
         except Exception as e:
             if topic != "shos/camera/processed":
