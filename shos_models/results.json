@@ -1,0 +1,70 @@
+{
+  "module_manager": {
+    "algorithm": "Decision Tree (multi-label)",
+    "accuracy_strict": 0.9825,
+    "accuracy_label": 0.9981,
+    "precision": 0.9964,
+    "recall": 0.9975,
+    "f1_score": 0.9962,
+    "inference_ms": 0.031,
+    "training_time_s": 3.9789,
+    "cv_mean": 0.9872,
+    "cv_std": 0.0038
+  },
+  "energy_cpu_freq": {
+    "algorithm": "MLP 32-16-8",
+    "accuracy": 0.94,
+    "precision": 0.9233,
+    "recall": 0.94,
+    "f1_score": 0.9307,
+    "inference_ms": 0.1696,
+    "training_time_s": 30.0461,
+    "classes": [
+      "HIGH",
+      "LOW",
+      "MED"
+    ]
+  },
+  "energy_fps_target": {
+    "algorithm": "MLP 32-16-8",
+    "accuracy": 0.9067,
+    "precision": 0.8958,
+    "recall": 0.9067,
+    "f1_score": 0.8952,
+    "inference_ms": 0.1775,
+    "training_time_s": 14.9456,
+    "classes": [
+      "10",
+      "15",
+      "20",
+      "25",
+      "30"
+    ]
+  },
+  "energy_sleep_modules": {
+    "algorithm": "MLP 32-16-8",
+    "accuracy": 0.9867,
+    "precision": 0.9846,
+    "recall": 0.9867,
+    "f1_score": 0.985,
+    "inference_ms": 0.3892,
+    "training_time_s": 14.8905,
+    "classes": [
+      "none",
+      "streaming",
+      "vision+streaming"
+    ]
+  },
+  "profile_predictor": {
+    "accuracy": 0.96,
+    "precision": 0.9604,
+    "recall": 0.96,
+    "f1_score": 0.9595,
+    "inference_ms": 0.0272,
+    "training_time_s": 0.004,
+    "k": 5,
+    "algorithm": "k-NN (k=5, weighted distance)",
+    "cv_mean": 0.94,
+    "cv_std": 0.0089
+  }
+}

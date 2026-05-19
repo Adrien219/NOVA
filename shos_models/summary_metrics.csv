@@ -1,0 +1,6 @@
+Modèle,Algorithme,Accuracy,Precision,Recall,F1-score,Inférence (ms),Train (s)
+module_manager,Decision Tree (multi-label),0.9825,0.9964,0.9975,0.9962,0.031,3.9789
+energy_cpu_freq,MLP 32-16-8,0.94,0.9233,0.94,0.9307,0.1696,30.0461
+energy_fps_target,MLP 32-16-8,0.9067,0.8958,0.9067,0.8952,0.1775,14.9456
+energy_sleep_modules,MLP 32-16-8,0.9867,0.9846,0.9867,0.985,0.3892,14.8905
+profile_predictor,"k-NN (k=5, weighted distance)",0.96,0.9604,0.96,0.9595,0.0272,0.004
