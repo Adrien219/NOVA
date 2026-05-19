@@ -7,32 +7,19 @@
                 "danger_monitor"
             ]
         },
-        "test_profil": {
-            "name": "Test_profil",
-            "main_module": "video_streaming",
-            "secondary_modules": [
-                "voice_assistant",
-                "hand_control"
-            ]
-        },
-        "aveugle": {
-            "name": "aveugle",
-            "main_module": null,
-            "secondary_modules": []
-        },
-        "assistant": {
-            "name": "assistant",
-            "main_module": "video_streaming",
-            "secondary_modules": [
-                "danger_monitor",
-                "vision_objet"
-            ]
-        },
         "vprof": {
             "name": "Vprof",
             "main_module": "vision_objet",
             "secondary_modules": [
                 "voice_assistant",
+                "danger_monitor",
+                "hardware_controls"
+            ]
+        },
+        "test_boutons": {
+            "name": "test_boutons",
+            "main_module": "vision_objet",
+            "secondary_modules": [
                 "danger_monitor",
                 "hardware_controls"
             ]

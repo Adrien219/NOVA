@@ -723,6 +723,26 @@ def save_profile():
         logger.error(f"❌ Erreur critique save_profile : {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/module/<module_id>/config')
+def module_config_route(module_id):
+    """Sert la page de configuration d'un module si config.html existe."""
+    if module_id not in AVAILABLE_MODULES:
+        return f"<h2>404</h2><p>Module {module_id} non chargé.</p>", 404
+    
+    config_path = PLUGINS_BASE_DIR / module_id / "config.html"
+    if not config_path.exists():
+        return f"<h2>404</h2><p>config.html introuvable pour {module_id}.</p>", 404
+    
+    try:
+        profile_id = request.args.get('profile', '').strip()
+        profile = resolve_profile(profile_id)
+        return render_template(f'{module_id}/config.html',
+                               config=AVAILABLE_MODULES[module_id],
+                               profile=profile)
+    except Exception as e:
+        return f"<h2>Erreur</h2><p>{e}</p>", 500
+
+
 # ============================================================================
 # ROUTES MODULES DYNAMIQUES
 # ============================================================================

@@ -5,231 +5,473 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>S.H.O.S · Commandes</title>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════════════════
-   HARDWARE_CONTROLS · WIDGET COMPACT
-   Affiche les commandes physiques configurées + switch IA
-═══════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   HARDWARE_CONTROLS · WIDGET COMPLET
+   ────────────────────────────────────────────────────────────
+   • Joystick virtuel (5 zones) — sync physique via MQTT
+   • Keypad 4×4 (16 boutons) — sync physique via MQTT
+   • Potentiomètre rotatif — sync valeur ADC physique
+   • Microphone (Web Speech API réelle)
+   • LED Infrarouge (commande GPIO)
+   • Switch backend Vision IA (MP / YOLO / MOON)
+   • Historique des commandes avec source (virtuel / physique)
+═══════════════════════════════════════════════════════════════ */
+
 :root {
-  --bg:rgba(14,17,23,0.55); --panel:rgba(255,255,255,0.06);
-  --border:rgba(255,255,255,0.10); --borderH:rgba(255,255,255,0.22);
-  --y:#e8d44d; --y2:rgba(232,212,77,0.15);
-  --blue:#4da6ff; --green:#34c759; --red:#ff453a;
-  --t1:rgba(255,255,255,0.95); --t2:rgba(255,255,255,0.55); --t3:rgba(255,255,255,0.30);
-  --font:'DM Sans',sans-serif; --mono:'DM Mono',monospace;
+  --bg:        rgba(14,17,23,0.55);
+  --panel:     rgba(255,255,255,0.06);
+  --border:    rgba(255,255,255,0.10);
+  --borderH:   rgba(255,255,255,0.22);
+  --y:         #e8d44d;
+  --y2:        rgba(232,212,77,0.15);
+  --y3:        rgba(232,212,77,0.05);
+  --blue:      #4da6ff;
+  --bdim:      rgba(77,166,255,0.15);
+  --green:     #34c759;
+  --gdim:      rgba(52,199,89,0.15);
+  --red:       #ff453a;
+  --t1:        rgba(255,255,255,0.95);
+  --t2:        rgba(255,255,255,0.55);
+  --t3:        rgba(255,255,255,0.30);
+  --font:      'DM Sans', system-ui, sans-serif;
+  --mono:      'DM Mono', monospace;
 }
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;font-family:var(--font);color:var(--t1);background:transparent}
 
-.wrap{
-  height:100vh;display:grid;
-  grid-template-columns:auto 1fr auto auto auto;
-  gap:10px;padding:8px 12px;align-items:center;
-  background:var(--bg);backdrop-filter:blur(20px) saturate(150%);
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height:100%; overflow:hidden;
+  font-family:var(--font); color:var(--t1);
+  background:transparent;
 }
 
-/* ── JOYSTICK VIRTUEL ── */
-.joy{position:relative;width:64px;height:64px;flex-shrink:0}
-.joy-base{
-  width:100%;height:100%;border-radius:50%;
-  background:radial-gradient(circle,rgba(255,255,255,0.04),rgba(0,0,0,0.18));
+/* ── CONTENEUR PRINCIPAL ─────────────────────────────────────── */
+.wrap {
+  height:100vh;
+  display:flex; align-items:center; gap:10px;
+  padding:6px 56px 6px 10px;
+  background:var(--bg); backdrop-filter:blur(20px) saturate(150%);
+  overflow-x:auto; overflow-y:hidden;
+  position:relative;
+}
+.wrap::-webkit-scrollbar { height:3px; }
+.wrap::-webkit-scrollbar-thumb { background:rgba(255,255,255,.1); border-radius:2px; }
+
+/* ── SECTION (label + composant) ────────────────────────────── */
+.sec {
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  flex-shrink:0;
+}
+.sec-label {
+  font-family:var(--mono); font-size:8px;
+  letter-spacing:.10em; text-transform:uppercase;
+  color:var(--t3); white-space:nowrap;
+}
+.divider {
+  width:1px; height:42px; flex-shrink:0;
+  background:linear-gradient(180deg, transparent, var(--border), transparent);
+  margin:0 4px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   1. JOYSTICK VIRTUEL (5 zones)
+═══════════════════════════════════════════════════════════════ */
+.joy {
+  position:relative; width:60px; height:60px; flex-shrink:0;
+}
+.joy-base {
+  width:100%; height:100%; border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.05), rgba(0,0,0,0.20));
   border:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:inset 2px 2px 6px rgba(0,0,0,.4),inset -2px -2px 6px rgba(255,255,255,.03);
+  box-shadow:
+    inset 2px 2px 6px rgba(0,0,0,0.4),
+    inset -2px -2px 6px rgba(255,255,255,0.03);
+  position:relative;
+  display:flex; align-items:center; justify-content:center;
 }
-.joy-stick{
-  width:24px;height:24px;border-radius:50%;
-  background:radial-gradient(circle at 30% 30%,#3a3f50,#1a1d24);
+.joy-stick {
+  width:22px; height:22px; border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, #4a4f60, #1a1d24);
   border:1px solid var(--borderH);
-  box-shadow:0 2px 4px rgba(0,0,0,.4);
-  transition:transform .15s ease;
+  box-shadow:0 2px 4px rgba(0,0,0,0.4);
+  transition:transform .15s ease-out;
+  position:relative; z-index:2;
 }
-.joy-zone{
-  position:absolute;width:18px;height:18px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:10px;color:var(--t3);cursor:pointer;
-  transition:all .15s;
+.joy-zone {
+  position:absolute; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:50%; transition:all .15s;
+  font-size:9px; color:var(--t3);
 }
-.joy-zone:hover{color:var(--y)}
-.joy-zone.has{color:var(--y);background:var(--y2);border:1px solid rgba(232,212,77,0.3)}
-.joy-zone[data-dir="N"]{top:-2px;left:50%;transform:translateX(-50%)}
-.joy-zone[data-dir="S"]{bottom:-2px;left:50%;transform:translateX(-50%)}
-.joy-zone[data-dir="E"]{right:-2px;top:50%;transform:translateY(-50%)}
-.joy-zone[data-dir="W"]{left:-2px;top:50%;transform:translateY(-50%)}
-.joy-zone[data-dir="C"]{top:50%;left:50%;transform:translate(-50%,-50%);width:14px;height:14px;font-size:8px}
-
-/* ── KEYPAD 4×4 ── */
-.keypad{
-  display:grid;grid-template-columns:repeat(4,1fr);gap:3px;
-  width:120px;height:60px;
+.joy-zone[data-dir="N"] { top:-3px;    left:50%; transform:translateX(-50%); width:18px; height:18px; }
+.joy-zone[data-dir="S"] { bottom:-3px; left:50%; transform:translateX(-50%); width:18px; height:18px; }
+.joy-zone[data-dir="E"] { right:-3px;  top:50%;  transform:translateY(-50%); width:18px; height:18px; }
+.joy-zone[data-dir="W"] { left:-3px;   top:50%;  transform:translateY(-50%); width:18px; height:18px; }
+.joy-zone[data-dir="C"] {
+  top:50%; left:50%; transform:translate(-50%,-50%);
+  width:12px; height:12px; z-index:3;
 }
-.kbtn{
-  background:rgba(255,255,255,0.04);border:1px solid var(--border);
-  border-radius:5px;cursor:pointer;font-size:9px;color:var(--t3);
-  display:flex;align-items:center;justify-content:center;
-  transition:all .15s;font-family:var(--mono);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px;
-}
-.kbtn:hover{border-color:var(--borderH);color:var(--t2)}
-.kbtn.has{background:var(--y2);border-color:rgba(232,212,77,0.35);color:var(--y)}
-.kbtn:active{transform:scale(0.95);background:rgba(232,212,77,0.25)}
-
-/* ── POTENTIOMÈTRE ── */
-.pot{
-  position:relative;width:56px;height:56px;flex-shrink:0;cursor:pointer;
-}
-.pot svg{width:100%;height:100%;transform:rotate(-135deg)}
-.pot circle.track{fill:none;stroke:rgba(255,255,255,0.08);stroke-width:3}
-.pot circle.prog{fill:none;stroke:var(--y);stroke-width:3;stroke-linecap:round;
-  stroke-dasharray:138;stroke-dashoffset:55;transition:stroke-dashoffset .3s}
-.pot-val{
-  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-family:var(--mono);font-size:13px;font-weight:600;color:var(--t1);
-}
-.pot-label{
-  font-family:var(--mono);font-size:8px;color:var(--t3);
-  text-align:center;letter-spacing:.06em;text-transform:uppercase;
-  margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;
-}
-.pot-wrap{display:flex;flex-direction:column;align-items:center}
-
-/* ── MIC + IR ── */
-.io-btn{
-  width:38px;height:38px;border-radius:50%;
-  background:rgba(255,255,255,0.04);border:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .15s;font-size:16px;
-}
-.io-btn:hover{border-color:var(--borderH)}
-.io-btn.has{background:var(--y2);border-color:rgba(232,212,77,0.35);color:var(--y)}
-.io-btn.active{background:rgba(52,199,89,0.20);border-color:rgba(52,199,89,0.5);
-  box-shadow:0 0 12px rgba(52,199,89,.4);animation:pulse 1.5s ease infinite}
-@keyframes pulse{0%,100%{box-shadow:0 0 8px rgba(52,199,89,.3)}50%{box-shadow:0 0 16px rgba(52,199,89,.5)}}
-
-/* ── SWITCH MODELE VISION ── */
-.ai-switch{display:flex;gap:4px;align-items:center;padding:5px 8px;
-  background:rgba(255,255,255,0.04);border:1px solid var(--border);
-  border-radius:8px}
-.ai-btn{
-  padding:5px 10px;border-radius:6px;cursor:pointer;
-  font-family:var(--mono);font-size:9px;font-weight:500;
-  color:var(--t3);background:transparent;border:1px solid transparent;
-  transition:all .15s;letter-spacing:.04em;text-transform:uppercase;
-}
-.ai-btn:hover{color:var(--t1)}
-.ai-btn.active{
-  background:var(--y2);border-color:rgba(232,212,77,0.3);
-  color:var(--y);box-shadow:0 0 8px rgba(232,212,77,.15);
+.joy-zone:hover { color:var(--y); }
+.joy-zone.has { color:var(--y); }
+.joy-zone.fired {
+  background:rgba(232,212,77,0.4);
+  box-shadow:0 0 12px rgba(232,212,77,0.6);
 }
 
-/* ── LABELS ── */
-.sec-label{
-  font-family:var(--mono);font-size:8px;letter-spacing:.10em;
-  text-transform:uppercase;color:var(--t3);margin-bottom:4px;text-align:center;
+/* Indicateur stick "phys" (depuis hardware réel) */
+.joy.phys-active .joy-stick {
+  box-shadow:0 0 12px rgba(77,166,255,0.6), 0 2px 4px rgba(0,0,0,0.4);
+  border-color:var(--blue);
 }
-.sec-wrap{display:flex;flex-direction:column;align-items:center;gap:2px}
 
-/* ── CONFIG LINK ── */
-.cfg-btn{
-  width:30px;height:30px;border-radius:6px;
-  background:rgba(255,255,255,0.04);border:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;
-  cursor:pointer;transition:all .15s;color:var(--t2);text-decoration:none;font-size:14px;
+/* ═══════════════════════════════════════════════════════════════
+   2. KEYPAD 4×4 (16 boutons)
+═══════════════════════════════════════════════════════════════ */
+.keypad {
+  display:grid; grid-template-columns:repeat(4, 1fr); gap:3px;
+  width:144px; height:60px;
+  padding:3px;
+  background:rgba(0,0,0,0.18);
+  border:1px solid var(--border); border-radius:8px;
+  box-shadow:inset 1px 1px 3px rgba(0,0,0,0.4);
 }
-.cfg-btn:hover{border-color:var(--borderH);color:var(--y)}
+.kbtn {
+  background:linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  border:1px solid var(--border);
+  border-radius:5px;
+  cursor:pointer;
+  font-size:8px; color:var(--t3); font-family:var(--mono);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  transition:all .12s;
+  overflow:hidden; white-space:nowrap;
+  position:relative;
+  padding:0 2px;
+}
+.kbtn-num {
+  font-size:7px; color:var(--t3); opacity:0.6;
+  position:absolute; top:1px; left:2px;
+}
+.kbtn-lbl {
+  font-size:8px; max-width:100%;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.kbtn:hover { border-color:var(--borderH); color:var(--t2); }
+.kbtn.has   { background:var(--y2); border-color:rgba(232,212,77,0.35); color:var(--y); }
+.kbtn:active, .kbtn.fired {
+  transform:scale(0.93);
+  background:rgba(232,212,77,0.3);
+  box-shadow:0 0 8px rgba(232,212,77,0.4);
+  color:#0e1117;
+}
+/* Bouton pressé physiquement */
+.kbtn.phys-pressed {
+  background:rgba(77,166,255,0.25); border-color:var(--blue);
+  box-shadow:0 0 10px rgba(77,166,255,0.5);
+}
 
-/* ── TOAST ── */
-.toast{
-  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
-  padding:8px 16px;border-radius:8px;
-  background:rgba(20,23,18,0.95);border:1px solid var(--borderH);
-  font-family:var(--mono);font-size:11px;color:var(--y);
-  pointer-events:none;opacity:0;transition:opacity .25s;z-index:100;
+/* ═══════════════════════════════════════════════════════════════
+   3. POTENTIOMÈTRE ROTATIF
+═══════════════════════════════════════════════════════════════ */
+.pot {
+  position:relative; width:54px; height:54px; flex-shrink:0; cursor:pointer;
 }
-.toast.show{opacity:1}
+.pot svg { width:100%; height:100%; transform:rotate(-135deg); }
+.pot circle.track { fill:none; stroke:rgba(255,255,255,0.08); stroke-width:3; }
+.pot circle.prog  {
+  fill:none; stroke:var(--y); stroke-width:3; stroke-linecap:round;
+  stroke-dasharray:138; stroke-dashoffset:55;
+  transition:stroke-dashoffset .25s;
+}
+.pot.phys-active circle.prog { stroke:var(--blue); }
 
-@media(max-width:700px){
-  .keypad{width:80px}
-  .joy{width:48px;height:48px}
-  .pot{width:44px;height:44px}
-  .ai-switch{display:none}
+.pot-val {
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:13px; font-weight:600; color:var(--t1);
 }
+.pot-action {
+  font-family:var(--mono); font-size:7px; color:var(--t3);
+  letter-spacing:.06em; text-transform:uppercase;
+  max-width:60px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4. MIC + IR (boutons ronds)
+═══════════════════════════════════════════════════════════════ */
+.io-btn {
+  width:38px; height:38px; border-radius:50%;
+  background:radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08), rgba(0,0,0,0.15));
+  border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .15s;
+  font-size:14px;
+  position:relative;
+}
+.io-btn:hover { border-color:var(--borderH); }
+.io-btn.has { background:radial-gradient(circle at 30% 30%, rgba(232,212,77,0.20), rgba(232,212,77,0.05)); border-color:rgba(232,212,77,0.4); color:var(--y); }
+.io-btn.active {
+  background:radial-gradient(circle at 30% 30%, rgba(52,199,89,0.30), rgba(52,199,89,0.08));
+  border-color:var(--green); color:var(--green);
+  box-shadow:0 0 16px rgba(52,199,89,0.45);
+  animation:pulse-io 1.4s ease infinite;
+}
+@keyframes pulse-io {
+  0%,100% { box-shadow:0 0 10px rgba(52,199,89,0.3); }
+  50%     { box-shadow:0 0 20px rgba(52,199,89,0.6); }
+}
+
+/* Indicateur ON pour IR */
+.io-status {
+  position:absolute; top:-2px; right:-2px;
+  width:8px; height:8px; border-radius:50%;
+  background:rgba(255,255,255,0.1); border:1px solid var(--border);
+  transition:all .2s;
+}
+.io-btn.active .io-status {
+  background:var(--green);
+  box-shadow:0 0 6px var(--green);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. SWITCH VISION IA (MP / YOLO / MOON)
+═══════════════════════════════════════════════════════════════ */
+.ai-switch {
+  display:flex; gap:3px;
+  padding:4px;
+  background:rgba(0,0,0,0.18);
+  border:1px solid var(--border); border-radius:8px;
+}
+.ai-btn {
+  padding:5px 10px; border-radius:5px;
+  cursor:pointer;
+  font-family:var(--mono); font-size:9px; font-weight:500;
+  color:var(--t3); background:transparent; border:1px solid transparent;
+  transition:all .15s; letter-spacing:.05em; text-transform:uppercase;
+  white-space:nowrap;
+}
+.ai-btn:hover { color:var(--t1); }
+.ai-btn.active {
+  background:var(--y2);
+  border-color:rgba(232,212,77,0.35);
+  color:var(--y);
+  box-shadow:0 0 8px rgba(232,212,77,0.15);
+}
+.ai-btn.loading {
+  color:var(--blue);
+  animation:pulse-ai 0.8s ease-in-out infinite;
+}
+@keyframes pulse-ai { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+/* ═══════════════════════════════════════════════════════════════
+   6. HISTORIQUE DES COMMANDES (compact, scrollable)
+═══════════════════════════════════════════════════════════════ */
+.history {
+  display:flex; flex-direction:column;
+  width:160px; max-width:160px; flex-shrink:0;
+  background:rgba(0,0,0,0.18);
+  border:1px solid var(--border); border-radius:8px;
+  padding:4px 6px;
+  height:60px; overflow:hidden;
+}
+.h-head {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:2px; flex-shrink:0;
+}
+.h-title {
+  font-family:var(--mono); font-size:8px;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--t3);
+}
+.h-clear {
+  background:none; border:none; color:var(--t3);
+  cursor:pointer; font-size:11px; padding:0 2px;
+  transition:color .15s;
+}
+.h-clear:hover { color:var(--red); }
+
+.h-list {
+  flex:1; overflow-y:auto;
+  display:flex; flex-direction:column; gap:1px;
+}
+.h-list::-webkit-scrollbar { width:2px; }
+.h-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.12); border-radius:1px; }
+
+.h-empty {
+  font-family:var(--mono); font-size:8px; color:var(--t3);
+  padding:6px 2px; text-align:center;
+}
+
+.h-item {
+  display:flex; align-items:center; gap:4px;
+  font-family:var(--mono); font-size:8px;
+  padding:1px 0;
+  animation:slideIn .25s ease;
+}
+@keyframes slideIn {
+  from { opacity:0; transform:translateX(-4px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+
+.h-src {
+  width:5px; height:5px; border-radius:50%; flex-shrink:0;
+}
+.h-src.virt { background:var(--y); box-shadow:0 0 4px var(--y); }
+.h-src.phys { background:var(--blue); box-shadow:0 0 4px var(--blue); }
+
+.h-time { color:var(--t3); flex-shrink:0; }
+.h-act  { color:var(--t1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.h-dev  { color:var(--t3); font-size:7px; flex-shrink:0; }
+
+/* ═══════════════════════════════════════════════════════════════
+   7. BOUTON CONFIG (toujours visible — position fixe)
+═══════════════════════════════════════════════════════════════ */
+.cfg-btn {
+  position:fixed; right:8px; top:50%; transform:translateY(-50%);
+  width:38px; height:38px; border-radius:9px;
+  background:radial-gradient(circle at 30% 30%, rgba(232,212,77,0.25), rgba(232,212,77,0.08));
+  border:1px solid rgba(232,212,77,0.4);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .18s;
+  color:var(--y); text-decoration:none; font-size:17px;
+  box-shadow:
+    -6px 0 14px rgba(14,17,23,0.7),
+    0 0 12px rgba(232,212,77,0.15);
+  z-index:20;
+}
+.cfg-btn:hover {
+  background:radial-gradient(circle at 30% 30%, rgba(232,212,77,0.35), rgba(232,212,77,0.12));
+  transform:translateY(-50%) scale(1.06);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8. TOAST DE NOTIFICATION
+═══════════════════════════════════════════════════════════════ */
+.toast {
+  position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+  padding:8px 16px; border-radius:8px;
+  background:rgba(20,23,18,0.96); border:1px solid var(--borderH);
+  font-family:var(--mono); font-size:11px; color:var(--y);
+  pointer-events:none; opacity:0; transition:opacity .25s; z-index:100;
+  box-shadow:0 4px 16px rgba(0,0,0,.4);
+}
+.toast.show { opacity:1; }
+.toast.error { color:var(--red); border-color:rgba(255,69,58,0.4); }
+.toast.success { color:var(--green); border-color:rgba(52,199,89,0.4); }
 </style>
 </head>
 <body>
+
 <div class="wrap">
 
-  <!-- JOYSTICK -->
-  <div class="sec-wrap">
-    <div class="sec-label">Joy<a href="/module/hardware_controls/config" class="cfg-btn" title="Configurer">⚙</a></div>
-    <div class="joy">
-      <div class="joy-base"><div class="joy-stick"></div></div>
-      <div class="joy-zone" data-dir="N" onclick="trigger('joy','N')" title="Nord"></div>
-      <div class="joy-zone" data-dir="S" onclick="trigger('joy','S')" title="Sud"></div>
-      <div class="joy-zone" data-dir="E" onclick="trigger('joy','E')" title="Est"></div>
-      <div class="joy-zone" data-dir="W" onclick="trigger('joy','W')" title="Ouest"></div>
-      <div class="joy-zone" data-dir="C" onclick="trigger('joy','C')" title="Center"></div>
+  <!-- ▌ 1. JOYSTICK ▐ -->
+  <div class="sec">
+    <div class="sec-label">Joy</div>
+    <div class="joy" id="joy">
+      <div class="joy-base"><div class="joy-stick" id="joy-stick"></div></div>
+      <div class="joy-zone" data-dir="N" onclick="trigger('joy','N','virt')" title="Nord"></div>
+      <div class="joy-zone" data-dir="S" onclick="trigger('joy','S','virt')" title="Sud"></div>
+      <div class="joy-zone" data-dir="E" onclick="trigger('joy','E','virt')" title="Est"></div>
+      <div class="joy-zone" data-dir="W" onclick="trigger('joy','W','virt')" title="Ouest"></div>
+      <div class="joy-zone" data-dir="C" onclick="trigger('joy','C','virt')" title="Centre"></div>
     </div>
-    
   </div>
 
-  <!-- KEYPAD 4×4 -->
-  <div class="sec-wrap">
+  <div class="divider"></div>
+
+  <!-- ▌ 2. KEYPAD 4×4 ▐ -->
+  <div class="sec">
     <div class="sec-label">Pad 4×4</div>
-    <div class="keypad" id="kp"></div>
+    <div class="keypad" id="keypad"></div>
   </div>
-    
-  <!-- POT -->
-  <div class="pot-wrap">
+
+  <div class="divider"></div>
+
+  <!-- ▌ 3. POTENTIOMÈTRE ▐ -->
+  <div class="sec">
     <div class="sec-label">Pot</div>
-    <div class="pot" id="pot">
+    <div class="pot" id="pot" onclick="trigger('pot',null,'virt')">
       <svg viewBox="0 0 60 60">
         <circle class="track" cx="30" cy="30" r="22"></circle>
         <circle class="prog"  cx="30" cy="30" r="22" id="potProg"></circle>
       </svg>
       <div class="pot-val" id="potVal">60</div>
     </div>
-    <div class="pot-label" id="potLbl">—</div>
+    <div class="pot-action" id="potAction">—</div>
   </div>
 
-  <!-- MIC + IR -->
-  <div style="display:flex;gap:8px;align-items:center">
-    <div class="sec-wrap">
-      <div class="sec-label">Mic</div>
-      <div class="io-btn" id="micBtn" onclick="trigger('mic')" title="Microphone">🎙</div>
-    </div>
-    <div class="sec-wrap">
-      <div class="sec-label">IR</div>
-      <div class="io-btn" id="irBtn" onclick="trigger('ir')" title="LED Infrarouge">💡</div>
+  <div class="divider"></div>
+
+  <!-- ▌ 4. MIC ▐ -->
+  <div class="sec">
+    <div class="sec-label">Mic</div>
+    <div class="io-btn" id="micBtn" onclick="toggleMic()" title="Microphone (Web Speech)">
+      🎙
+      <div class="io-status"></div>
     </div>
   </div>
 
-  <!-- SWITCH MODÈLE VISION -->
-  <div class="sec-wrap">
+  <!-- ▌ 5. IR LED ▐ -->
+  <div class="sec">
+    <div class="sec-label">IR LED</div>
+    <div class="io-btn" id="irBtn" onclick="toggleIR()" title="LED Infrarouge">
+      💡
+      <div class="io-status"></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ▌ 6. SWITCH VISION IA ▐ -->
+  <div class="sec">
     <div class="sec-label">Vision IA</div>
     <div class="ai-switch">
-      <button class="ai-btn active" id="ai-mp"   onclick="setVisionBackend('mediapipe')">MP</button>
-      <button class="ai-btn"        id="ai-yolo" onclick="setVisionBackend('yolo11n')">YOLO</button>
-      <button class="ai-btn"        id="ai-moon" onclick="setVisionBackend('moondream')">MOON</button>
+      <button class="ai-btn active" id="ai-mp"   onclick="setVisionBackend('mediapipe')" title="MediaPipe">MP</button>
+      <button class="ai-btn"        id="ai-yolo" onclick="setVisionBackend('yolo11n')"   title="YOLO 11n">YOLO</button>
+      <button class="ai-btn"        id="ai-moon" onclick="setVisionBackend('moondream')" title="Moondream 2">MOON</button>
     </div>
   </div>
 
-  <!-- CONFIG -->
-  <a href="/module/hardware_controls/config" class="cfg-btn" title="Configurer">⚙</a>
+  <div class="divider"></div>
+
+  <!-- ▌ 7. HISTORIQUE ▐ -->
+  <div class="history">
+    <div class="h-head">
+      <span class="h-title">Historique</span>
+      <button class="h-clear" onclick="clearHistory()" title="Effacer">✕</button>
+    </div>
+    <div class="h-list" id="histList">
+      <div class="h-empty">aucune commande</div>
+    </div>
+  </div>
+
 </div>
 
+<!-- Bouton configuration (fixe) -->
+ <a href="/module/hardware_controls/config" class="cfg-btn" title="Configuration" target="_top">⚙</a>
+<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 <script>
-const socket = io({transports:['websocket','polling']});
+/* ═══════════════════════════════════════════════════════════════
+   ÉTAT & CONFIGURATION
+═══════════════════════════════════════════════════════════════ */
 
-// État local
-let CONFIG = { joy:{}, buttons:Array(16).fill('null'),
-               pot:'volume_up', mic:'launch_voice', ir:'screenshot' };
+const socket = io({ transports:['websocket','polling'] });
 
-// Labels courts pour affichage
-const SHORT = {
+let CONFIG = {
+  joy:     { N:null, S:null, E:null, W:null, C:null },
+  buttons: Array(16).fill(null),
+  pot:     'volume_up',
+  mic:     'launch_voice',
+  ir:      'screenshot'
+};
+
+let HISTORY = [];
+const HISTORY_MAX = 50;
+
+// Labels compacts pour affichage
+const SHORT_LABELS = {
   launch_voice:'Voice', launch_vision:'Vision', launch_ocr:'OCR',
   launch_streaming:'Stream', launch_danger:'Danger', launch_hand:'Hand',
   launch_joystick:'Joy', kill_module:'Kill',
@@ -242,158 +484,516 @@ const SHORT = {
   run_python_file:'Py', run_shell_cmd:'Sh', run_benchmark:'Bench',
   mqtt_publish:'Pub', mqtt_alert:'Alert', mqtt_info:'Info', mqtt_ping:'Ping',
 };
-function short(id){ return id && id!=='null' ? (SHORT[id]||id.slice(0,5)) : '—'; }
 
-// Charger config depuis l'API
+function short(id) {
+  if (!id || id === 'null') return '—';
+  return SHORT_LABELS[id] || id.slice(0, 5);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   CHARGEMENT DE LA CONFIGURATION
+═══════════════════════════════════════════════════════════════ */
+
 async function loadConfig() {
   try {
     const r = await fetch('/module/hardware_controls/api/config');
     if (r.ok) {
       const d = await r.json();
-      CONFIG = { ...CONFIG, ...d };
+      if (d && typeof d === 'object') {
+        CONFIG = { ...CONFIG, ...d };
+      }
     }
-  } catch(e) { /* fallback config par défaut */ }
-  render();
+  } catch(e) {
+    console.warn('[HW] Config non trouvée, valeurs par défaut');
+  }
+  renderAll();
 }
 
-// Rendu keypad 4x4
+
+/* ═══════════════════════════════════════════════════════════════
+   RENDUS UI
+═══════════════════════════════════════════════════════════════ */
+
 function renderKeypad() {
-  const kp = document.getElementById('kp');
+  const kp = document.getElementById('keypad');
   kp.innerHTML = '';
-  for (let i=0; i<16; i++) {
+  for (let i = 0; i < 16; i++) {
     const b = document.createElement('div');
     b.className = 'kbtn';
-    const a = CONFIG.buttons[i];
-    if (a && a !== 'null') b.classList.add('has');
-    b.textContent = short(a);
-    b.onclick = () => trigger('btn', i);
+    b.id = 'k' + i;
+    const action = CONFIG.buttons[i];
+    if (action && action !== 'null') b.classList.add('has');
+    b.innerHTML = `
+      <span class="kbtn-num">${i+1}</span>
+      <span class="kbtn-lbl">${short(action)}</span>
+    `;
+    b.onclick = () => trigger('btn', i, 'virt');
     kp.appendChild(b);
   }
 }
 
-// Rendu joystick (highlight zones avec actions)
-function renderJoy() {
+function renderJoystick() {
   ['N','S','E','W','C'].forEach(dir => {
     const z = document.querySelector(`.joy-zone[data-dir="${dir}"]`);
     if (!z) return;
-    const a = CONFIG.joy[dir];
-    z.classList.toggle('has', a && a !== 'null');
-    z.title = `${dir} : ${short(a)}`;
+    const action = CONFIG.joy[dir];
+    z.classList.toggle('has', action && action !== 'null');
+    z.title = `${dir} · ${short(action)}`;
   });
 }
 
-// Rendu pot
 function renderPot() {
-  document.getElementById('potLbl').textContent = short(CONFIG.pot);
-  const pot = document.getElementById('potProg');
-  const pct = 60; // valeur courante par défaut
-  const dash = 138 - (pct/100)*138;
-  pot.style.strokeDashoffset = dash;
+  document.getElementById('potAction').textContent = short(CONFIG.pot);
 }
 
-// Rendu mic / IR
 function renderIO() {
   const mic = document.getElementById('micBtn');
   const ir  = document.getElementById('irBtn');
   mic.classList.toggle('has', CONFIG.mic && CONFIG.mic !== 'null');
   ir.classList.toggle('has',  CONFIG.ir  && CONFIG.ir  !== 'null');
-  mic.title = `Micro : ${short(CONFIG.mic)}`;
-  ir.title  = `IR : ${short(CONFIG.ir)}`;
+  mic.title = `Mic · ${short(CONFIG.mic)}`;
+  ir.title  = `IR · ${short(CONFIG.ir)}`;
 }
 
-function render() { renderKeypad(); renderJoy(); renderPot(); renderIO(); }
+function renderAll() {
+  renderKeypad();
+  renderJoystick();
+  renderPot();
+  renderIO();
+}
 
-// ── Exécution d'une commande ──
-function trigger(type, key) {
+
+/* ═══════════════════════════════════════════════════════════════
+   EXÉCUTION D'UNE COMMANDE (virtuel ou physique)
+   source : 'virt' = clic UI    'phys' = capteur réel
+═══════════════════════════════════════════════════════════════ */
+
+function trigger(type, key, source = 'virt') {
   let action = null;
-  if (type === 'joy') action = CONFIG.joy[key];
-  if (type === 'btn') action = CONFIG.buttons[key];
-  if (type === 'pot') action = CONFIG.pot;
-  if (type === 'mic') action = CONFIG.mic;
-  if (type === 'ir')  action = CONFIG.ir;
+  let deviceLabel = '';
 
+  if (type === 'joy') {
+    action = CONFIG.joy[key];
+    deviceLabel = `Joy·${key}`;
+  } else if (type === 'btn') {
+    action = CONFIG.buttons[key];
+    deviceLabel = `Btn·${key+1}`;
+  } else if (type === 'pot') {
+    action = CONFIG.pot;
+    deviceLabel = 'Pot';
+  } else if (type === 'mic') {
+    action = CONFIG.mic;
+    deviceLabel = 'Mic';
+  } else if (type === 'ir') {
+    action = CONFIG.ir;
+    deviceLabel = 'IR';
+  }
+
+  // Si pas configuré → toast
   if (!action || action === 'null') {
-    showToast('Non configuré');
+    showToast(`${deviceLabel} non configuré`, 'error');
+    addHistory({ source, device:deviceLabel, action:'(non config.)', ts:Date.now() });
     return;
   }
 
-  // Animation joystick stick
-  if (type === 'joy') {
-    const stick = document.querySelector('.joy-stick');
-    const offsets = {N:[0,-8], S:[0,8], E:[8,0], W:[-8,0], C:[0,0]};
-    const [x,y] = offsets[key]||[0,0];
-    stick.style.transform = `translate(${x}px, ${y}px)`;
-    setTimeout(() => stick.style.transform = '', 200);
-  }
+  // Animations visuelles
+  animateDevice(type, key);
 
-  // Animation mic/ir
-  if (type === 'mic' || type === 'ir') {
-    const el = document.getElementById(type+'Btn');
-    el.classList.add('active');
-    setTimeout(() => el.classList.remove('active'), 1500);
-  }
+  // Historique
+  addHistory({ source, device:deviceLabel, action:short(action), ts:Date.now() });
 
-  // Exécuter via API
+  // Exécution réelle via API
   fetch('/module/hardware_controls/api/execute', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({action_id: action, source: type+':'+(key||'')})
+    body: JSON.stringify({
+      action_id: action,
+      source: source,
+      device: `${type}:${key !== null && key !== undefined ? key : ''}`
+    })
   })
-  .then(r => r.json())
-  .then(d => showToast(d.msg || ('✓ ' + short(action))))
-  .catch(() => showToast('Erreur'));
+    .then(r => r.json())
+    .then(d => {
+      const ok = d.ok !== false;
+      showToast(d.msg || `✓ ${short(action)}`, ok ? 'success' : 'error');
+    })
+    .catch(e => {
+      showToast('Erreur API', 'error');
+      console.warn('[HW] execute:', e);
+    });
 }
 
-// ── Switch backend vision ──
-async function setVisionBackend(b) {
-  document.querySelectorAll('.ai-btn').forEach(x => x.classList.remove('active'));
+
+/* ═══════════════════════════════════════════════════════════════
+   ANIMATIONS DES COMPOSANTS
+═══════════════════════════════════════════════════════════════ */
+
+function animateDevice(type, key) {
+  if (type === 'joy') {
+    const stick = document.getElementById('joy-stick');
+    const offsets = { N:[0,-8], S:[0,8], E:[8,0], W:[-8,0], C:[0,0] };
+    const [x, y] = offsets[key] || [0, 0];
+    stick.style.transform = `translate(${x}px, ${y}px)`;
+    setTimeout(() => { stick.style.transform = ''; }, 220);
+
+    // Flash de la zone
+    const zone = document.querySelector(`.joy-zone[data-dir="${key}"]`);
+    if (zone) {
+      zone.classList.add('fired');
+      setTimeout(() => zone.classList.remove('fired'), 350);
+    }
+  }
+
+  if (type === 'btn') {
+    const btn = document.getElementById('k' + key);
+    if (btn) {
+      btn.classList.add('fired');
+      setTimeout(() => btn.classList.remove('fired'), 250);
+    }
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   POTENTIOMÈTRE — mise à jour valeur + arc
+═══════════════════════════════════════════════════════════════ */
+
+function setPotValue(val, source = 'virt') {
+  const v = Math.max(0, Math.min(100, Math.round(val)));
+  document.getElementById('potVal').textContent = v;
+  const dash = 138 - (v / 100) * 138;
+  document.getElementById('potProg').style.strokeDashoffset = dash;
+
+  const pot = document.getElementById('pot');
+  pot.classList.toggle('phys-active', source === 'phys');
+
+  if (source === 'phys') {
+    // Auto-clear l'indicateur "phys" après 1s
+    clearTimeout(window._potPhysTimer);
+    window._potPhysTimer = setTimeout(() => pot.classList.remove('phys-active'), 1000);
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MICROPHONE — Web Speech API réelle
+═══════════════════════════════════════════════════════════════ */
+
+let recognition = null;
+let micActive = false;
+
+function toggleMic() {
+  const btn = document.getElementById('micBtn');
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SR) {
+    showToast('Web Speech non supporté', 'error');
+    return;
+  }
+
+  if (!recognition) {
+    recognition = new SR();
+    recognition.lang = 'fr-FR';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = e => {
+      let txt = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) txt += e.results[i][0].transcript;
+      }
+      if (txt) {
+        socket.emit('voice_text', { text:txt, source:'mic_widget' });
+        addHistory({ source:'virt', device:'Mic', action:'🎙 ' + txt.slice(0,30), ts:Date.now() });
+      }
+    };
+
+    recognition.onend = () => {
+      if (micActive) recognition.start();  // redémarre auto
+    };
+
+    recognition.onerror = (e) => {
+      console.warn('[Mic]', e.error);
+      micActive = false;
+      btn.classList.remove('active');
+    };
+  }
+
+  micActive = !micActive;
+  btn.classList.toggle('active', micActive);
+
+  if (micActive) {
+    recognition.start();
+    showToast('🎙 Micro actif');
+    addHistory({ source:'virt', device:'Mic', action:'Activé', ts:Date.now() });
+    // Action configurée (ex: launch_voice)
+    if (CONFIG.mic && CONFIG.mic !== 'null') {
+      trigger('mic', null, 'virt');
+    }
+  } else {
+    recognition.stop();
+    showToast('Micro arrêté');
+    addHistory({ source:'virt', device:'Mic', action:'Arrêté', ts:Date.now() });
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   LED INFRAROUGE — Toggle réel via API
+═══════════════════════════════════════════════════════════════ */
+
+let irActive = false;
+
+function toggleIR() {
+  const btn = document.getElementById('irBtn');
+  irActive = !irActive;
+  btn.classList.toggle('active', irActive);
+
+  // Commande GPIO via API
+  fetch('/module/hardware_controls/api/ir', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ state: irActive ? 'on' : 'off', source:'virt' })
+  })
+    .then(r => r.json())
+    .then(d => showToast(d.msg || (irActive ? '💡 IR ON' : '💡 IR OFF')))
+    .catch(() => showToast(irActive ? 'IR ON (offline)' : 'IR OFF'));
+
+  addHistory({ source:'virt', device:'IR', action: irActive ? 'ON' : 'OFF', ts:Date.now() });
+
+  // Action configurée (ex: screenshot)
+  if (irActive && CONFIG.ir && CONFIG.ir !== 'null') {
+    trigger('ir', null, 'virt');
+  }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SWITCH BACKEND VISION (MP / YOLO / MOON)
+═══════════════════════════════════════════════════════════════ */
+
+async function setVisionBackend(backend) {
   const map = { mediapipe:'ai-mp', yolo11n:'ai-yolo', moondream:'ai-moon' };
-  const btn = document.getElementById(map[b]);
-  if (btn) btn.classList.add('active');
+  const btn = document.getElementById(map[backend]);
+
+  document.querySelectorAll('.ai-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('loading');
 
   try {
     const r = await fetch('http://' + location.hostname + ':5051/api/backend', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({backend: b})
+      body: JSON.stringify({ backend: backend })
     });
     const d = await r.json();
-    showToast(d.ok ? `✓ ${b}` : (d.msg || 'Erreur'));
+
+    if (btn) btn.classList.remove('loading');
+
+    if (!d.ok) {
+      if (btn) btn.classList.add('active');
+      showToast(d.msg || 'Backend non disponible', 'error');
+      addHistory({ source:'virt', device:'Vision', action:`✗ ${backend}`, ts:Date.now() });
+      return;
+    }
+
+    if (btn) btn.classList.add('active');
+    showToast(`✓ ${backend.toUpperCase()}`, 'success');
+    addHistory({ source:'virt', device:'Vision', action:`→ ${backend}`, ts:Date.now() });
+
+    // Notifier user_interface parent pour recharger les iframes modules
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type:'vision_backend_changed', backend:backend }, '*');
+      }
+    } catch(e) {}
+
+    socket.emit('vision_backend_changed', { backend: backend });
+
   } catch(e) {
-    showToast('Vision service hors ligne');
+    if (btn) btn.classList.remove('loading');
+    showToast('Vision service hors ligne', 'error');
   }
 }
 
-// État initial du backend vision
+// Init état du backend au chargement
 async function initVisionState() {
   try {
     const r = await fetch('http://' + location.hostname + ':5051/api/backend');
     const d = await r.json();
-    if (d.active) setVisionBackendUI(d.active);
+    if (d.active) {
+      document.querySelectorAll('.ai-btn').forEach(b => b.classList.remove('active'));
+      const map = { mediapipe:'ai-mp', yolo11n:'ai-yolo', moondream:'ai-moon' };
+      const el = document.getElementById(map[d.active]);
+      if (el) el.classList.add('active');
+    }
   } catch(e) {}
 }
-function setVisionBackendUI(b) {
-  document.querySelectorAll('.ai-btn').forEach(x => x.classList.remove('active'));
-  const map = { mediapipe:'ai-mp', yolo11n:'ai-yolo', moondream:'ai-moon' };
-  const btn = document.getElementById(map[b]);
-  if (btn) btn.classList.add('active');
+
+
+/* ═══════════════════════════════════════════════════════════════
+   HISTORIQUE — ajout / rendu / clear
+═══════════════════════════════════════════════════════════════ */
+
+function addHistory(entry) {
+  HISTORY.unshift(entry);
+  if (HISTORY.length > HISTORY_MAX) HISTORY.length = HISTORY_MAX;
+  renderHistory();
+
+  // Persistance localStorage
+  try {
+    localStorage.setItem('shos_hw_history', JSON.stringify(HISTORY.slice(0, 20)));
+  } catch(e) {}
 }
 
-// ── Toast ──
-function showToast(msg) {
+function renderHistory() {
+  const list = document.getElementById('histList');
+  if (HISTORY.length === 0) {
+    list.innerHTML = '<div class="h-empty">aucune commande</div>';
+    return;
+  }
+  list.innerHTML = '';
+  HISTORY.slice(0, 30).forEach(h => {
+    const item = document.createElement('div');
+    item.className = 'h-item';
+    const time = new Date(h.ts).toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    item.innerHTML = `
+      <span class="h-src ${h.source === 'phys' ? 'phys' : 'virt'}" title="${h.source === 'phys' ? 'Hardware' : 'Virtuel'}"></span>
+      <span class="h-time">${time}</span>
+      <span class="h-act" title="${h.device} → ${h.action}">${h.action}</span>
+      <span class="h-dev">${h.device}</span>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function clearHistory() {
+  HISTORY = [];
+  renderHistory();
+  try { localStorage.removeItem('shos_hw_history'); } catch(e) {}
+}
+
+// Restaurer historique au chargement
+try {
+  const saved = localStorage.getItem('shos_hw_history');
+  if (saved) HISTORY = JSON.parse(saved) || [];
+} catch(e) {}
+
+
+/* ═══════════════════════════════════════════════════════════════
+   SYNC HARDWARE PHYSIQUE → UI
+   Réception des événements MQTT/SocketIO depuis les capteurs réels
+═══════════════════════════════════════════════════════════════ */
+
+// Joystick physique
+socket.on('hw_joystick', d => {
+  if (!d || !d.dir) return;
+  const dir = d.dir.toUpperCase();
+  if (!['N','S','E','W','C'].includes(dir)) return;
+
+  // Anime le stick + flash zone
+  animateDevice('joy', dir);
+  document.getElementById('joy').classList.add('phys-active');
+  setTimeout(() => document.getElementById('joy').classList.remove('phys-active'), 600);
+
+  // Historique
+  addHistory({ source:'phys', device:`Joy·${dir}`, action:short(CONFIG.joy[dir]), ts:Date.now() });
+
+  // Exécuter l'action configurée si présente
+  if (CONFIG.joy[dir] && CONFIG.joy[dir] !== 'null') {
+    fetch('/module/hardware_controls/api/execute', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action_id:CONFIG.joy[dir], source:'phys', device:`joy:${dir}` })
+    }).catch(()=>{});
+  }
+});
+
+// Keypad 4×4 physique
+socket.on('hw_keypad', d => {
+  if (!d || typeof d.key !== 'number') return;
+  const i = d.key;
+  if (i < 0 || i > 15) return;
+
+  // Anime le bouton
+  const btn = document.getElementById('k' + i);
+  if (btn) {
+    btn.classList.add('phys-pressed');
+    setTimeout(() => btn.classList.remove('phys-pressed'), 400);
+  }
+
+  addHistory({ source:'phys', device:`Btn·${i+1}`, action:short(CONFIG.buttons[i]), ts:Date.now() });
+
+  if (CONFIG.buttons[i] && CONFIG.buttons[i] !== 'null') {
+    fetch('/module/hardware_controls/api/execute', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action_id:CONFIG.buttons[i], source:'phys', device:`btn:${i}` })
+    }).catch(()=>{});
+  }
+});
+
+// Potentiomètre physique
+socket.on('hw_pot', d => {
+  if (!d || d.value == null) return;
+  setPotValue(d.value, 'phys');
+});
+
+// Micro hardware (bouton physique de capture)
+socket.on('hw_mic', d => {
+  const btn = document.getElementById('micBtn');
+  btn.classList.add('active');
+  setTimeout(() => { if (!micActive) btn.classList.remove('active'); }, 1500);
+  addHistory({ source:'phys', device:'Mic', action:'Pressé', ts:Date.now() });
+});
+
+// IR physique (capteur ou bouton)
+socket.on('hw_ir', d => {
+  const btn = document.getElementById('irBtn');
+  btn.classList.add('active');
+  setTimeout(() => { if (!irActive) btn.classList.remove('active'); }, 1500);
+  addHistory({ source:'phys', device:'IR', action:d.state || 'Pulse', ts:Date.now() });
+});
+
+// Config mise à jour ailleurs (page config)
+socket.on('hardware_config_updated', d => {
+  CONFIG = { ...CONFIG, ...d };
+  renderAll();
+});
+
+// Backend vision changé depuis ailleurs
+socket.on('vision_backend_changed', d => {
+  if (d && d.backend) {
+    document.querySelectorAll('.ai-btn').forEach(b => b.classList.remove('active'));
+    const map = { mediapipe:'ai-mp', yolo11n:'ai-yolo', moondream:'ai-moon' };
+    const el = document.getElementById(map[d.backend]);
+    if (el) el.classList.add('active');
+  }
+});
+
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST
+═══════════════════════════════════════════════════════════════ */
+
+function showToast(msg, kind) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(window._tt);
-  window._tt = setTimeout(() => t.classList.remove('show'), 1800);
+  t.className = 'toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
 }
 
-// SocketIO : sync si config change ailleurs
-socket.on('hardware_config_updated', d => { CONFIG = {...CONFIG, ...d}; render(); });
-socket.on('vision_backend_changed',  d => { if (d.backend) setVisionBackendUI(d.backend); });
+
+/* ═══════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════ */
 
 loadConfig();
 initVisionState();
+renderHistory();
+
+
 </script>
 </body>
 </html>
