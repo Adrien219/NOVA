@@ -1,5 +1,5 @@
 {
-  "name":            "Video Streaming",
+  "name":            "vision_objet",
   "template":        "interface.html",
   "description":     "Stream vidéo temps réel, métriques capteurs, reconnaissance vocale",
   "icon":            "📡",

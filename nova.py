@@ -1002,6 +1002,232 @@ def video_feed():
     )
 
 
+
+
+
+
+# ════════════════════════════════════════════════════════════════════
+# PATCH NOVA.PY — Routes API manquantes pour hardware_controls
+# ────────────────────────────────────────────────────────────────────
+# 3 routes à ajouter dans nova.py (n'importe où dans les routes Flask) :
+#
+#   POST /module/hardware_controls/api/execute    → exécute une action
+#   POST /module/hardware_controls/api/ir         → toggle LED infrarouge
+#   GET  /module/hardware_controls/api/config     → charge la config bindings
+#
+# Le code délègue tout à actions.py qui contient déjà les 30 actions
+# (volume, brightness, screenshot, reboot, etc.)
+# ════════════════════════════════════════════════════════════════════
+
+import sys
+import time
+import json
+import logging
+import importlib.util
+from pathlib import Path
+from flask import jsonify, request
+
+# Logger (réutilise celui existant dans nova.py)
+logger = logging.getLogger("nova")
+
+
+# ── Chargement lazy du module actions.py de hardware_controls ──────────────
+_hw_actions_module = None
+
+def _load_hw_actions():
+    """Charge actions.py de hardware_controls et configure son contexte."""
+    global _hw_actions_module
+    if _hw_actions_module is not None:
+        return _hw_actions_module
+
+    project_root = Path(__file__).resolve().parent
+    actions_path = project_root / "plugins" / "modules" / "hardware_controls" / "actions.py"
+
+    if not actions_path.exists():
+        logger.warning("⚠ actions.py introuvable : %s", actions_path)
+        return None
+
+    try:
+        spec = importlib.util.spec_from_file_location("hw_actions", actions_path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+
+        # Injecter le contexte partagé (mqtt + socketio)
+        if hasattr(module, "ctx"):
+            module.ctx.project_root = project_root
+            # Récupère mqtt et socketio depuis les globals de nova.py
+            globs = globals()
+            if "mqtt_bridge" in globs and hasattr(globs["mqtt_bridge"], "client"):
+                module.ctx.mqtt_client = globs["mqtt_bridge"].client
+            if "socketio" in globs:
+                module.ctx.socketio = globs["socketio"]
+
+        _hw_actions_module = module
+        logger.info("✅ actions.py chargé (%d actions disponibles)",
+                    len(getattr(module, "ACTIONS", {})))
+        return module
+    except Exception as e:
+        logger.error("❌ Erreur chargement actions.py : %s", e)
+        return None
+
+
+# ════════════════════════════════════════════════════════════════════
+# ROUTE 1 : POST /module/hardware_controls/api/execute
+# ════════════════════════════════════════════════════════════════════
+@app.route('/module/hardware_controls/api/execute', methods=['POST'])
+def hw_api_execute():
+    """
+    Exécute une action hardware via le dispatcher actions.py.
+    Body JSON : {
+        "action_id": "volume_up" | "screenshot" | "launch_voice" | ...,
+        "source":    "topbar" | "popover" | "virt" | "phys",
+        "device":    "system_button" | "joy:N" | "btn:5" | ...,
+        ... (paramètres optionnels selon action)
+    }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        action_id = str(data.get("action_id", "")).strip()
+        if not action_id:
+            return jsonify({"ok": False, "msg": "action_id requis"}), 400
+
+        # Récupère le module actions
+        mod = _load_hw_actions()
+        if mod is None:
+            # Fallback minimal pour ne pas casser l'UI
+            logger.warning("actions.py absent — fallback simple")
+            return jsonify({
+                "ok": True,
+                "msg": f"✓ {action_id} (simulé)",
+                "action_id": action_id,
+                "fallback": True,
+            })
+
+        # Délègue au dispatcher
+        result = mod.execute_action(action_id, params=data)
+
+        # Diffuse aussi via SocketIO pour les autres clients
+        try:
+            socketio.emit('hardware_action', {
+                "action": action_id,
+                "source": data.get("source", "unknown"),
+                "device": data.get("device", ""),
+                "result": result,
+                "ts":     time.time(),
+            })
+        except Exception:
+            pass
+
+        return jsonify(result), (200 if result.get("ok") else 500)
+
+    except Exception as e:
+        logger.error("hw_api_execute: %s", e)
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+# ════════════════════════════════════════════════════════════════════
+# ROUTE 2 : POST /module/hardware_controls/api/ir
+# ════════════════════════════════════════════════════════════════════
+@app.route('/module/hardware_controls/api/ir', methods=['POST'])
+def hw_api_ir():
+    """
+    Toggle LED infrarouge (GPIO).
+    Body JSON : { "state": "on" | "off", "source": "virt" | "phys" }
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        state = str(data.get("state", "off")).lower()
+        source = data.get("source", "virt")
+
+        # Tentative GPIO (silencieux si non disponible)
+        gpio_ok = False
+        try:
+            import RPi.GPIO as GPIO
+            IR_PIN = 26  # à ajuster selon ton montage
+            GPIO.setwarnings(False)
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(IR_PIN, GPIO.OUT)
+            GPIO.output(IR_PIN, GPIO.HIGH if state == "on" else GPIO.LOW)
+            gpio_ok = True
+        except (ImportError, RuntimeError):
+            pass
+        except Exception as e:
+            logger.warning("IR GPIO: %s", e)
+
+        # Publish MQTT pour les autres clients
+        try:
+            if "mqtt_bridge" in globals() and mqtt_bridge.client:
+                mqtt_bridge.client.publish(
+                    "shos/hardware/ir",
+                    json.dumps({"state": state, "source": source, "ts": time.time()}),
+                    qos=0
+                )
+        except Exception:
+            pass
+
+        # Notif SocketIO
+        try:
+            socketio.emit('hw_ir', {"state": state, "source": source})
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok":     True,
+            "state":  state,
+            "gpio":   gpio_ok,
+            "msg":    f"💡 IR {state.upper()}",
+        })
+
+    except Exception as e:
+        logger.error("hw_api_ir: %s", e)
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
+
+# ════════════════════════════════════════════════════════════════════
+# ROUTE 3 : GET /module/hardware_controls/api/config
+# ════════════════════════════════════════════════════════════════════
+@app.route('/module/hardware_controls/api/config', methods=['GET', 'POST'])
+def hw_api_config():
+    """
+    Charge ou sauvegarde la configuration des bindings hardware.
+    Stockée dans plugins/modules/hardware_controls/bindings.json
+    Structure : { joy:{N,S,E,W,C}, buttons:[16], pot, mic, ir }
+    """
+    bindings_path = (Path(__file__).resolve().parent
+                     / "plugins" / "modules" / "hardware_controls" / "bindings.json")
+
+    if request.method == 'GET':
+        if not bindings_path.exists():
+            # Renvoie un default si pas encore configuré
+            return jsonify({
+                "joy":     {"N": None, "S": None, "E": None, "W": None, "C": None},
+                "buttons": [None] * 16,
+                "pot":     "volume_up",
+                "mic":     "launch_voice",
+                "ir":      "screenshot",
+            })
+        try:
+            with open(bindings_path, 'r', encoding='utf-8') as f:
+                return jsonify(json.load(f))
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # POST → sauvegarde
+    try:
+        data = request.get_json(silent=True) or {}
+        bindings_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(bindings_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        # Notifie les autres clients
+        try:
+            socketio.emit('hardware_config_updated', data)
+        except Exception:
+            pass
+
+        return jsonify({"ok": True, "msg": "Configuration sauvée"})
+    except Exception as e:
+        return jsonify({"ok": False, "msg": str(e)}), 500
 # --- GESTION DES SERVICES NOVA ---
 running_processes = []
 
@@ -1023,6 +1249,124 @@ def stop_nova_services(sig, frame):
     for p in running_processes:
         p.terminate()
     sys.exit(0)
+
+
+
+
+
+
+
+# ════════════════════════════════════════════════════════════════════
+# PATCH NOVA.PY — ROUTES ACTIONS PAR MODULE
+# ────────────────────────────────────────────────────────────────────
+# À coller dans nova.py, à la FIN du fichier
+# JUSTE AVANT  if __name__ == "__main__":
+#
+# Format à ajouter dans le config.json de chaque module qui veut
+# proposer des actions :
+#
+#   {
+#     "id": "voice_assistant",
+#     "name": "Assistant Vocal NOVA",
+#     ...
+#     "actions": [
+#       { "id": "start_listening", "label": "Start", "icon": "🎙",
+#         "description": "Démarrer l'écoute", "mqtt_topic": "shos/voice/cmd",
+#         "mqtt_payload": { "cmd": "start" } },
+#       { "id": "stop_listening",  "label": "Stop",  "icon": "⏸",
+#         "mqtt_topic": "shos/voice/cmd",
+#         "mqtt_payload": { "cmd": "stop" } }
+#     ]
+#   }
+#
+# Chaque action publie sur MQTT le payload défini.
+# Le module lui-même écoute son topic et exécute la commande.
+# ════════════════════════════════════════════════════════════════════
+
+@app.route('/module/<module_id>/api/actions', methods=['GET'])
+def module_api_actions(module_id):
+    """
+    Retourne la liste des actions déclarées dans le config.json du module.
+    Utilisée par user_interface.html pour afficher les boutons dans la barre.
+    """
+    if module_id not in AVAILABLE_MODULES:
+        return jsonify({"error": f"Module {module_id} non chargé"}), 404
+
+    cfg = AVAILABLE_MODULES[module_id]
+    actions = cfg.get("actions", [])
+
+    return jsonify({
+        "module_id": module_id,
+        "name":      cfg.get("name", module_id),
+        "actions":   actions,
+    })
+
+
+@app.route('/module/<module_id>/api/action', methods=['POST'])
+def module_api_trigger_action(module_id):
+    """
+    Déclenche une action d'un module.
+    Body JSON : { "action_id": "start_listening", "source": "topbar" }
+
+    L'action déclenche un publish MQTT vers le topic défini dans le config.
+    """
+    try:
+        if module_id not in AVAILABLE_MODULES:
+            return jsonify({"ok": False, "msg": f"Module {module_id} inconnu"}), 404
+
+        data = request.get_json(silent=True) or {}
+        action_id = str(data.get("action_id", "")).strip()
+        if not action_id:
+            return jsonify({"ok": False, "msg": "action_id requis"}), 400
+
+        cfg = AVAILABLE_MODULES[module_id]
+        actions = cfg.get("actions", [])
+        action = next((a for a in actions if a.get("id") == action_id), None)
+        if not action:
+            return jsonify({"ok": False, "msg": f"Action {action_id} non trouvée"}), 404
+
+        # Publication MQTT
+        topic = action.get("mqtt_topic", f"shos/plugins/{module_id}/cmd")
+        payload = action.get("mqtt_payload", {})
+
+        # Enrichir le payload
+        full_payload = {
+            **payload,
+            "action_id": action_id,
+            "source":    data.get("source", "api"),
+            "ts":        time.time(),
+        }
+
+        published = False
+        try:
+            if "mqtt_bridge" in globals() and mqtt_bridge.client:
+                mqtt_bridge.client.publish(topic, json.dumps(full_payload), qos=0)
+                published = True
+        except Exception as e:
+            logger.warning("MQTT publish action: %s", e)
+
+        # Notification SocketIO
+        try:
+            socketio.emit('module_action_triggered', {
+                "module":  module_id,
+                "action":  action_id,
+                "topic":   topic,
+                "payload": full_payload,
+            })
+        except Exception:
+            pass
+
+        return jsonify({
+            "ok":      True,
+            "msg":     f"✓ {action.get('label', action_id)}",
+            "topic":   topic,
+            "published": published,
+        })
+
+    except Exception as e:
+        logger.error("module_api_trigger_action: %s", e)
+        return jsonify({"ok": False, "msg": str(e)}), 500
+
 
 # ============================================================================
 # MAIN

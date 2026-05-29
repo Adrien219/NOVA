@@ -1,9 +1,44 @@
 {
-  "id": "voice_assistant",
-  "name": "Assistant Vocal NOVA",
+  "id":          "voice_assistant",
+  "name":        "Assistant Vocal NOVA",
   "description": "Reconnaissance vocale hors-ligne via Vosk et synthèse espeak-ng",
-  "template": "interface.html",
+  "template":    "interface.html",
   "entry_point": "plugins.modules.voice_assistant.voice_module",
-  "enabled": true,
-  "icon": "mic"
+  "enabled":     true,
+  "icon":        "mic",
+
+  "actions": [
+    {
+      "id":           "start_listening",
+      "label":        "Start",
+      "icon":         "🎙",
+      "description":  "Démarrer l'écoute vocale",
+      "mqtt_topic":   "shos/plugins/voice_assistant/cmd",
+      "mqtt_payload": { "cmd": "start" }
+    },
+    {
+      "id":           "stop_listening",
+      "label":        "Stop",
+      "icon":         "⏸",
+      "description":  "Arrêter l'écoute",
+      "mqtt_topic":   "shos/plugins/voice_assistant/cmd",
+      "mqtt_payload": { "cmd": "stop" }
+    },
+    {
+      "id":           "speak_status",
+      "label":        "Statut",
+      "icon":         "🔊",
+      "description":  "Annoncer le statut système vocalement",
+      "mqtt_topic":   "shos/plugins/voice_assistant/cmd",
+      "mqtt_payload": { "cmd": "speak", "text": "Statut système" }
+    },
+    {
+      "id":           "list_files",
+      "label":        "Fichiers",
+      "icon":         "📁",
+      "description":  "Lister les fichiers NOVA",
+      "mqtt_topic":   "shos/plugins/voice_assistant/cmd",
+      "mqtt_payload": { "cmd": "list_files" }
+    }
+  ]
 }

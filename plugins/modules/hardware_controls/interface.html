@@ -448,8 +448,9 @@ html, body {
 </div>
 
 <!-- Bouton configuration (fixe) -->
- <a href="/module/hardware_controls/config" class="cfg-btn" title="Configuration" target="_top">⚙</a>
-<!-- Toast -->
+ <button class="cfg-btn" title="Configuration des commandes"
+        onclick="openConfigInParent()" type="button"
+        style="border:none;font:inherit">⚙</button>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -509,6 +510,40 @@ async function loadConfig() {
   }
   renderAll();
 }
+
+
+
+
+
+
+
+
+function openConfigInParent() {
+  // Envoie un postMessage au user_interface (window.parent)
+  // qui va ouvrir le modal overlay
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: 'open_module_config',
+        module_id: 'hardware_controls',
+        title: 'Configuration des commandes'
+      }, '*');
+    } else {
+      // Fallback : si pas dans une iframe, ouvrir dans la même page
+      window.location.href = '/module/hardware_controls/config';
+    }
+  } catch (e) {
+    // Fallback ultime
+    window.open('/module/hardware_controls/config', '_blank');
+  }
+}
+</script>
+
+
+
+
+
+
 
 
 /* ═══════════════════════════════════════════════════════════════

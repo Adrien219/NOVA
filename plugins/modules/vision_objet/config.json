@@ -1,7 +1,34 @@
 {
-    "id": "vision_objet",
-    "name": "Vision d'Objet",
-    "description": "Détection et suivi d'objets dans la scène",
-    "icon": "binoculars",
-    "template": "interface.html"
+  "id":          "vision_objet",
+  "name":        "Vision d'Objet",
+  "description": "Détection et suivi d'objets dans la scène",
+  "icon":        "binoculars",
+  "template":    "interface.html",
+
+  "actions": [
+    {
+      "id":           "snapshot",
+      "label":        "Snap",
+      "icon":         "📸",
+      "description":  "Capturer une image",
+      "mqtt_topic":   "shos/camera/snapshot_request",
+      "mqtt_payload": { "trigger": "manual" }
+    },
+    {
+      "id":           "toggle_detect",
+      "label":        "Toggle",
+      "icon":         "👁",
+      "description":  "Activer / désactiver la détection",
+      "mqtt_topic":   "shos/plugins/vision_objet/cmd",
+      "mqtt_payload": { "cmd": "toggle" }
+    },
+    {
+      "id":           "clear_history",
+      "label":        "Clear",
+      "icon":         "🧹",
+      "description":  "Vider l'historique des détections",
+      "mqtt_topic":   "shos/plugins/vision_objet/cmd",
+      "mqtt_payload": { "cmd": "clear" }
+    }
+  ]
 }
