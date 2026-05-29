@@ -1,0 +1,11 @@
+Métrique,Valeur,Unité
+Messages envoyés,100,
+Messages reçus,100,
+Erreurs/Timeout,0,
+Perte paquets,0.0,%
+Latence min,0.0,ms
+Latence max,16.0,ms
+Latence moyenne,0.32,ms
+Latence médiane,0.0,ms
+Latence P95,0.0,ms
+Latence P99,16.0,ms

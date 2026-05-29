@@ -1,0 +1,7 @@
+Métrique,Valeur,Unité
+FPS observé,3.87,fps
+Frames reçues,232,frames
+Durée test,60,s
+Topic MQTT,shos/camera/vision,
+Intervalle inter-frame,260.08,ms
+Jitter,21.96,ms

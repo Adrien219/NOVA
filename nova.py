@@ -513,6 +513,39 @@ current_gesture = "NONE"
 detection_stats = {"objects": 0, "inference_time_ms": 0}
 camera_stats = {"frames": 0, "errors": 0}
 
+
+
+
+
+
+
+# ════════════════════════════════════════════════════════════════════
+# ORCHESTRATOR BRIDGE — Relais MQTT → SocketIO
+# ════════════════════════════════════════════════════════════════════
+
+SUBSCRIPTIONS_ORCHESTRATOR_ADDITIONS = [
+    ("shos/orchestrator/decision", 1),
+    ("shos/orchestrator/modules",  1),
+    ("shos/orchestrator/energy",   1),
+    ("shos/orchestrator/profile",  1),
+]
+
+def dispatch_orchestrator(topic, payload_raw, socketio):
+    """
+    Parse le JSON et relaie la décision au navigateur via SocketIO.
+    Retourne True si le topic a été traité.
+    """
+    if not topic.startswith("shos/orchestrator/"):
+        return False
+    try:
+        payload = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
+        kind = topic.split("/")[-1]  # 'decision' / 'modules' / 'energy' / 'profile'
+        socketio.emit(f'orchestrator_{kind}', payload)
+    except Exception as e:
+        logger.warning(f"⚠ dispatch_orchestrator [{topic}] : {e}")
+    return True
+
+
 # ============================================================================
 # GESTIONNAIRE MQTT UNIVERSEL (DYNAMIC DISCOVERY)
 # ============================================================================
@@ -540,40 +573,54 @@ class MQTTHandler:
             print(f"❌ [MQTT] Erreur de connexion : {e}")
 
     def _on_connect(self, client, userdata, flags, rc, properties=None):
-        print(f"✅ [MQTT] Connecté au Broker (Code: {rc})")
-        client.subscribe([
-            ("shos/sensors/normalized", 1),
-            ("shos/sensors/raw", 1),
-            ("shos/camera/processed", 1),
-            ("shos/benchmark/ping", 1),
-            ("shos/plugins/+/data", 1)
+        logger.info(f"✅ [MQTT] Connecté au Broker (Code: {rc})")
 
-            ("shos/orchestrator/decision",  1),
-            ("shos/orchestrator/modules",   1),
-            ("shos/orchestrator/energy",    1),
-            ("shos/orchestrator/profile",   1),
-        ])
-        print("📡 [MQTT] Écoute active : Vidéo IA + Capteurs")
+        subscriptions = [
+            ("shos/sensors/normalized", 1),
+            ("shos/sensors/raw",        1),
+            ("shos/camera/processed",   1),
+            ("shos/benchmark/ping",     1),
+            ("shos/plugins/+/data",     1),
+            ("shos/orchestrator/decision", 1),
+            ("shos/orchestrator/modules",  1),
+            ("shos/orchestrator/energy",   1),
+            ("shos/orchestrator/profile",  1),
+        ]
+        client.subscribe(subscriptions)
+
+        logger.info("📡 [MQTT] Écoute active : Vidéo IA + Capteurs + Orchestrateur")
 
     def _on_message(self, client, userdata, msg):
         global global_frame
         topic = msg.topic
 
         try:
+            # 1. Flux vidéo binaire
             if topic == "shos/camera/processed":
-                nparr = np.frombuffer(msg.payload, np.uint8)
-                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                if frame is not None:
-                    with frame_lock:
-                        global_frame = frame
+                try:
+                    import cv2
+                    nparr = np.frombuffer(msg.payload, np.uint8)
+                    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                    if frame is not None:
+                        with frame_lock:
+                            global_frame = frame
+                except ImportError:
+                    pass
                 return
 
+            # 2. Décodage du payload en string
             payload_raw = msg.payload.decode('utf-8')
 
+            # 3. Orchestrateur IA → dashboard (parse JSON puis emit)
+            if dispatch_orchestrator(topic, payload_raw, socketio):
+                return
+
+            # 4. Ping benchmark
             if topic == "shos/benchmark/ping":
                 self.client.publish("shos/benchmark/pong", payload_raw)
                 return
 
+            # 5. JSON capteurs et plugins
             payload = json.loads(payload_raw)
 
             if topic in ("shos/sensors/normalized", "shos/sensors/raw"):
@@ -581,20 +628,44 @@ class MQTTHandler:
 
             elif "plugins" in topic:
                 parts = topic.split('/')
-                mod_name = parts[2]
-                socketio.emit('module_update', {'module': mod_name, 'data': payload})
-                socketio.emit('plugin_data', payload)
-
-            elif topic.startswith("shos/orchestrator/"):
-                kind = topic.split("/")[-1]
-                socketio.emit(f'orchestrator_{kind}', payload)
+                if len(parts) >= 3:
+                    mod_name = parts[2]
+                    socketio.emit('module_update', {'module': mod_name, 'data': payload})
+                    socketio.emit('plugin_data', payload)  # compat descendante
 
         except Exception as e:
             if topic != "shos/camera/processed":
-                print(f"❌ [MQTT] Erreur routing sur {topic}: {e}")
+                logger.error(f"❌ [MQTT] Erreur routing sur {topic}: {e}")
+
 
 mqtt_bridge = MQTTHandler()
 
+
+# ════════════════════════════════════════════════════════════════════
+# ROUTE /api/system_status — supprime les 404 répétés du dashboard
+# ════════════════════════════════════════════════════════════════════
+
+@app.route('/api/system_status')
+def api_system_status():
+    """Statut système agrégé pour le dashboard (CPU/RAM/Temp)."""
+    try:
+        import psutil
+        cpu = psutil.cpu_percent(interval=None)
+        ram = psutil.virtual_memory().percent
+        try:
+            with open('/sys/class/thermal/thermal_zone0/temp') as f:
+                temp = int(f.read().strip()) / 1000
+        except OSError:
+            temp = 0.0
+        return jsonify({
+            "status": "ok",
+            "cpu":    round(cpu, 1),
+            "ram":    round(ram, 1),
+            "temp":   round(temp, 1),
+            "ts":     time.time(),
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 # ============================================================================
 # ROUTES PRINCIPALES (WEB UI)
 # ============================================================================

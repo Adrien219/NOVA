@@ -23,7 +23,16 @@
                 "danger_monitor",
                 "hardware_controls"
             ]
+        },
+        "test": {
+            "name": "test",
+            "main_module": "voice_assistant",
+            "secondary_modules": [
+                "danger_monitor",
+                "hardware_controls",
+                "text_reader"
+            ]
         }
     },
-    "current_active_profile": "vprof"
+    "current_active_profile": "stream"
 }

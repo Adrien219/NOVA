@@ -381,6 +381,256 @@ body::after {
   .sidebar { display:none; }
   .main { padding:6px; gap:6px; }
 }
+
+
+
+
+
+
+:root {
+  --topbar-h: 64px;
+}
+
+.topbar {
+  padding: 0 14px;
+  gap: 10px;
+}
+
+/* ── GROUPE METRIQUES (CPU/RAM/Temp/Battery/FPS) ─────────────── */
+.metrics-group {
+  display:flex; align-items:center; gap:5px;
+  padding:4px 8px;
+  background:rgba(255,255,255,.03);
+  border:1px solid var(--border);
+  border-radius:10px;
+}
+
+.metric {
+  display:flex; flex-direction:column; align-items:center;
+  min-width:38px;
+  padding:0 4px;
+  cursor:default;
+}
+.metric-lbl {
+  font-family:var(--mono); font-size:8px;
+  letter-spacing:.06em; text-transform:uppercase;
+  color:var(--t3); margin-bottom:1px;
+}
+.metric-val {
+  font-family:var(--mono); font-size:11px; font-weight:500;
+  color:var(--t1); line-height:1;
+}
+.metric-bar {
+  width:32px; height:2px; background:rgba(255,255,255,.08);
+  border-radius:1px; overflow:hidden; margin-top:2px;
+}
+.metric-fill {
+  height:100%; background:var(--green);
+  border-radius:1px; transition:width .35s, background .25s;
+}
+.metric-fill.warn { background:var(--amber); }
+.metric-fill.danger { background:var(--red); }
+
+/* ── BOUTONS SYSTÈME (icônes circulaires) ─────────────────────── */
+.sys-actions {
+  display:flex; align-items:center; gap:4px;
+  padding:3px 6px;
+  background:rgba(255,255,255,.03);
+  border:1px solid var(--border);
+  border-radius:10px;
+}
+.sys-btn {
+  width:30px; height:30px;
+  border:none; background:none; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--t2); cursor:pointer; transition:all .15s;
+  position:relative;
+}
+.sys-btn svg {
+  width:14px; height:14px;
+  fill:none; stroke:currentColor;
+  stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
+}
+.sys-btn:hover {
+  background:rgba(255,255,255,.08);
+  color:var(--t1);
+}
+.sys-btn.danger:hover {
+  background:rgba(255,69,58,.15);
+  color:var(--red);
+}
+.sys-btn.active {
+  background:var(--ydim);
+  color:var(--yell);
+}
+.sys-btn[data-state="off"] {
+  color:var(--t3);
+}
+
+/* Tooltip sur hover */
+.sys-btn::after {
+  content:attr(data-tip);
+  position:absolute; top:36px; left:50%; transform:translateX(-50%);
+  padding:3px 8px; border-radius:5px;
+  background:rgba(20,23,18,0.96); border:1px solid var(--border);
+  font-family:var(--mono); font-size:9px; color:var(--t1);
+  white-space:nowrap; pointer-events:none;
+  opacity:0; transition:opacity .18s;
+  z-index:1000;
+}
+.sys-btn:hover::after { opacity:1; }
+
+/* ── POP-OVER PROFIL ────────────────────────────────────────── */
+.prof-badge { cursor:pointer; position:relative; }
+
+.prof-popover {
+  position:fixed; top:60px; left:8px;
+  width:280px; max-width:90vw;
+  background:rgba(14,17,23,0.96);
+  backdrop-filter:blur(28px) saturate(160%);
+  border:1px solid var(--border-a);
+  border-radius:14px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,.04) inset;
+  padding:14px;
+  opacity:0; pointer-events:none; transform:translateY(-6px);
+  transition:opacity .2s, transform .2s;
+  z-index:200;
+}
+.prof-popover.show {
+  opacity:1; pointer-events:all; transform:translateY(0);
+}
+
+.pp-head {
+  display:flex; align-items:center; gap:9px;
+  padding-bottom:10px; margin-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+.pp-avatar {
+  width:32px; height:32px; border-radius:8px;
+  background:var(--bdim); border:1px solid rgba(77,166,255,.3);
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px;
+}
+.pp-title {
+  font-size:13px; font-weight:600; color:var(--t1); line-height:1.2;
+}
+.pp-sub {
+  font-family:var(--mono); font-size:9px; color:var(--t3);
+  letter-spacing:.06em; margin-top:2px;
+}
+
+/* Section titre dans popover */
+.pp-sec-lbl {
+  font-family:var(--mono); font-size:8px; letter-spacing:.10em;
+  text-transform:uppercase; color:var(--t3);
+  margin:8px 0 6px;
+}
+
+/* Modules du profil (grille de boutons toggle) */
+.pp-modules {
+  display:grid; grid-template-columns:1fr 1fr; gap:5px;
+  margin-bottom:8px;
+}
+.pp-mod {
+  display:flex; align-items:center; gap:6px;
+  padding:7px 9px; border-radius:8px;
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  cursor:pointer; transition:all .15s;
+  font-size:11px; color:var(--t2);
+}
+.pp-mod:hover { background:rgba(255,255,255,.08); color:var(--t1); }
+.pp-mod.on {
+  background:var(--ydim); border-color:rgba(232,212,77,.35);
+  color:var(--yell);
+}
+.pp-mod-ico { font-size:13px; flex-shrink:0; }
+.pp-mod-name {
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.pp-mod-dot {
+  width:5px; height:5px; border-radius:50%;
+  background:rgba(255,255,255,.15); flex-shrink:0;
+  margin-left:auto;
+}
+.pp-mod.on .pp-mod-dot {
+  background:var(--green); box-shadow:0 0 4px var(--green);
+}
+
+/* Switch backend vision */
+.pp-vision {
+  display:flex; gap:3px; padding:3px;
+  background:rgba(0,0,0,0.20); border:1px solid var(--border);
+  border-radius:8px; margin-bottom:8px;
+}
+.pp-vbtn {
+  flex:1; padding:5px;
+  background:none; border:1px solid transparent; border-radius:5px;
+  font-family:var(--mono); font-size:9px; font-weight:500;
+  color:var(--t3); cursor:pointer; transition:all .15s;
+  letter-spacing:.05em; text-transform:uppercase;
+}
+.pp-vbtn:hover { color:var(--t1); }
+.pp-vbtn.on {
+  background:var(--ydim); border-color:rgba(232,212,77,.35);
+  color:var(--yell);
+}
+
+/* Bouton SOS */
+.pp-sos {
+  width:100%; padding:9px;
+  background:linear-gradient(135deg, rgba(255,69,58,.18), rgba(255,69,58,.08));
+  border:1px solid rgba(255,69,58,.45);
+  border-radius:9px;
+  color:var(--red); font-weight:600; font-size:11px;
+  letter-spacing:.08em; text-transform:uppercase;
+  cursor:pointer; transition:all .18s;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.pp-sos:hover {
+  background:linear-gradient(135deg, rgba(255,69,58,.28), rgba(255,69,58,.14));
+  box-shadow:0 0 16px rgba(255,69,58,.25);
+}
+.pp-sos:active { transform:scale(0.97); }
+
+/* Overlay flou derrière popover */
+.pp-backdrop {
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.32);
+  opacity:0; pointer-events:none;
+  transition:opacity .2s;
+  z-index:150;
+}
+.pp-backdrop.show { opacity:1; pointer-events:all; }
+
+/* ── RESPONSIVE topbar enrichie ────────────────────────────── */
+@media (max-width:1100px) {
+  .metrics-group { gap:2px; }
+  .metric { min-width:32px; }
+  .metric-lbl { display:none; }
+}
+@media (max-width:880px) {
+  .sys-btn[data-priority="low"] { display:none; }
+  .metric[data-priority="low"] { display:none; }
+}
+@media (max-width:640px) {
+  :root { --topbar-h:56px; }
+  .metrics-group { display:none; }
+}
+
+/* Toast pour confirmations actions système */
+.sys-toast {
+  position:fixed; top:75px; right:14px;
+  padding:8px 14px; border-radius:9px;
+  background:rgba(14,17,23,0.96); border:1px solid var(--border-a);
+  font-family:var(--mono); font-size:10px; color:var(--t1);
+  opacity:0; transform:translateY(-8px);
+  pointer-events:none; transition:all .25s;
+  z-index:500;
+  display:flex; align-items:center; gap:6px;
+}
+.sys-toast.show { opacity:1; transform:translateY(0); }
+.sys-toast.success { color:var(--green); border-color:rgba(52,199,89,.4); }
+.sys-toast.error { color:var(--red); border-color:rgba(255,69,58,.4); }
 </style>
 </head>
 <body>
@@ -388,8 +638,9 @@ body::after {
 
 <!-- ══════════════════════════════ TOPBAR ══════════════════════════════ -->
 <header class="topbar" role="banner">
+
+  <!-- ▌ Logo + Profil ▐ -->
   <div class="tb-l">
-    <!-- Logo -->
     <div class="logo" aria-hidden="true">
       <svg viewBox="0 0 14 14">
         <polygon points="7,1 13,5 13,9 7,13 1,9 1,5"/>
@@ -400,24 +651,137 @@ body::after {
     </div>
     <span class="brand">S.H.O.S</span>
 
-    <!-- Profil actif — cliquable pour changer -->
-    <a class="prof-badge" href="/profiles"
-       id="prof-badge" title="Changer de profil"
-       role="button" aria-label="Profil actif">
+    <a class="prof-badge" id="prof-badge" onclick="toggleProfPopover(event)"
+       title="Cliquer pour les actions profil"
+       role="button" aria-label="Actions profil">
       <span class="pico" id="prof-ico">👤</span>
       <span id="prof-nm">{{ profile.name if profile else 'Sans profil' }}</span>
     </a>
   </div>
 
+  <!-- ▌ Métriques live ▐ -->
+  <div class="metrics-group" aria-label="Métriques système">
+    <div class="metric" title="CPU">
+      <span class="metric-lbl">CPU</span>
+      <span class="metric-val" id="m-cpu">—</span>
+      <div class="metric-bar"><div class="metric-fill" id="m-cpu-bar" style="width:0%"></div></div>
+    </div>
+    <div class="metric" title="Mémoire RAM">
+      <span class="metric-lbl">RAM</span>
+      <span class="metric-val" id="m-ram">—</span>
+      <div class="metric-bar"><div class="metric-fill" id="m-ram-bar" style="width:0%"></div></div>
+    </div>
+    <div class="metric" title="Température CPU">
+      <span class="metric-lbl">TEMP</span>
+      <span class="metric-val" id="m-temp">—</span>
+      <div class="metric-bar"><div class="metric-fill" id="m-temp-bar" style="width:0%"></div></div>
+    </div>
+    <div class="metric" data-priority="low" title="Batterie">
+      <span class="metric-lbl">BAT</span>
+      <span class="metric-val" id="m-bat">—</span>
+      <div class="metric-bar"><div class="metric-fill" id="m-bat-bar" style="width:0%"></div></div>
+    </div>
+    <div class="metric" data-priority="low" title="FPS vision">
+      <span class="metric-lbl">FPS</span>
+      <span class="metric-val" id="m-fps">—</span>
+      <div class="metric-bar"><div class="metric-fill" id="m-fps-bar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- ▌ Actions système (7 boutons) ▐ -->
+  <div class="sys-actions" aria-label="Commandes système">
+
+    <!-- Volume - -->
+    <button class="sys-btn" data-tip="Volume −" onclick="sysAction('volume_down')" aria-label="Volume moins">
+      <svg viewBox="0 0 24 24">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <line x1="23" y1="9" x2="17" y2="15"/>
+        <line x1="17" y1="9" x2="23" y2="15"/>
+      </svg>
+    </button>
+
+    <!-- Volume + -->
+    <button class="sys-btn" data-tip="Volume +" onclick="sysAction('volume_up')" aria-label="Volume plus">
+      <svg viewBox="0 0 24 24">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+      </svg>
+    </button>
+
+    <!-- Mute -->
+    <button class="sys-btn" data-tip="Mute" onclick="sysAction('mute_system')" id="btn-mute" aria-label="Couper le son">
+      <svg viewBox="0 0 24 24">
+        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+        <line x1="22" y1="9" x2="16" y2="15"/>
+        <line x1="16" y1="9" x2="22" y2="15"/>
+      </svg>
+    </button>
+
+    <!-- Luminosité - -->
+    <button class="sys-btn" data-tip="Luminosité −" data-priority="low" onclick="sysAction('brightness_down')" aria-label="Luminosité moins">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3"/>
+        <line x1="2" y1="12" x2="6" y2="12"/>
+        <line x1="18" y1="12" x2="22" y2="12"/>
+      </svg>
+    </button>
+
+    <!-- Luminosité + -->
+    <button class="sys-btn" data-tip="Luminosité +" onclick="sysAction('brightness_up')" aria-label="Luminosité plus">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4"/>
+        <line x1="12" y1="2" x2="12" y2="4"/>
+        <line x1="12" y1="20" x2="12" y2="22"/>
+        <line x1="2" y1="12" x2="4" y2="12"/>
+        <line x1="20" y1="12" x2="22" y2="12"/>
+        <line x1="4.93" y1="4.93" x2="6.34" y2="6.34"/>
+        <line x1="17.66" y1="17.66" x2="19.07" y2="19.07"/>
+        <line x1="4.93" y1="19.07" x2="6.34" y2="17.66"/>
+        <line x1="17.66" y1="6.34" x2="19.07" y2="4.93"/>
+      </svg>
+    </button>
+
+    <!-- Screenshot -->
+    <button class="sys-btn" data-tip="Capture d'écran" onclick="sysAction('screenshot')" aria-label="Capture">
+      <svg viewBox="0 0 24 24">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+    </button>
+
+    <!-- Network -->
+    <button class="sys-btn" data-tip="Réseau" data-priority="low" id="btn-net" aria-label="Réseau">
+      <svg viewBox="0 0 24 24">
+        <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+        <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+        <line x1="12" y1="20" x2="12.01" y2="20"/>
+      </svg>
+    </button>
+
+    <!-- Reboot -->
+    <button class="sys-btn" data-tip="Redémarrer" onclick="sysActionConfirm('reboot','Redémarrer le système ?')" aria-label="Reboot">
+      <svg viewBox="0 0 24 24">
+        <polyline points="23 4 23 10 17 10"/>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>
+    </button>
+
+    <!-- Power off -->
+    <button class="sys-btn danger" data-tip="Éteindre" onclick="sysActionConfirm('shutdown','Éteindre le système ?')" aria-label="Power off">
+      <svg viewBox="0 0 24 24">
+        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
+        <line x1="12" y1="2" x2="12" y2="12"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- ▌ Indicateurs de connexion ▐ -->
   <div class="tb-r">
-    <!-- Indicateurs temps réel -->
     <div class="pill" aria-live="polite">
       <div class="dot dot-wait" id="dot-mqtt"></div>
       <span>MQTT</span>
-    </div>
-    <div class="pill" aria-live="polite">
-      <div class="dot dot-wait" id="dot-hw"></div>
-      <span>Capteurs</span>
     </div>
     <div class="pill" aria-live="polite">
       <div class="dot dot-wait" id="dot-cam"></div>
@@ -431,6 +795,46 @@ body::after {
     </a>
   </div>
 </header>
+
+<!-- ▌ Pop-over profil (placé hors topbar pour z-index) ▐ -->
+<div class="pp-backdrop" id="pp-backdrop" onclick="closeProfPopover()"></div>
+
+<div class="prof-popover" id="prof-popover" role="dialog" aria-label="Actions profil">
+  <div class="pp-head">
+    <div class="pp-avatar" id="pp-avatar">👤</div>
+    <div>
+      <div class="pp-title" id="pp-name">{{ profile.name if profile else 'Sans profil' }}</div>
+      <div class="pp-sub" id="pp-sub">profil actif</div>
+    </div>
+  </div>
+
+  <!-- Modules du profil -->
+  <div class="pp-sec-lbl">Modules du profil</div>
+  <div class="pp-modules" id="pp-modules">
+    <!-- généré par JS -->
+  </div>
+
+  <!-- Switch backend vision -->
+  <div class="pp-sec-lbl">Backend vision</div>
+  <div class="pp-vision">
+    <button class="pp-vbtn on" id="pp-vmp"   onclick="ppSetVision('mediapipe')">MP</button>
+    <button class="pp-vbtn"    id="pp-vyolo" onclick="ppSetVision('yolo11n')">YOLO</button>
+    <button class="pp-vbtn"    id="pp-vmoon" onclick="ppSetVision('moondream')">MOON</button>
+  </div>
+
+  <!-- SOS -->
+  <button class="pp-sos" onclick="ppTriggerSOS()" aria-label="Déclencher alerte SOS">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+      <line x1="12" y1="9" x2="12" y2="13"/>
+      <line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    Déclencher SOS
+  </button>
+</div>
+
+<!-- Toast pour feedback action -->
+<div class="sys-toast" id="sys-toast"></div>
 
 <!-- ══════════════════════════════ SIDEBAR ══════════════════════════════ -->
 <nav class="sidebar" role="navigation" aria-label="Navigation principale">
@@ -895,6 +1299,276 @@ window.addEventListener('message', (ev) => {
     }
   });
 });
+
+
+
+
+
+
+
+/* ════════════════════════════════════════════════════════════════════
+   COMMANDES SYSTÈME — exécution via hardware_controls/api/execute
+═══════════════════════════════════════════════════════════════════════ */
+
+function showSysToast(msg, kind) {
+  const t = document.getElementById('sys-toast');
+  if (!t) return;
+  t.textContent = msg;
+  t.className = 'sys-toast show' + (kind ? ' ' + kind : '');
+  clearTimeout(window._sysToastT);
+  window._sysToastT = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+function sysAction(actionId, params) {
+  // Appel API hardware_controls (même endpoint que les boutons hardware)
+  fetch('/module/hardware_controls/api/execute', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      action_id: actionId,
+      source: 'topbar',
+      device: 'system_button',
+      ...(params || {})
+    })
+  })
+  .then(r => r.json())
+  .then(d => showSysToast(d.msg || `✓ ${actionId}`, d.ok !== false ? 'success' : 'error'))
+  .catch(() => showSysToast('Erreur réseau', 'error'));
+}
+
+function sysActionConfirm(actionId, message) {
+  if (!confirm(message)) return;
+  sysAction(actionId);
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   MÉTRIQUES LIVE — depuis SocketIO sys_update + camera_vision
+═══════════════════════════════════════════════════════════════════════ */
+
+function setMetric(id, value, unit, max) {
+  const el = document.getElementById(id);
+  const bar = document.getElementById(id + '-bar');
+  if (!el) return;
+  el.textContent = (value == null) ? '—' : value + (unit || '');
+  if (bar && value != null && max) {
+    const pct = Math.max(0, Math.min(100, (value / max) * 100));
+    bar.style.width = pct + '%';
+    bar.classList.remove('warn', 'danger');
+    if      (pct > 85) bar.classList.add('danger');
+    else if (pct > 65) bar.classList.add('warn');
+  }
+}
+
+// Système (sys_update — toutes les 5s depuis nova.py)
+if (typeof socket !== 'undefined') {
+  socket.on('sys_update', function(d) {
+    if (!d) return;
+    if (d.cpu  != null) setMetric('m-cpu',  Math.round(d.cpu),  '%', 100);
+    if (d.ram  != null) setMetric('m-ram',  Math.round(d.ram),  '%', 100);
+    if (d.temp != null) setMetric('m-temp', Math.round(d.temp), '°', 85);
+  });
+
+  // FPS depuis le service vision
+  socket.on('camera_vision', function(d) {
+    if (d && d.fps != null) setMetric('m-fps', Math.round(d.fps), '', 30);
+  });
+
+  // Batterie via capteur (sensor_update)
+  socket.on('sensor_update', function(d) {
+    if (d && d.battery != null) setMetric('m-bat', Math.round(d.battery), '%', 100);
+  });
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   POP-OVER PROFIL — toggle et actions
+═══════════════════════════════════════════════════════════════════════ */
+
+const MODULE_META_POP = {
+  'video_streaming':  { ico:'📡', name:'Streaming' },
+  'vision_objet':     { ico:'👁',  name:'Vision' },
+  'voice_assistant':  { ico:'🎙',  name:'Voice' },
+  'danger_monitor':   { ico:'⚠️',  name:'Danger' },
+  'text_reader':      { ico:'📖',  name:'OCR' },
+  'hand_control':     { ico:'✋',  name:'Hand' },
+  'mediapipe_gesture':{ ico:'🤖',  name:'Gestes' },
+  'joystick':         { ico:'🕹',  name:'Joystick' },
+  'remote':           { ico:'📡',  name:'Remote' },
+};
+
+let popoverActiveModules = new Set();
+
+function toggleProfPopover(ev) {
+  if (ev) ev.preventDefault();
+  const pop = document.getElementById('prof-popover');
+  const bd  = document.getElementById('pp-backdrop');
+  if (!pop) return;
+  const opened = pop.classList.toggle('show');
+  if (bd) bd.classList.toggle('show', opened);
+  if (opened) renderPopoverModules();
+}
+
+function closeProfPopover() {
+  document.getElementById('prof-popover')?.classList.remove('show');
+  document.getElementById('pp-backdrop')?.classList.remove('show');
+}
+
+function renderPopoverModules() {
+  const container = document.getElementById('pp-modules');
+  if (!container) return;
+  container.innerHTML = '';
+
+  // Récupère la config profil (variable PROFILE définie dans script existant)
+  const profileModules = [];
+  if (typeof PROFILE !== 'undefined' && PROFILE) {
+    if (PROFILE.main_module) profileModules.push(PROFILE.main_module);
+    if (Array.isArray(PROFILE.secondary_modules)) {
+      profileModules.push(...PROFILE.secondary_modules);
+    }
+  }
+
+  // Avatar + nom
+  const avatar = document.getElementById('pp-avatar');
+  const name   = document.getElementById('pp-name');
+  const sub    = document.getElementById('pp-sub');
+  if (avatar && typeof PROFILE !== 'undefined') avatar.textContent = PROFILE.icon || '👤';
+  if (name   && typeof PROFILE !== 'undefined') name.textContent   = PROFILE.name || 'Sans profil';
+  if (sub    && typeof PROFILE !== 'undefined') {
+    sub.textContent = profileModules.length + ' module' + (profileModules.length > 1 ? 's' : '');
+  }
+
+  // Affiche un bouton par module du profil
+  if (profileModules.length === 0) {
+    container.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--t3);padding:6px;grid-column:1/3;text-align:center">Aucun module dans ce profil</div>';
+    return;
+  }
+
+  profileModules.forEach((modId) => {
+    const meta = MODULE_META_POP[modId] || { ico:'📦', name: modId };
+    const isOn = popoverActiveModules.has(modId);
+    const div = document.createElement('div');
+    div.className = 'pp-mod' + (isOn ? ' on' : '');
+    div.innerHTML = `
+      <span class="pp-mod-ico">${meta.ico}</span>
+      <span class="pp-mod-name">${meta.name}</span>
+      <span class="pp-mod-dot"></span>
+    `;
+    div.onclick = () => togglePopoverModule(modId, div);
+    container.appendChild(div);
+  });
+}
+
+function togglePopoverModule(modId, el) {
+  const wasOn = popoverActiveModules.has(modId);
+  const action = wasOn ? 'kill_module' : ('launch_' + (modId.includes('_') ? modId.split('_')[0] : modId));
+
+  fetch('/module/hardware_controls/api/execute', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      action_id: action,
+      source: 'popover',
+      device: 'profile_module',
+      module: modId
+    })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok !== false) {
+      if (wasOn) popoverActiveModules.delete(modId);
+      else popoverActiveModules.add(modId);
+      el.classList.toggle('on', !wasOn);
+      showSysToast((wasOn ? '⏹ ' : '▶ ') + modId, 'success');
+    } else {
+      showSysToast(d.msg || 'Erreur', 'error');
+    }
+  })
+  .catch(() => showSysToast('Erreur réseau', 'error'));
+}
+
+function ppSetVision(backend) {
+  document.querySelectorAll('.pp-vbtn').forEach(b => b.classList.remove('on'));
+  const map = { mediapipe:'pp-vmp', yolo11n:'pp-vyolo', moondream:'pp-vmoon' };
+  const btn = document.getElementById(map[backend]);
+  if (btn) btn.classList.add('on');
+
+  // Appel direct au vision_service
+  fetch('http://' + location.hostname + ':5051/api/backend', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ backend: backend })
+  })
+  .then(r => r.json())
+  .then(d => {
+    showSysToast(d.ok ? `✓ ${backend.toUpperCase()}` : (d.msg || 'Erreur'),
+                 d.ok ? 'success' : 'error');
+
+    // Recharger les iframes pour appliquer le nouveau backend
+    if (d.ok) {
+      ['iframe-main','iframe-s1','iframe-s2'].forEach(id => {
+        const f = document.getElementById(id);
+        if (f && f.src && f.src !== 'about:blank') {
+          const u = new URL(f.src, location.href);
+          u.searchParams.set('_v', Date.now());
+          f.src = u.toString();
+        }
+      });
+    }
+  })
+  .catch(() => showSysToast('Vision service hors ligne', 'error'));
+}
+
+function ppTriggerSOS() {
+  if (!confirm('Déclencher une alerte SOS ?\n\nCela enverra un signal de détresse sur le bus MQTT.')) return;
+  fetch('/module/hardware_controls/api/execute', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      action_id: 'mqtt_alert',
+      source: 'popover',
+      message: 'SOS — alerte utilisateur',
+      level: 'critical'
+    })
+  })
+  .then(r => r.json())
+  .then(d => showSysToast(d.ok !== false ? '🚨 SOS envoyé' : 'Erreur SOS',
+                          d.ok !== false ? 'success' : 'error'))
+  .catch(() => showSysToast('Erreur SOS', 'error'));
+
+  closeProfPopover();
+}
+
+// Fermer le popover sur Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeProfPopover();
+});
+
+// Récupérer l'état initial du backend vision au chargement
+(function initVisionStatePopover() {
+  fetch('http://' + location.hostname + ':5051/api/backend')
+    .then(r => r.json())
+    .then(d => {
+      if (d && d.active) {
+        document.querySelectorAll('.pp-vbtn').forEach(b => b.classList.remove('on'));
+        const map = { mediapipe:'pp-vmp', yolo11n:'pp-vyolo', moondream:'pp-vmoon' };
+        const el = document.getElementById(map[d.active]);
+        if (el) el.classList.add('on');
+      }
+    })
+    .catch(() => {});
+})();
+
+
+
+
+
+
+
+
+
+
+
 
 /* ── INIT ───────────────────────────────────────────────────── */
 applyProfile();

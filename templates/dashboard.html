@@ -717,7 +717,7 @@ a.card:hover .c-ico { transform:scale(1.08); }
 
 
 
-            <div class="card c-r3a1" role="region" aria-label="Orchestrateur IA">
+            <div class="card c-r3a" role="region" aria-label="Orchestrateur IA">
                 <div class="card-lbl">Orchestrateur IA</div>
                 <div class="q-grid">
                     <div class="q-item" aria-label="Statut IA">
@@ -772,7 +772,7 @@ a.card:hover .c-ico { transform:scale(1.08); }
             </div>
 
             <!-- ── CARD 7 : Portes / Diagnostic ── -->
-            <div class="card c-r3a" role="region" aria-label="Modules rapides">
+            <div class="card c-r3a1" role="region" aria-label="Modules rapides">
                 <div class="card-lbl">Accès rapide</div>
                 <div class="q-grid">
                     <a href="/hud"              class="q-item" aria-label="HUD NOVA"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M2 12C4 7 7.6 4 12 4s8 3 10 8-5.6 8-10 8S2 17 2 12z"/></svg>HUD</a>
@@ -868,31 +868,34 @@ a.card:hover .c-ico { transform:scale(1.08); }
    Socket.IO · /api/get_profiles · /api/system_status
 ═══════════════════════════════════════════════════════ */
 document.addEventListener("DOMContentLoaded", () => {
-    if (typeof socket !== 'undefined') {
-      socket.on('relay_decision', (data) => {
-        if (!data) return;
-        
-        // 1. Statut (Passe au vert si actif)
-        const statusEl = document.getElementById('mini-orch-status');
-        statusEl.textContent = 'En ligne';
-        statusEl.style.color = '#30d158'; 
+  if (typeof socket === 'undefined') return;
 
-        // 2. Énergie (ex: "MED | 20fps")
-        const e = data.energy || {};
-        const cpu = (e.cpu_freq || '—').replace('GHz', 'G'); // Raccourci pour l'affichage
-        document.getElementById('mini-orch-energy').textContent = `${cpu} | ${e.fps_target || '-'}fps`;
+  // 🎯 Le nom d'événement doit correspondre exactement à ce que nova.py émet
+  socket.on('orchestrator_decision', (data) => {
+    if (!data) return;
 
-        // 3. Modules (ex: "3 Actifs")
-        const mods = data.active_modules || [];
-        document.getElementById('mini-orch-mods').textContent = `${mods.length} Actif${mods.length > 1 ? 's' : ''}`;
+    // 1. Statut
+    const statusEl = document.getElementById('mini-orch-status');
+    statusEl.textContent = 'En ligne';
+    statusEl.style.color = '#30d158';
 
-        // 4. Profil (ex: "P_1")
-        const p = data.profile || {};
-        let profName = p.suggested ? p.suggested.replace('profile_', 'P_') : '—';
-        document.getElementById('mini-orch-prof').textContent = `${profName}`;
-      });
-    }
+    // 2. Énergie
+    const e = data.energy || {};
+    document.getElementById('mini-orch-energy').textContent =
+      `${e.cpu_freq || '—'} | ${e.fps_target || '-'}fps`;
+
+    // 3. Modules — la clé est "activate" (pas "active_modules")
+    const mods = (data.modules && data.modules.activate) || [];
+    document.getElementById('mini-orch-mods').textContent =
+      `${mods.length} Actif${mods.length > 1 ? 's' : ''}`;
+
+    // 4. Profil
+    const p = data.profile || {};
+    const profName = p.suggested ? p.suggested.replace('profile_', 'P_') : '—';
+    document.getElementById('mini-orch-prof').textContent = profName;
   });
+});
+
 
 
 
