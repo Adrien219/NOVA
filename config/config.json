@@ -26,11 +26,11 @@
         },
         "test": {
             "name": "test",
-            "main_module": "voice_assistant",
+            "main_module": "video_streaming",
             "secondary_modules": [
-                "danger_monitor",
-                "hardware_controls",
-                "text_reader"
+                "voice_assistant",
+                "text_reader",
+                "hand_control"
             ]
         }
     },

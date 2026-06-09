@@ -2,27 +2,25 @@
 # -*- coding: utf-8 -*-
 """
 ===============================================================================
- S.H.O.S · VISION SERVICE V2 — MULTI-BACKEND
+ S.H.O.S - VISION SERVICE V3 MULTI-BACKEND
 ===============================================================================
- 3 backends de vision interchangeables a chaud via API :
+ 3 backends interchangeables a chaud via API REST :
 
-   - MEDIAPIPE       : Hands + Pose (rapide, faible CPU, ~15 fps)
-   - YOLO11N_NCNN    : Detection 80 classes COCO (NCNN, ~10-20 fps Pi 4B)
-   - MOONDREAM2      : VLM 0.5B (comprehension scene, 1 image / 5-10s)
+   - MEDIAPIPE    : Hands + Pose (rapide, ~15 fps Pi 4B)
+   - YOLO11N      : Detection 80 classes COCO via ultralytics
+   - MOONDREAM 2  : VLM 0.5B (caption FR, 1 image / 5-10s)
 
  Switch dynamique :
    POST /api/backend  { "backend": "yolo11n" }
    GET  /api/backend  -> backend actif + liste disponibles
 
- Sortie :
-   /video_feed   -> MJPEG annote (boxes + labels overlay)
-   /status       -> JSON metriques (fps, backend, meta)
-   MQTT topic    -> shos/camera/vision
+ Modeles attendus dans ./models/ :
+   models/yolo11n_ncnn_model/     (export NCNN) ou yolo11n.pt
+   models/moondream-0_5b-int4.gguf
+   models/mmproj.gguf
 
- Modeles attendus dans ~/memoir/NOVA/models/ :
-   models/yolo11n_ncnn_model/      (export NCNN)
-   models/moondream-0_5b-int4.gguf (modele GGUF)
-   models/mmproj.gguf              (projecteur multimodal moondream)
+ Si un modele est absent -> backend marque "non disponible".
+ MediaPipe charge toujours si installe (pas de fichier requis).
 ===============================================================================
 """
 
@@ -52,15 +50,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 MODELS_DIR   = PROJECT_ROOT / "models"
 
 YOLO_NCNN_PATH       = MODELS_DIR / "yolo11n_ncnn_model"
+YOLO_PT_PATH         = MODELS_DIR / "yolo11n.pt"
 MOONDREAM_MODEL_PATH = MODELS_DIR / "moondream-0_5b-int4.gguf"
 MOONDREAM_MMPROJ     = MODELS_DIR / "mmproj.gguf"
 
 DEFAULT_BACKEND = "mediapipe"
 BACKENDS = ("mediapipe", "yolo11n", "moondream")
 
-# -----------------------------------------------------------------------------
-# LOGGING
-# -----------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s - %(message)s',
@@ -68,10 +64,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger("VisionService")
 
-# -----------------------------------------------------------------------------
-# FLASK
-# -----------------------------------------------------------------------------
 app = Flask(__name__)
+
+# ----- CORS -----
+@app.after_request
+def add_cors(response):
+    response.headers["Access-Control-Allow-Origin"]  = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
 
 
 # =============================================================================
@@ -79,13 +80,10 @@ app = Flask(__name__)
 # =============================================================================
 class VisionBackend:
     name = "base"
-
     def is_available(self) -> bool:
         return False
-
     def process(self, frame: np.ndarray) -> Tuple[np.ndarray, dict]:
         return frame, {"backend": self.name, "detections": []}
-
     def close(self):
         pass
 
@@ -100,6 +98,13 @@ class MediaPipeBackend(VisionBackend):
         self.available = False
         try:
             import mediapipe as mp
+            # Workaround Windows + Py 3.12
+            try:
+                _ = mp.solutions
+            except AttributeError:
+                from mediapipe.python import solutions as _sol
+                mp.solutions = _sol
+
             self.mp_hands = mp.solutions.hands
             self.hands = self.mp_hands.Hands(
                 static_image_mode=False, max_num_hands=1,
@@ -113,23 +118,24 @@ class MediaPipeBackend(VisionBackend):
             self.mp_draw = mp.solutions.drawing_utils
             self.mp_draw_styles = mp.solutions.drawing_styles
             self.available = True
-            logger.info("MediaPipe initialise (Hands + Pose)")
+            logger.info("✅ MediaPipe initialise (Hands + Pose)")
         except Exception as e:
-            logger.error("MediaPipe indisponible : %s", e)
+            logger.error("❌ MediaPipe indisponible : %s", e)
 
-    def is_available(self): return self.available
+    def is_available(self):
+        return self.available
 
     def process(self, frame):
         if not self.available:
             return frame, {"backend": self.name, "error": "not_available"}
 
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        hr  = self.hands.process(rgb)
-        pr  = self.pose.process(rgb)
+        hr = self.hands.process(rgb)
+        pr = self.pose.process(rgb)
 
         annotated = frame.copy()
-        hands_n   = 0
-        pose_ok   = False
+        hands_n = 0
+        pose_ok = False
 
         if hr.multi_hand_landmarks:
             hands_n = len(hr.multi_hand_landmarks)
@@ -149,24 +155,27 @@ class MediaPipeBackend(VisionBackend):
         return annotated, {
             "backend": self.name,
             "hands_detected": hands_n,
-            "pose_detected":  pose_ok,
-            "detections":     [],
+            "pose_detected": pose_ok,
+            "detections": [],
         }
 
     def close(self):
-        try: self.hands.close(); self.pose.close()
-        except Exception: pass
+        try:
+            self.hands.close()
+            self.pose.close()
+        except Exception:
+            pass
 
 
 # -----------------------------------------------------------------------------
-# BACKEND 2 : YOLO 11N NCNN
+# BACKEND 2 : YOLO 11n (NCNN ou PT)
 # -----------------------------------------------------------------------------
-class YoloNcnnBackend(VisionBackend):
+class YoloBackend(VisionBackend):
     name = "yolo11n"
 
     COCO = [
         "personne","velo","voiture","moto","avion","bus","train","camion","bateau","feu",
-        "panneau stop","parcmetre","banc","oiseau","chat","chien","cheval","mouton","vache","elephant",
+        "stop","parcmetre","banc","oiseau","chat","chien","cheval","mouton","vache","elephant",
         "ours","zebre","girafe","sac a dos","parapluie","sac","cravate","valise","frisbee","skis",
         "snowboard","ballon","cerf-volant","batte","gant","skate","surf","raquette","bouteille","verre",
         "tasse","fourchette","couteau","cuillere","bol","banane","pomme","sandwich","orange","brocoli",
@@ -175,28 +184,37 @@ class YoloNcnnBackend(VisionBackend):
         "evier","frigo","livre","horloge","vase","ciseaux","peluche","seche-cheveux","brosse a dents","_",
     ]
 
-    def __init__(self, model_path: Path = YOLO_NCNN_PATH):
-        self.model_path = model_path
+    def __init__(self):
         self.model = None
         self.available = False
         self._load()
 
     def _load(self):
-        if not self.model_path.exists():
-            logger.warning("YOLO NCNN : dossier introuvable %s", self.model_path)
-            logger.warning("  Pour activer : yolo export model=yolo11n.pt format=ncnn")
+        # Priorite : NCNN > PT
+        model_path = None
+        if YOLO_NCNN_PATH.exists():
+            model_path = YOLO_NCNN_PATH
+            logger.info("YOLO : utilisation du modele NCNN %s", model_path)
+        elif YOLO_PT_PATH.exists():
+            model_path = YOLO_PT_PATH
+            logger.info("YOLO : utilisation du modele PyTorch %s", model_path)
+        else:
+            logger.warning("⚠ YOLO : aucun modele trouve dans %s", MODELS_DIR)
+            logger.warning("   Attendu : yolo11n_ncnn_model/ OU yolo11n.pt")
             return
+
         try:
             from ultralytics import YOLO
-            self.model = YOLO(str(self.model_path), task="detect")
+            self.model = YOLO(str(model_path), task="detect")
             self.available = True
-            logger.info("YOLO11n NCNN charge : %s", self.model_path)
+            logger.info("✅ YOLO11n charge")
         except ImportError:
-            logger.warning("ultralytics non installe - pip install ultralytics")
+            logger.warning("⚠ ultralytics non installe - pip install ultralytics")
         except Exception as e:
-            logger.error("YOLO load : %s", e)
+            logger.error("❌ YOLO load : %s", e)
 
-    def is_available(self): return self.available
+    def is_available(self):
+        return self.available
 
     def process(self, frame):
         if not self.available:
@@ -214,26 +232,26 @@ class YoloNcnnBackend(VisionBackend):
                 continue
             for box in boxes:
                 cls_id = int(box.cls[0].item())
-                conf   = float(box.conf[0].item())
-                x1,y1,x2,y2 = box.xyxy[0].cpu().numpy().astype(int)
+                conf = float(box.conf[0].item())
+                x1, y1, x2, y2 = box.xyxy[0].cpu().numpy().astype(int)
                 label = self.COCO[cls_id] if cls_id < len(self.COCO) else f"cls_{cls_id}"
 
-                cv2.rectangle(annotated, (x1,y1), (x2,y2), (77, 212, 232), 2)
+                cv2.rectangle(annotated, (x1, y1), (x2, y2), (77, 212, 232), 2)
                 txt = f"{label} {conf:.2f}"
                 (tw, th), _ = cv2.getTextSize(txt, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-                cv2.rectangle(annotated, (x1, y1-th-6), (x1+tw+6, y1), (77, 212, 232), -1)
-                cv2.putText(annotated, txt, (x1+3, y1-4),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (12,15,11), 1, cv2.LINE_AA)
-
+                cv2.rectangle(annotated, (x1, y1 - th - 6), (x1 + tw + 6, y1), (77, 212, 232), -1)
+                cv2.putText(annotated, txt, (x1 + 3, y1 - 4),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (12, 15, 11), 1, cv2.LINE_AA)
                 dets.append({
-                    "class": label, "confidence": round(conf, 3),
+                    "class": label,
+                    "confidence": round(conf, 3),
                     "bbox": [int(x1), int(y1), int(x2), int(y2)],
                 })
 
         return annotated, {
-            "backend": self.name, "detections": dets,
+            "backend": self.name,
+            "detections": dets,
             "objects_count": len(dets),
-            "model": "yolo11n-ncnn",
         }
 
 
@@ -243,8 +261,7 @@ class YoloNcnnBackend(VisionBackend):
 class MoondreamBackend(VisionBackend):
     name = "moondream"
 
-    def __init__(self, model_path: Path = MOONDREAM_MODEL_PATH):
-        self.model_path = model_path
+    def __init__(self):
         self.available = False
         self.model = None
         self._caption = "Analyse en cours..."
@@ -254,40 +271,42 @@ class MoondreamBackend(VisionBackend):
         self._load()
 
     def _load(self):
-        if not self.model_path.exists():
-            logger.warning("Moondream : GGUF introuvable %s", self.model_path)
-            logger.warning("  Telecharger moondream-0_5b-int4.gguf + mmproj.gguf dans models/")
+        if not MOONDREAM_MODEL_PATH.exists():
+            logger.warning("⚠ Moondream : GGUF introuvable %s", MOONDREAM_MODEL_PATH)
+            return
+        if not MOONDREAM_MMPROJ.exists():
+            logger.warning("⚠ Moondream : mmproj.gguf manquant %s", MOONDREAM_MMPROJ)
             return
         try:
             from llama_cpp import Llama
             from llama_cpp.llama_chat_format import MoondreamChatHandler
-            if not MOONDREAM_MMPROJ.exists():
-                logger.warning("Moondream : mmproj.gguf manquant - %s", MOONDREAM_MMPROJ)
-                return
             self.handler = MoondreamChatHandler(clip_model_path=str(MOONDREAM_MMPROJ))
             self.model = Llama(
-                model_path=str(self.model_path),
+                model_path=str(MOONDREAM_MODEL_PATH),
                 chat_handler=self.handler,
                 n_ctx=2048, verbose=False,
             )
             self.available = True
-            logger.info("Moondream 2 charge : %s", self.model_path)
+            logger.info("✅ Moondream 2 charge")
         except ImportError:
-            logger.warning("llama-cpp-python absent - pip install llama-cpp-python")
+            logger.warning("⚠ llama-cpp-python absent - pip install llama-cpp-python")
         except Exception as e:
-            logger.warning("Moondream load : %s", e)
+            logger.warning("⚠ Moondream load : %s", e)
 
-    def is_available(self): return self.available
+    def is_available(self):
+        return self.available
 
     def _analyze_async(self, frame):
-        if self._inflight: return
+        if self._inflight:
+            return
         self._inflight = True
 
         def _run():
             try:
                 import base64
                 ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
-                if not ok: return
+                if not ok:
+                    return
                 b64 = base64.b64encode(buf.tobytes()).decode("ascii")
                 resp = self.model.create_chat_completion(
                     messages=[{
@@ -324,16 +343,16 @@ class MoondreamBackend(VisionBackend):
             caption = self._caption
 
         overlay = annotated.copy()
-        cv2.rectangle(overlay, (0, h-60), (w, h), (12, 15, 11), -1)
+        cv2.rectangle(overlay, (0, h - 60), (w, h), (12, 15, 11), -1)
         cv2.addWeighted(overlay, 0.78, annotated, 0.22, 0, annotated)
 
-        cv2.putText(annotated, "MOONDREAM 2", (10, h-38),
+        cv2.putText(annotated, "MOONDREAM 2", (10, h - 38),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.45, (77, 212, 232), 1, cv2.LINE_AA)
         cap = caption[:90] + ("..." if len(caption) > 90 else "")
-        cv2.putText(annotated, cap, (10, h-15),
+        cv2.putText(annotated, cap, (10, h - 15),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (240, 240, 240), 1, cv2.LINE_AA)
         if self._inflight:
-            cv2.circle(annotated, (w-20, h-30), 5, (77, 166, 255), -1)
+            cv2.circle(annotated, (w - 20, h - 30), 5, (77, 166, 255), -1)
 
         return annotated, {
             "backend": self.name,
@@ -350,7 +369,8 @@ class MoondreamBackend(VisionBackend):
 class CameraSource:
     def __init__(self, width=640, height=480):
         self.width, self.height = width, height
-        self.picam2 = None; self.cap = None
+        self.picam2 = None
+        self.cap = None
         self.using_picamera = False
         self._open()
 
@@ -374,7 +394,7 @@ class CameraSource:
         try:
             self.cap = cv2.VideoCapture(0)
             if self.cap.isOpened():
-                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH,  self.width)
+                self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
                 self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
                 logger.info("OpenCV VideoCapture(0) ouvert")
             else:
@@ -386,8 +406,10 @@ class CameraSource:
 
     def read(self):
         if self.using_picamera and self.picam2:
-            try: return self.picam2.capture_array()
-            except Exception: return None
+            try:
+                return self.picam2.capture_array()
+            except Exception:
+                return None
         if self.cap:
             ok, f = self.cap.read()
             return f if ok else None
@@ -398,11 +420,15 @@ class CameraSource:
 
     def close(self):
         try:
-            if self.picam2: self.picam2.stop()
-        except Exception: pass
+            if self.picam2:
+                self.picam2.stop()
+        except Exception:
+            pass
         try:
-            if self.cap: self.cap.release()
-        except Exception: pass
+            if self.cap:
+                self.cap.release()
+        except Exception:
+            pass
 
 
 # =============================================================================
@@ -415,35 +441,42 @@ class VisionService:
         logger.info("Initialisation des backends...")
         self.backends: Dict[str, VisionBackend] = {
             "mediapipe": MediaPipeBackend(),
-            "yolo11n":   YoloNcnnBackend(),
+            "yolo11n":   YoloBackend(),
             "moondream": MoondreamBackend(),
         }
-        self.active_name = DEFAULT_BACKEND
+
+        # Backend par defaut : premier dispo
+        if self.backends[DEFAULT_BACKEND].is_available():
+            self.active_name = DEFAULT_BACKEND
+        else:
+            self.active_name = next(
+                (n for n, b in self.backends.items() if b.is_available()),
+                DEFAULT_BACKEND,
+            )
+
         self._lock = threading.Lock()
-
         self.output_frame = None
-        self.frame_lock   = threading.Lock()
-        self.is_running   = True
-        self.frame_count  = 0
-        self.last_meta    = {"backend": DEFAULT_BACKEND}
-
+        self.frame_lock = threading.Lock()
+        self.is_running = True
+        self.frame_count = 0
+        self.last_meta = {"backend": self.active_name}
         self._fps = 0.0
         self._fps_counter = 0
         self._fps_timer = time.time()
-
         self.mqtt = self._init_mqtt()
         self._last_mqtt = 0.0
 
-        avail = [n for n,b in self.backends.items() if b.is_available()]
+        avail = [n for n, b in self.backends.items() if b.is_available()]
         logger.info("Backends disponibles : %s", avail)
+        logger.info("Backend initial : %s", self.active_name)
 
     def _init_mqtt(self):
         try:
             try:
                 from paho.mqtt.enums import CallbackAPIVersion
-                c = mqtt.Client(CallbackAPIVersion.VERSION2, "NOVA_VISION_V2")
+                c = mqtt.Client(CallbackAPIVersion.VERSION2, "NOVA_VISION_V3")
             except ImportError:
-                c = mqtt.Client("NOVA_VISION_V2")
+                c = mqtt.Client("NOVA_VISION_V3")
             c.connect(MQTT_BROKER, MQTT_PORT, keepalive=60)
             c.loop_start()
             logger.info("MQTT connecte %s:%d", MQTT_BROKER, MQTT_PORT)
@@ -453,14 +486,17 @@ class VisionService:
             return None
 
     def publish_meta(self, meta):
-        if not self.mqtt: return
+        if not self.mqtt:
+            return
         now = time.time()
-        if now - self._last_mqtt < 0.2: return
+        if now - self._last_mqtt < 0.2:
+            return
         self._last_mqtt = now
         try:
             payload = {**meta, "fps": round(self._fps, 1), "ts": now}
             self.mqtt.publish(MQTT_TOPIC, json.dumps(payload), qos=0)
-        except Exception: pass
+        except Exception:
+            pass
 
     def set_backend(self, name):
         if name not in self.backends:
@@ -471,9 +507,11 @@ class VisionService:
             self.active_name = name
         logger.info("Backend actif -> %s", name)
         if self.mqtt:
-            try: self.mqtt.publish("shos/camera/backend",
-                                   json.dumps({"backend": name, "ts": time.time()}))
-            except Exception: pass
+            try:
+                self.mqtt.publish("shos/camera/backend",
+                                  json.dumps({"backend": name, "ts": time.time()}))
+            except Exception:
+                pass
         return {"ok": True, "backend": name}
 
     def get_active(self):
@@ -485,20 +523,24 @@ class VisionService:
             logger.error("Pas de camera - boucle vision annulee")
             return
         for _ in range(8):
-            self.camera.read(); time.sleep(0.04)
+            self.camera.read()
+            time.sleep(0.04)
         logger.info("Vision demarree - backend : %s", self.active_name)
 
         while self.is_running:
             try:
                 frame = self.camera.read()
                 if frame is None or frame.size == 0:
-                    time.sleep(0.05); continue
+                    time.sleep(0.05)
+                    continue
 
                 if frame.dtype != np.uint8:
                     frame = frame.astype(np.uint8)
                 if len(frame.shape) != 3 or frame.shape[2] != 3:
-                    try: frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-                    except Exception: continue
+                    try:
+                        frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+                    except Exception:
+                        continue
                 frame = np.ascontiguousarray(frame)
 
                 backend = self.get_active()
@@ -520,11 +562,10 @@ class VisionService:
 
                 with self.frame_lock:
                     self.output_frame = annotated.copy()
-                    self.last_meta    = meta
+                    self.last_meta = meta
 
                 self.publish_meta(meta)
                 self.frame_count += 1
-
             except Exception as e:
                 logger.error("Erreur boucle : %s", e)
                 time.sleep(0.1)
@@ -534,21 +575,28 @@ class VisionService:
             with self.frame_lock:
                 frame = None if self.output_frame is None else self.output_frame.copy()
             if frame is None:
-                time.sleep(0.03); continue
+                time.sleep(0.03)
+                continue
             ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
-            if not ok: continue
+            if not ok:
+                continue
             yield (b"--frame\r\n"
                    b"Content-Type: image/jpeg\r\n\r\n" + buf.tobytes() + b"\r\n")
 
     def stop(self):
         self.is_running = False
         for b in self.backends.values():
-            try: b.close()
-            except Exception: pass
+            try:
+                b.close()
+            except Exception:
+                pass
         self.camera.close()
         if self.mqtt:
-            try: self.mqtt.loop_stop(); self.mqtt.disconnect()
-            except Exception: pass
+            try:
+                self.mqtt.loop_stop()
+                self.mqtt.disconnect()
+            except Exception:
+                pass
 
 
 vision = VisionService()
@@ -560,19 +608,19 @@ vision = VisionService()
 @app.route("/")
 def index():
     return """
-    <!DOCTYPE html><html><head><title>SHOS Vision V2</title>
+    <!DOCTYPE html><html><head><title>SHOS Vision V3</title>
     <style>body{background:#0e1117;color:#e8d44d;font-family:monospace;text-align:center;padding:20px}
     img{max-width:90%;border:2px solid #e8d44d;border-radius:10px;margin:20px}
     h1{font-weight:400;letter-spacing:.1em}
     button{background:rgba(232,212,77,.1);border:1px solid #e8d44d;color:#e8d44d;padding:8px 16px;margin:4px;cursor:pointer;border-radius:6px;font-family:inherit}
     button:hover{background:rgba(232,212,77,.2)}</style></head><body>
-    <h1>S.H.O.S VISION SERVICE V2</h1>
+    <h1>S.H.O.S VISION SERVICE V3</h1>
     <div>
       <button onclick="setBackend('mediapipe')">MediaPipe</button>
       <button onclick="setBackend('yolo11n')">YOLO 11n</button>
       <button onclick="setBackend('moondream')">Moondream 2</button>
     </div>
-    <img src="/video_feed" alt="Vision Stream">
+    <img src="/video_feed">
     <script>
     function setBackend(b){fetch('/api/backend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({backend:b})}).then(r=>r.json()).then(d=>console.log(d));}
     </script></body></html>
@@ -598,7 +646,7 @@ def status():
 def api_get_backend():
     return jsonify({
         "active": vision.active_name,
-        "available": {n: b.is_available() for n,b in vision.backends.items()},
+        "available": {n: b.is_available() for n, b in vision.backends.items()},
         "all": list(BACKENDS),
     })
 
@@ -625,9 +673,9 @@ if __name__ == "__main__":
         t = threading.Thread(target=vision.run, name="VisionLoop", daemon=True)
         t.start()
 
-        logger.info("Serveur Vision V2 sur http://0.0.0.0:%d", PORT_WEB)
+        logger.info("Serveur Vision V3 sur http://0.0.0.0:%d", PORT_WEB)
         logger.info("Stream  : http://localhost:%d/video_feed", PORT_WEB)
-        logger.info("Status  : http://localhost:%d/status",     PORT_WEB)
+        logger.info("Status  : http://localhost:%d/status", PORT_WEB)
         logger.info("Backend : POST http://localhost:%d/api/backend", PORT_WEB)
 
         app.run(host="0.0.0.0", port=PORT_WEB,
