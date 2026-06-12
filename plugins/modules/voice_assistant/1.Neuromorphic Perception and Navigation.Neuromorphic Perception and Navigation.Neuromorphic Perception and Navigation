@@ -1,0 +1,207 @@
+1.Neuromorphic Perception and Navigation for Mobile
+Robots: A Review
+A. Novoa∗
+, F. Lobonb
+, H.G. De Marinaa
+, S. Romeroa
+, F. Barrancoa
+aDepartment of Computer Engineering, Automation and Robotics, Research Centre for Information and
+Communication Technologies (CITIC-UGR), University of Granada, 18014, Granada, Spain
+b
+Instituto de Astrof´ısica de Andaluc´ıa (IAA-CSIC), 18008, Granada, Spain
+
+
+2.This work has been submitted to the IEEE for possible publication. Copyright may be transferred without notice, after which this version may no longer be accessible. 1
+Joint Perception and Prediction for
+Autonomous Driving: A Survey
+Lucas Dal’Col , Miguel Oliveira , and V´ıtor Santos , Member, IEEE
+
+
+
+3.Implicit Dual-Control for Visibility-Aware
+Navigation Unstructured Environments
+Benjamin Johnson1,
+, Qilun Zhu1,
+, Robert Prucka1,
+,
+Miriam A. Figueroa-Santos2,
+, Morgan J. Barron2,
+, and Matthew P. Castanier2,
+
+
+4.Temporally Consistent Unsupervised Segmentation
+for Mobile Robot Perception
+Christian C. Ellis1,2 Maggie B. Wigness2 Craig T. Lennon2 Lance Fiondella3
+1Oden Institute for Computational Engineering & Sciences, University of Texas at Austin
+2DEVCOM Army Research Laboratory, Adelphi, MD, United States
+3Department of Electrical and Computer Engineering, University of Massachusetts Dartmouth
+christian.ellis@austin.utexas.edu, maggie.b.wigness.civ@army.mil,
+craig.t.lennon.civ@army.mil, lfiondella@umassd.edu
+
+
+5.JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2024 1
+A Survey on Deep Multi-Task Learning in
+Connected Autonomous Vehicles
+Jiayuan Wang, Farhad Pourpanah, Q. M. Jonathan Wu, and Ning Zhang
+
+
+6.A Survey on LiDAR-based Autonomous
+Aerial Vehicles
+Yunfan Ren, Yixi Cai, Haotian Li, Nan Chen, Fangcheng Zhu,
+Longji Yin, Fanze Kong, Rundong Li and Fu Zhang
+
+
+7.Assistive Decision-Making for Right of Way Navigation
+at Uncontrolled Intersections
+Navya Tiwari∗
+, Joseph Vazhaeparampil∗
+, Victoria Preston
+
+
+8.Learning to Navigate Socially Through Proactive Risk Perception
+Erjia Xiao*
+HKUST (GZ)
+exiao469@connect.hkust-gz.edu.cn
+Lingfeng Zhang*
+Tsinghua University
+Xiaomi EV
+zlf25@mails.tsinghua.edu.cn
+Yingbo Tang
+Institute of Automation, CAS
+tangyingbo2020@ia.ac.cn
+Hao Cheng
+HKUST (GZ)
+hcheng046@connect.hkust-gz.edu.cn
+Renjing Xu
+HKUST (GZ)
+renjingxu@hkust-gz.edu.cn
+Wenbo Ding
+Tsinghua University
+ding.wenbo@sz.tsinghua.edu.cn
+Lei Zhou, Long Chen, Hangjun Ye, Xiaoshuai Hao†
+Xiaomi EV
+{zhoulei21, chenlong37, yehangjun, haoxiaoshuai}@xiaomi.com
+
+
+9.A Step Toward World Models: A Survey on
+Robotic Manipulation
+Peng-Fei Zhang, Ying Cheng, Xiaofan Sun, Shijie Wang, Fengling Li, Lei Zhu, Heng Tao Shen
+
+
+10.Distributed Koopman Operator Learning for Perception and Safe Navigation
+Ali Azarbahram, Shenyu Liu and Gian Paolo Incremona, Senior Member, IEEE
+
+
+11.Deep Learning Perspective of Scene 
+Understanding in Autonomous Robots
+Afia Maham
+Dept. of Computer Science
+National Textile University
+Faisalabad, Pakistan
+afiamaham08@gmail.com
+Dur E Nayab Tashfa
+durenayabtashfa@gmail.com
+
+
+12.SNOW: Spatio-Temporal Scene Understanding with World Knowledge for
+Open-World Embodied Reasoning
+Tin Stribor Sohn1,3†∗ Maximilian Dillitzer2,3∗
+Jason J. Corso4,5 Eric Sax1
+1 Karlsruhe Institute of Technology 2 Esslingen University of Applied Sciences
+3 Dr. Ing. h.c. F. Porsche AG 4 University of Michigan 5 Voxel51 Inc.
+tin stribor.sohn@porsche.de
+
+
+13.LoGoPlanner: Localization Grounded Navigation Policy with
+Metric-aware Visual Geometry
+Jiaqi Peng∗,1,2
+, Wenzhe Cai∗,2
+, Yuqiang Yang∗,2
+, Tai Wang2,†
+, Yuan Shen1,2,†
+and Jiangmiao Pang
+
+
+14.PHANTOM: PHysical ANamorphic Threats
+Obstructing Connected Vehicle Mobility
+Md Nahid Hasan Shuvo and Moinul Hossain
+George Mason University, Fairfax, VA, USA
+Email: mshuvo@gmu.edu; mhossa5@gmu.edu
+
+
+15.SuperiorGAT: Graph Attention Networks for Sparse
+LiDAR Point Cloud Reconstruction in Autonomous
+Systems
+Khalfalla Awedat1,*, Mohamed Abidalrekab2
+, Gurcan Comert3
+, and Mustafa Ayad4
+1Computer Information Technology Department, SUNY Morrisville College, Morrisville, NY, USA
+2Electrical and Computer Engineering, Portland State University, Portland, OR, USA
+3Computational Data Science and Engineering Department, North Carolina A&T State University, Greensboro, NC,
+USA
+4Electrical and Computer Engineering Department, SUNY Oswego, Oswego, NY, USA
+*awedatk@morrisville.edu
+
+
+16.JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021 1
+Guided Diffusion-based Generation of Adversarial Objects for
+Real-World Monocular Depth Estimation Attacks
+Yongtao Chen, Yanbo Wang, Wentao Zhao, Guole Shen, Tianchen Deng, Jingchuan Wang, Senior Member, IEEE
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+J'ai comparé mon cadre analytique avec le modèle que vous avez fourni. Cette comparaison révèle des différences fondamentales dans le **champ d'analyse** et la **structure**, que je synthétise ici pour vous aider à affiner votre propre méthodologie.
+
+### 🔍 Comparaison Structurelle des Deux Approches
+Le tableau ci-dessous détaille comment chaque approche aborde les cinq éléments clés de l'analyse d'un article de recherche.
+
+| Élément d'Analyse | **Approche de l'Assistant (sur la première liste)** | **Votre Modèle Fourni (analyse de ReasonNav)** |
+| :--- | :--- | :--- |
+| **1. Problématique & Contexte** | Cadrage large et technique. Ex: "Revue des approches neuromorphiques". | Cadrage **centré sur le déficit fonctionnel** spécifique : manque de compétences humaines (lecture de panneaux) chez les robots. |
+| **2. Méthodologie** | Description technique des algorithmes et capteurs (SLAM, LiDAR, SNN). | Description du **principe architectural clé** (abstraction par *repères*) et de son rôle pour le VLM. |
+| **3. Apports & Contributions** | Liste d'innovations techniques (latence, précision). | Mise en avant de l'**apport systémique** : un cadre modulaire intégrant un raisonnement de haut niveau. |
+| **4. Limites & Faiblesses** | Critiques techniques génériques (coût, complexité). | Critiques **liées aux choix de conception** : dépendance au détecteur d'objets, vision limitée aux *repères*. |
+| **5. Pertinence pour votre mémoire** | Lien indirect, basé sur la similarité technologique (ex: efficacité énergétique). | Lien direct et **explicite** avec les objectifs du mémoire (architecture modulaire, compétences humaines). |
+
+### 📊 Synthèse des Observations Clés
+Votre modèle excelle dans la création d'une narration qui soutient directement le positionnement de votre recherche, ce qui est essentiel pour un état de l'art convaincant.
+
+*   **Niveau d'Analyse** : Mon analyse initiale est restée à un **niveau descriptif et technique**, tandis que votre modèle propose une **analyse critique axée sur l'architecture**. Il n'explique pas seulement *que* ReasonNav utilise un VLM, mais *pourquoi* (pour compenser sa faiblesse avec les données spatiales) et *comment* (via une abstraction par repères).
+*   **Guider la Narration** : Une force majeure de votre modèle est que l'analyse de chaque article **prépare explicitement le terrain pour votre contribution**. En soulignant systématiquement des limites comme la dépendance à des détecteurs spécifiques ou le manque de centrage utilisateur, vous construisez naturellement l'argument justifiant votre propre système.
+*   **Structuration de la Synthèse** : Votre synthèse complète utilise des stratégies efficaces — comme regrouper les articles par approches communes (modularité, fusion sensorielle) — pour dépasser la simple liste de résumés et créer une véritable discussion critique du domaine.
+
+### 💡 Recommandations pour Renforcer Votre Analyse
+Pour renforcer encore votre état de l'art, voici des actions pour approfondir l'analyse :
+
+*   **Creuser les Limitations Fondamentales** : Pour chaque article, demandez-vous non seulement "Quelles sont ses limites ?" mais aussi **"Quels postulats ou contraintes de conception sous-jacents causent ces limites ?"**. Par exemple, la limite de ReasonNav est enracinée dans son choix d'utiliser un pipeline modulaire avec un détecteur d'objets séparé.
+*   **Établir des Dialogues Explicites entre Articles** : Dans votre synthèse, **créez des liens explicites entre les articles**. Vous pourriez, par exemple, contraster le raisonnement "humain" de ReasonNav avec les stratégies de navigation purement géométriques ou sociales d'autres articles, en analysant leurs compromis respectifs.
+*   **Affiner le Vocabulaire** : Utilisez une terminologie précise et constante. Distinguez par exemple la **modularité** (indépendance des composants) de l'**hiérarchisation** (différents niveaux de planification, comme le raisonnement de haut niveau vs. le contrôle bas niveau), toutes deux présentes dans les articles que vous avez analysés.
+
+J'espère que cette comparaison détaillée vous sera utile pour finaliser votre cadre analytique. Souhaitez-vous 
+vous exercer à appliquer ce regard critique sur un article spécifique de votre liste ?
+
+
+
+
+
+
+
+
+
+
+

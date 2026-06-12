@@ -32,7 +32,16 @@
                 "text_reader",
                 "hand_control"
             ]
+        },
+        "test_vocal": {
+            "name": "test vocal",
+            "main_module": "voice_assistant",
+            "secondary_modules": [
+                "danger_monitor",
+                "text_reader",
+                "voice_assistant"
+            ]
         }
     },
-    "current_active_profile": "vprof"
+    "current_active_profile": "test_vocal"
 }

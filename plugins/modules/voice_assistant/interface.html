@@ -5,196 +5,321 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>S.H.O.S · Assistant Vocal</title>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════════
-   MODULE : ASSISTANT VOCAL — S.H.O.S design system
-   Logique originale conservée intégralement
-   Responsive : fonctionne de 280px à plein écran
-═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   MODULE VOICE ASSISTANT V3 — Adaptatif fluide
+   ────────────────────────────────────────────────────────────
+   • Marche dans un slot 280px × 200px aussi bien que plein écran
+   • Tout est en clamp() — aucun breakpoint, fluidité totale
+   • Orbe pulsant + waveform + devices audio + historique
+   • SocketIO : reçoit plugin_data du backend
+═══════════════════════════════════════════════════════════════ */
 :root {
   --bg:     #0e1117;
-  --glass:  rgba(255,255,255,0.055);
+  --glass:  rgba(255,255,255,0.045);
   --border: rgba(255,255,255,0.09);
+  --borderH:rgba(255,255,255,0.18);
   --y:      #e8d44d;
   --y2:     rgba(232,212,77,0.14);
-  --y3:     rgba(232,212,77,0.06);
   --blue:   #4da6ff;
+  --b2:     rgba(77,166,255,0.15);
   --green:  #34c759;
   --red:    #ff453a;
-  --t1:     rgba(255,255,255,0.93);
-  --t2:     rgba(255,255,255,0.52);
-  --t3:     rgba(255,255,255,0.28);
+  --t1:     rgba(255,255,255,0.94);
+  --t2:     rgba(255,255,255,0.55);
+  --t3:     rgba(255,255,255,0.30);
   --font:   'DM Sans', system-ui, sans-serif;
   --mono:   'DM Mono', monospace;
 }
-
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; font-family:var(--font); background:var(--bg); color:var(--t1); }
 
-html, body {
-  height:100%; overflow:hidden;
-  font-family:var(--font);
-  background:var(--bg); color:var(--t1);
-}
-
-/* ── LAYOUT ── */
+/* ─── LAYOUT FLUIDE ─── */
 .wrap {
   height:100vh;
-  display:flex; flex-direction:column;
+  display:grid;
+  grid-template-rows: auto 1fr auto;
   background:
-    radial-gradient(ellipse 70% 50% at 50% 60%, rgba(77,166,255,0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 50% at 50% 40%, rgba(77,166,255,0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 50% 80%, rgba(232,212,77,0.04) 0%, transparent 70%),
     var(--bg);
 }
 
-/* ── HEADER ── */
+/* ─── HEADER ─── */
 .hdr {
   display:flex; align-items:center; justify-content:space-between;
-  padding:clamp(8px,2vh,14px) clamp(10px,3vw,18px);
-  background:rgba(14,17,23,0.95);
+  padding:clamp(6px,1.5cqh,12px) clamp(8px,3cqw,16px);
+  background:rgba(14,17,23,0.92);
   border-bottom:1px solid var(--border);
-  flex-shrink:0; gap:8px;
+  gap:8px; min-height:0;
 }
-.hdr-left { display:flex; align-items:center; gap:7px; min-width:0; }
+.hdr-l { display:flex; align-items:center; gap:6px; min-width:0; flex:1; }
 .mod-ico {
-  width:clamp(18px,3vw,22px); height:clamp(18px,3vw,22px);
-  border-radius:6px; background:rgba(77,166,255,0.12);
-  border:1px solid rgba(77,166,255,0.25);
+  width:clamp(18px,4cqw,24px); height:clamp(18px,4cqw,24px);
+  border-radius:6px;
+  background:var(--b2); border:1px solid rgba(77,166,255,.32);
   display:flex; align-items:center; justify-content:center;
-  font-size:clamp(9px,1.5vw,12px); flex-shrink:0;
+  font-size:clamp(10px,2cqw,13px); flex-shrink:0;
 }
 .mod-name {
-  font-size:clamp(9px,1.8vw,11px); font-weight:500;
+  font-size:clamp(9px,1.8cqw,11px); font-weight:500;
   letter-spacing:.08em; text-transform:uppercase; color:var(--t2);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.status-pill {
+.pill {
   display:flex; align-items:center; gap:4px;
-  padding:3px 9px; border-radius:10px;
-  background:rgba(255,255,255,.06); border:1px solid var(--border);
-  font-family:var(--mono); font-size:clamp(8px,1.5vw,10px); color:var(--t2);
+  padding:3px clamp(6px,1.5cqw,10px); border-radius:10px;
+  background:rgba(255,255,255,.05); border:1px solid var(--border);
+  font-family:var(--mono); font-size:clamp(8px,1.5cqw,10px); color:var(--t2);
   white-space:nowrap; flex-shrink:0;
 }
 .dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
-.dot-blue { background:var(--blue); box-shadow:0 0 6px var(--blue); }
-.dot-green{ background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 1.2s ease-in-out infinite; }
-.dot-wait { background:rgba(255,255,255,.3); }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+.dot-wait { background:rgba(255,255,255,.25); }
+.dot-on   { background:var(--green); box-shadow:0 0 6px var(--green); animation:dotblink 1.3s ease-in-out infinite; }
+.dot-off  { background:var(--red); }
+@keyframes dotblink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
-/* ── CENTRE ── */
+/* ─── CENTRE — ORBE + TRANSCRIPTION ─── */
 .center {
-  flex:1; display:flex; flex-direction:column;
+  display:flex; flex-direction:column;
   align-items:center; justify-content:center;
-  gap:clamp(12px,3vh,24px);
-  padding:clamp(10px,3vh,20px);
+  gap:clamp(8px,2cqh,18px);
+  padding:clamp(8px,2cqh,16px);
   overflow:hidden;
+  min-height:0;
 }
 
 /* Orbe IA */
-.orb-wrap { position:relative; display:flex; align-items:center; justify-content:center; }
-
-.orb {
-  position:relative; border-radius:50%;
-  width:clamp(60px,20vw,120px); height:clamp(60px,20vw,120px);
-  background:rgba(77,166,255,0.06);
-  border:1.5px solid rgba(77,166,255,0.35);
-  box-shadow:0 0 20px rgba(77,166,255,0.15), inset 0 0 20px rgba(77,166,255,0.08);
+.orb-wrap {
+  position:relative;
+  width:clamp(60px,28cqmin,140px);
+  height:clamp(60px,28cqmin,140px);
   display:flex; align-items:center; justify-content:center;
-  transition:all .35s ease;
-  cursor:pointer;
-}
-.orb-icon { font-size:clamp(20px,5vw,36px); user-select:none; }
-
-/* Ondes */
-.wave {
-  position:absolute; border-radius:50%;
-  border:1px solid rgba(77,166,255,0.3);
-  width:100%; height:100%;
-  animation:ripple 2.2s linear infinite; opacity:0;
-}
-.wave:nth-child(2) { animation-delay:.7s; }
-.wave:nth-child(3) { animation-delay:1.4s; }
-@keyframes ripple {
-  0%  { transform:scale(1); opacity:.5; }
-  100%{ transform:scale(2.6); opacity:0; }
-}
-
-/* Orbe actif */
-.orb.listening {
-  border-color:rgba(232,212,77,0.6);
-  box-shadow:0 0 28px rgba(232,212,77,0.25), inset 0 0 20px rgba(232,212,77,0.08);
-  background:rgba(232,212,77,0.06);
-}
-.orb.listening .wave {
-  border-color:rgba(232,212,77,0.3);
-}
-
-/* Transcription */
-.transcription {
-  text-align:center; width:100%; max-width:360px;
-}
-#transcription-text {
-  font-size:clamp(11px,2.5vw,16px); font-weight:400;
-  color:var(--blue);
-  text-shadow:0 0 12px rgba(77,166,255,0.4);
-  line-height:1.5;
-  min-height:2em;
-  padding:0 8px;
-  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
-  overflow:hidden;
-  transition:color .3s;
-}
-#transcription-text.active { color:var(--y); text-shadow:0 0 12px rgba(232,212,77,0.4); }
-
-/* Badge statut sous la transcription */
-#status {
-  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px);
-  letter-spacing:.12em; text-transform:uppercase; color:var(--t3);
-  margin-top:6px; transition:color .3s;
-}
-#status.active { color:var(--y); }
-#status.listening { color:var(--blue); }
-
-/* ── HISTORIQUE COMPACT ── */
-.history {
-  width:100%; max-width:360px;
-  background:var(--glass); border:1px solid var(--border);
-  border-radius:10px; overflow:hidden;
   flex-shrink:0;
 }
-.history-head {
-  padding:5px 10px;
-  border-bottom:1px solid var(--border);
-  font-family:var(--mono); font-size:9px;
-  letter-spacing:.1em; text-transform:uppercase; color:var(--t3);
+.orb {
+  position:absolute; inset:0;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 35%, rgba(77,166,255,0.20), rgba(77,166,255,0.04));
+  border:1.5px solid rgba(77,166,255,0.40);
+  box-shadow:
+    0 0 24px rgba(77,166,255,0.18),
+    inset 0 0 24px rgba(77,166,255,0.10);
+  display:flex; align-items:center; justify-content:center;
+  transition:all .35s ease;
+  z-index:2;
 }
+.orb-icon {
+  font-size:clamp(20px,8cqmin,40px);
+  user-select:none;
+  filter:drop-shadow(0 0 6px rgba(77,166,255,.5));
+  transition:transform .25s, filter .25s;
+}
+
+/* Ondes concentriques */
+.wave {
+  position:absolute; inset:0;
+  border-radius:50%;
+  border:1px solid rgba(77,166,255,0.35);
+  opacity:0;
+  z-index:1;
+  animation:ripple 2.4s linear infinite;
+}
+.wave:nth-child(2) { animation-delay:.8s; }
+.wave:nth-child(3) { animation-delay:1.6s; }
+@keyframes ripple {
+  0%   { transform:scale(1);   opacity:.5; }
+  100% { transform:scale(2.6); opacity:0;  }
+}
+
+/* Orbe en écoute (jaune) */
+.orb-wrap.listening .orb {
+  border-color:rgba(232,212,77,0.65);
+  background:radial-gradient(circle at 35% 35%, rgba(232,212,77,0.22), rgba(232,212,77,0.05));
+  box-shadow:
+    0 0 32px rgba(232,212,77,0.30),
+    inset 0 0 24px rgba(232,212,77,0.10);
+}
+.orb-wrap.listening .orb-icon {
+  filter:drop-shadow(0 0 8px rgba(232,212,77,.6));
+}
+.orb-wrap.listening .wave { border-color:rgba(232,212,77,0.35); }
+
+/* Orbe en pause (gris) */
+.orb-wrap.paused .orb {
+  border-color:rgba(255,255,255,0.20);
+  background:radial-gradient(circle at 35% 35%, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+  box-shadow:none;
+}
+.orb-wrap.paused .wave { display:none; }
+
+/* Orbe qui parle (vert pulsant) */
+.orb-wrap.speaking .orb {
+  border-color:rgba(52,199,89,0.7);
+  background:radial-gradient(circle at 35% 35%, rgba(52,199,89,0.25), rgba(52,199,89,0.05));
+  box-shadow:0 0 28px rgba(52,199,89,0.4);
+  animation:speakPulse 0.6s ease-in-out infinite;
+}
+@keyframes speakPulse {
+  0%,100% { transform:scale(1); }
+  50%     { transform:scale(1.04); }
+}
+
+/* ─── WAVEFORM (mini barres) ─── */
+.waveform {
+  display:flex; align-items:flex-end; justify-content:center;
+  gap:2px; height:clamp(14px,4cqh,22px);
+  width:clamp(80px,40cqw,180px);
+  opacity:0; transition:opacity .3s;
+}
+.waveform.show { opacity:1; }
+.wf-bar {
+  width:clamp(2px,0.6cqw,3px);
+  background:linear-gradient(180deg, var(--blue), rgba(77,166,255,.3));
+  border-radius:2px;
+  animation:wfWave 1.2s ease-in-out infinite;
+  min-height:3px;
+}
+.waveform.listening .wf-bar {
+  background:linear-gradient(180deg, var(--y), rgba(232,212,77,.3));
+}
+.wf-bar:nth-child(1) { animation-delay:0s;    }
+.wf-bar:nth-child(2) { animation-delay:.1s;   }
+.wf-bar:nth-child(3) { animation-delay:.2s;   }
+.wf-bar:nth-child(4) { animation-delay:.3s;   }
+.wf-bar:nth-child(5) { animation-delay:.4s;   }
+.wf-bar:nth-child(6) { animation-delay:.5s;   }
+.wf-bar:nth-child(7) { animation-delay:.4s;   }
+.wf-bar:nth-child(8) { animation-delay:.3s;   }
+.wf-bar:nth-child(9) { animation-delay:.2s;   }
+.wf-bar:nth-child(10){ animation-delay:.1s;   }
+@keyframes wfWave {
+  0%,100% { transform:scaleY(0.25); }
+  50%     { transform:scaleY(1);    }
+}
+
+/* ─── TRANSCRIPTION ─── */
+.tx-wrap {
+  text-align:center; width:100%;
+  max-width:min(420px, 92cqw);
+  padding:0 clamp(6px,2cqw,12px);
+}
+#tx {
+  font-size:clamp(11px,2.6cqw,17px); font-weight:400;
+  color:var(--blue);
+  text-shadow:0 0 12px rgba(77,166,255,0.35);
+  line-height:1.4;
+  min-height:clamp(20px,5cqh,30px);
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical;
+  overflow:hidden;
+  transition:color .3s, text-shadow .3s;
+}
+#tx.active   { color:var(--y);     text-shadow:0 0 12px rgba(232,212,77,0.45); }
+#tx.speaking { color:var(--green); text-shadow:0 0 12px rgba(52,199,89,0.45); }
+
+#status-sub {
+  font-family:var(--mono); font-size:clamp(8px,1.4cqw,10px);
+  letter-spacing:.12em; text-transform:uppercase; color:var(--t3);
+  margin-top:clamp(3px,0.8cqh,6px);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  transition:color .3s;
+}
+#status-sub.active   { color:var(--y); }
+#status-sub.speaking { color:var(--green); }
+
+/* ─── BAS — DEVICES + HISTORIQUE ─── */
+.bottom {
+  display:grid; grid-template-rows:auto auto;
+  gap:clamp(4px,1cqh,8px);
+  padding:clamp(6px,1.5cqh,12px) clamp(8px,3cqw,14px);
+  background:rgba(255,255,255,.02);
+  border-top:1px solid var(--border);
+}
+
+.devices {
+  display:flex; gap:6px; flex-wrap:wrap;
+  font-family:var(--mono); font-size:clamp(8px,1.5cqw,10px); color:var(--t2);
+}
+.dev-chip {
+  display:flex; align-items:center; gap:4px;
+  padding:3px clamp(6px,1.5cqw,10px); border-radius:8px;
+  background:rgba(255,255,255,.04); border:1px solid var(--border);
+  white-space:nowrap; max-width:48%;
+  overflow:hidden; text-overflow:ellipsis;
+}
+.dev-chip .dev-ico { font-size:11px; flex-shrink:0; }
+.dev-chip .dev-name { overflow:hidden; text-overflow:ellipsis; }
+
+.history {
+  background:var(--glass); border:1px solid var(--border);
+  border-radius:8px; overflow:hidden; min-height:0;
+}
+.history-head {
+  padding:4px clamp(6px,1.5cqw,10px);
+  display:flex; align-items:center; justify-content:space-between;
+  font-family:var(--mono); font-size:clamp(7px,1.3cqw,9px);
+  letter-spacing:.10em; text-transform:uppercase; color:var(--t3);
+  border-bottom:1px solid var(--border);
+}
+.h-clear {
+  background:none; border:none; color:var(--t3);
+  cursor:pointer; font-size:10px;
+  transition:color .15s;
+}
+.h-clear:hover { color:var(--red); }
+
 .history-list {
-  max-height:clamp(50px,12vh,80px);
-  overflow-y:auto; padding:4px 0;
+  max-height:clamp(40px,15cqh,100px);
+  overflow-y:auto;
+  padding:3px 0;
 }
 .history-list::-webkit-scrollbar { width:3px; }
-.history-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); }
+.history-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.10); border-radius:2px; }
+
 .h-item {
-  padding:4px 10px;
-  font-size:clamp(9px,1.6vw,11px); color:var(--t2);
-  border-left:2px solid rgba(77,166,255,.3);
-  margin:3px 6px;
+  padding:3px clamp(6px,1.5cqw,10px);
+  font-size:clamp(8px,1.5cqw,10px); color:var(--t2);
+  border-left:2px solid rgba(77,166,255,.35);
+  margin:2px 4px;
+  font-family:var(--mono);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   animation:slideIn .25s ease;
 }
-@keyframes slideIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:none} }
-.h-empty { padding:8px 10px; font-size:10px; color:var(--t3); font-family:var(--mono); }
+.h-item .h-time { color:var(--t3); margin-right:5px; }
+@keyframes slideIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:none} }
+
+.h-empty {
+  padding:clamp(8px,2cqh,14px);
+  font-size:clamp(8px,1.4cqw,10px); color:var(--t3);
+  font-family:var(--mono); text-align:center;
+}
+
+/* Container queries — adaptation fluide selon taille du parent */
+.wrap { container-type:size; container-name:voice; }
+
+/* Mode très compact (slot mini) — masquer devices */
+@container voice (max-height: 240px) {
+  .devices { display:none; }
+  .history-list { max-height:30px; }
+}
+/* Mode large (slot principal) — augmenter contenu */
+@container voice (min-height: 500px) {
+  .history-list { max-height:200px; }
+}
 </style>
 </head>
 <body>
+
 <div class="wrap">
 
   <!-- HEADER -->
   <header class="hdr">
-    <div class="hdr-left">
+    <div class="hdr-l">
       <div class="mod-ico">🎙</div>
       <span class="mod-name">{{ config.name if config else 'Assistant Vocal' }}</span>
     </div>
-    <div class="status-pill">
+    <div class="pill">
       <div class="dot dot-wait" id="dot"></div>
       <span id="status">EN ATTENTE</span>
     </div>
@@ -202,89 +327,227 @@ html, body {
 
   <!-- CENTRE -->
   <div class="center">
-
-    <!-- Orbe IA -->
-    <div class="orb-wrap">
-      <div class="orb" id="orb">
-        <div class="wave"></div>
-        <div class="wave"></div>
-        <div class="wave"></div>
-        <span class="orb-icon">🎙</span>
+    <!-- Orbe -->
+    <div class="orb-wrap" id="orb-wrap">
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="wave"></div>
+      <div class="orb">
+        <span class="orb-icon" id="orb-icon">🎙</span>
       </div>
     </div>
 
+    <!-- Waveform -->
+    <div class="waveform" id="waveform">
+      <div class="wf-bar"></div><div class="wf-bar"></div><div class="wf-bar"></div>
+      <div class="wf-bar"></div><div class="wf-bar"></div><div class="wf-bar"></div>
+      <div class="wf-bar"></div><div class="wf-bar"></div><div class="wf-bar"></div>
+      <div class="wf-bar"></div>
+    </div>
+
     <!-- Transcription -->
-    <div class="transcription">
-      <div id="transcription-text">En attente de la voix...</div>
-      <div id="status-sub" style="font-family:var(--mono);font-size:9px;color:var(--t3);letter-spacing:.1em;text-transform:uppercase;margin-top:5px;">NOVA · PRÊT</div>
+    <div class="tx-wrap">
+      <div id="tx">En attente de la voix...</div>
+      <div id="status-sub">NOVA · PRÊT</div>
+    </div>
+  </div>
+
+  <!-- BAS -->
+  <div class="bottom">
+    <!-- Devices audio -->
+    <div class="devices">
+      <div class="dev-chip" title="Microphone">
+        <span class="dev-ico">🎤</span>
+        <span class="dev-name" id="dev-mic">—</span>
+      </div>
+      <div class="dev-chip" title="Haut-parleur">
+        <span class="dev-ico">🔈</span>
+        <span class="dev-name" id="dev-spk">—</span>
+      </div>
     </div>
 
     <!-- Historique -->
     <div class="history">
-      <div class="history-head">Historique</div>
+      <div class="history-head">
+        <span>Historique</span>
+        <button class="h-clear" onclick="clearHistory()" aria-label="Effacer">✕</button>
+      </div>
       <div class="history-list" id="history">
         <div class="h-empty">Aucune transcription</div>
       </div>
     </div>
-
   </div>
+
 </div>
 
 <script>
-const socket = io();
-const orb    = document.getElementById('orb');
-const txt    = document.getElementById('transcription-text');
-const dot    = document.getElementById('dot');
-const status = document.getElementById('status');
+const socket = io({ transports:['websocket','polling'] });
+
+// Refs DOM
+const orbWrap   = document.getElementById('orb-wrap');
+const orbIcon   = document.getElementById('orb-icon');
+const waveform  = document.getElementById('waveform');
+const tx        = document.getElementById('tx');
+const dot       = document.getElementById('dot');
+const status    = document.getElementById('status');
 const statusSub = document.getElementById('status-sub');
 const history   = document.getElementById('history');
+const devMic    = document.getElementById('dev-mic');
+const devSpk    = document.getElementById('dev-spk');
 
 let resetTimer;
-let firstItem = true;
+let firstItem   = true;
+let historyData = [];
 
-/* ── Réception données plugin (logique originale conservée) ── */
-socket.on('plugin_data', function(data) {
-  if (data.plugin === "voice_assistant" || data.module === "voice_assistant") {
-    if (data.type === "transcription" || data.value || data.text) {
-      const phrase = data.value || data.text || '';
-      if (!phrase) return;
+/* ─── ÉTATS DE L'ORBE ─── */
+function setState(state) {
+  // states : idle | listening | analyzing | speaking | paused | offline
+  orbWrap.className = 'orb-wrap';
+  waveform.className = 'waveform';
+  tx.className = '';
+  statusSub.className = '';
+  dot.className = 'dot dot-wait';
 
-      // Mise à jour transcription
-      txt.textContent = '\u00ab\u00a0' + phrase + '\u00a0\u00bb';
-      txt.classList.add('active');
+  switch (state) {
+    case 'listening':
+      orbWrap.classList.add('listening');
+      waveform.classList.add('show', 'listening');
+      dot.className = 'dot dot-on';
+      status.textContent = 'ÉCOUTE';
+      statusSub.textContent = 'NOVA EN ÉCOUTE';
+      orbIcon.textContent = '🎙';
+      break;
+    case 'analyzing':
+      orbWrap.classList.add('listening');
+      tx.classList.add('active');
+      statusSub.classList.add('active');
+      dot.className = 'dot dot-on';
+      status.textContent = 'ANALYSE';
+      statusSub.textContent = 'TRAITEMENT...';
+      orbIcon.textContent = '🧠';
+      break;
+    case 'speaking':
+      orbWrap.classList.add('speaking');
+      tx.classList.add('speaking');
+      statusSub.classList.add('speaking');
+      dot.className = 'dot dot-on';
+      status.textContent = 'PARLE';
+      statusSub.textContent = 'NOVA RÉPOND';
+      orbIcon.textContent = '🔊';
+      break;
+    case 'paused':
+      orbWrap.classList.add('paused');
+      status.textContent = 'PAUSE';
+      statusSub.textContent = 'EN PAUSE';
+      orbIcon.textContent = '⏸';
+      break;
+    case 'offline':
+      orbWrap.classList.add('paused');
+      dot.className = 'dot dot-off';
+      status.textContent = 'OFFLINE';
+      statusSub.textContent = 'DÉCONNECTÉ';
+      orbIcon.textContent = '⛔';
+      break;
+    default:
+      status.textContent = 'EN ATTENTE';
+      statusSub.textContent = 'NOVA · PRÊT';
+      orbIcon.textContent = '🎙';
+  }
+}
 
-      // Orbe actif
-      orb.classList.add('listening');
-      dot.className = 'dot dot-green';
-      status.textContent = 'NOVA ANALYSE...';
-      statusSub.textContent = 'TRAITEMENT EN COURS';
+setState('idle');
 
-      // Historique
-      if (firstItem) { history.innerHTML = ''; firstItem = false; }
+/* ─── HISTORIQUE ─── */
+function addHistory(text, kind) {
+  if (firstItem) { history.innerHTML = ''; firstItem = false; }
+  const now = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+  const item = document.createElement('div');
+  item.className = 'h-item';
+  const prefix = kind === 'response' ? '🔊 ' : '';
+  item.innerHTML = `<span class="h-time">${now}</span>${prefix}${text}`;
+  history.prepend(item);
+  while (history.children.length > 20) history.lastElementChild.remove();
+
+  historyData.unshift({text, kind, ts: Date.now()});
+  if (historyData.length > 20) historyData.length = 20;
+  try { localStorage.setItem('shos_voice_history', JSON.stringify(historyData)); } catch(e) {}
+}
+
+function clearHistory() {
+  history.innerHTML = '<div class="h-empty">Aucune transcription</div>';
+  firstItem = true;
+  historyData = [];
+  try { localStorage.removeItem('shos_voice_history'); } catch(e) {}
+}
+
+// Restaurer historique au chargement
+try {
+  const saved = JSON.parse(localStorage.getItem('shos_voice_history') || '[]');
+  if (saved.length > 0) {
+    firstItem = false; history.innerHTML = '';
+    saved.slice(0, 20).reverse().forEach(h => {
       const item = document.createElement('div');
       item.className = 'h-item';
-      item.textContent = new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}) + ' · ' + phrase;
+      const now = new Date(h.ts).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+      const prefix = h.kind === 'response' ? '🔊 ' : '';
+      item.innerHTML = `<span class="h-time">${now}</span>${prefix}${h.text}`;
       history.prepend(item);
-      if (history.children.length > 6) history.lastElementChild.remove();
+    });
+    historyData = saved;
+  }
+} catch(e) {}
 
-      // Reset
+/* ─── RÉCEPTION DONNÉES PLUGIN ─── */
+socket.on('plugin_data', (data) => {
+  if (!data) return;
+  if (data.plugin !== 'voice_assistant' && data.module !== 'voice_assistant') return;
+
+  const type = data.type;
+
+  // Transcription
+  if (type === 'transcription' || data.value || data.text) {
+    const phrase = data.value || data.text || '';
+    if (!phrase) return;
+
+    tx.textContent = '\u00ab\u00a0' + phrase + '\u00a0\u00bb';
+    setState('analyzing');
+    addHistory(phrase, 'user');
+
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => setState('listening'), 2500);
+  }
+
+  // NOVA parle
+  else if (type === 'speaking') {
+    const text = data.value || '';
+    if (text) {
+      tx.textContent = text;
+      setState('speaking');
+      addHistory(text, 'response');
       clearTimeout(resetTimer);
-      resetTimer = setTimeout(() => {
-        orb.classList.remove('listening');
-        txt.classList.remove('active');
-        dot.className = 'dot dot-wait';
-        status.textContent = 'EN ATTENTE';
-        statusSub.textContent = 'NOVA \u00b7 PR\u00caT';
-      }, 2500);
+      resetTimer = setTimeout(() => setState('listening'), 3000);
     }
+  }
+
+  // Statut explicite
+  else if (type === 'status') {
+    const v = data.value || data.status || '';
+    if (v === 'listening')      setState('listening');
+    else if (v === 'paused')    setState('paused');
+    else if (v === 'ready')     setState('idle');
+  }
+
+  // Devices audio
+  else if (type === 'audio' && data.audio) {
+    const a = data.audio;
+    if (a.mic)     devMic.textContent = a.mic;
+    if (a.speaker) devSpk.textContent = a.speaker;
   }
 });
 
-socket.on('disconnect', () => {
-  dot.className = 'dot';
-  dot.style.background = 'var(--red)';
-  status.textContent = 'D\u00c9CONNECT\u00c9';
-});
+/* ─── CONNEXION SOCKETIO ─── */
+socket.on('connect',    () => setState('listening'));
+socket.on('disconnect', () => setState('offline'));
 </script>
 </body>
 </html>
