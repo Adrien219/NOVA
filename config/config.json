@@ -41,7 +41,15 @@
                 "text_reader",
                 "voice_assistant"
             ]
+        },
+        "test_hand_control": {
+            "name": "test hand control",
+            "main_module": "hand_control",
+            "secondary_modules": [
+                "danger_monitor",
+                "voice_assistant"
+            ]
         }
     },
-    "current_active_profile": "test_vocal"
+    "current_active_profile": "test_hand_control"
 }

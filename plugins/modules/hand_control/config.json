@@ -1,8 +1,28 @@
 {
-  "id": "hand_control",
-  "name": "Contrôle Gestuel",
-  "description": "Pilotage SHOS avec les mains",
-  "template": "interface.html",
-  "entry_point": "plugins.modules.hand_control.hand_module",
-  "enabled": true
+  "id":          "hand_control",
+  "name":        "Contrôle Gestuel",
+  "description": "Pilotage SHOS par gestes MediaPipe — 10 gestes, inter-modules",
+  "template":    "interface.html",
+  "entry_point": "plugins.modules.hand_control.main",
+  "enabled":     true,
+  "icon":        "hand",
+
+  "actions": [
+    { "id": "start_detection",  "label": "Start",   "icon": "🖐",  "description": "Démarrer la détection", "mqtt_topic": "shos/plugins/hand_control/cmd", "mqtt_payload": {"cmd": "start"} },
+    { "id": "stop_detection",   "label": "Stop",    "icon": "✊",  "description": "Arrêter la détection",  "mqtt_topic": "shos/plugins/hand_control/cmd", "mqtt_payload": {"cmd": "stop"} },
+    { "id": "reset_gestures",   "label": "Reset",   "icon": "🔄",  "description": "Réinitialiser les gestes", "mqtt_topic": "shos/plugins/hand_control/cmd", "mqtt_payload": {"cmd": "reset"} }
+  ],
+
+  "gesture_map": {
+    "START_SYSTEM":    { "label": "Main ouverte",  "emoji": "🖐", "action": "launch_voice_assistant",  "topic": "shos/modules/voice_assistant/cmd",  "payload": {"cmd": "start",  "target": "voice_assistant"} },
+    "STOP_SYSTEM":     { "label": "Poing fermé",   "emoji": "✊", "action": "kill_active_module",       "topic": "shos/system/kill_module",           "payload": {"source": "hand_control"} },
+    "READ_TEXT":       { "label": "Index levé",    "emoji": "☝", "action": "launch_text_reader",       "topic": "shos/system/launch_module",         "payload": {"module": "text_reader", "source": "hand_control"} },
+    "TRIGGER_VISION":  { "label": "Pouce levé",    "emoji": "👍", "action": "launch_vision",            "topic": "shos/system/launch_module",         "payload": {"module": "vision_objet", "source": "hand_control"} },
+    "PEACE":           { "label": "Victoire (V)",  "emoji": "✌", "action": "launch_danger_monitor",   "topic": "shos/system/launch_module",         "payload": {"module": "danger_monitor", "source": "hand_control"} },
+    "OK":              { "label": "OK",             "emoji": "👌", "action": "screenshot",              "topic": "shos/plugins/hand_control/cmd",     "payload": {"cmd": "snapshot"} },
+    "POINTING_DOWN":   { "label": "Index bas",     "emoji": "👇", "action": "volume_down",              "topic": "shos/settings/volume",              "payload": {"cmd": "down", "step": 10} },
+    "PINCH":           { "label": "Pincement",     "emoji": "🤏", "action": "snapshot_video",          "topic": "shos/camera/snapshot_request",      "payload": {"trigger": "hand_control"} },
+    "SWIPE_LEFT":      { "label": "Swipe gauche",  "emoji": "👈", "action": "previous_module",         "topic": "shos/modules/hand_control/cmd",     "payload": {"cmd": "prev_module"} },
+    "SWIPE_RIGHT":     { "label": "Swipe droite",  "emoji": "👉", "action": "next_module",             "topic": "shos/modules/hand_control/cmd",     "payload": {"cmd": "next_module"} }
+  }
 }

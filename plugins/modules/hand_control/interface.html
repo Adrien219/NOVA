@@ -5,129 +5,212 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>S.H.O.S · Contrôle Gestuel</title>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════════
-   MODULE : CONTRÔLE GESTUEL — S.H.O.S
-   Logique originale (plugin_data / hand_control) conservée
-═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════
+   HAND CONTROL V3 — Interface adaptative
+   Fluide de 280px à plein écran via container queries + clamp()
+═══════════════════════════════════════════════════════════════════ */
 :root {
-  --bg:    #0e1117;
-  --glass: rgba(255,255,255,0.055);
-  --border:rgba(255,255,255,0.09);
-  --y:     #e8d44d;
-  --y2:    rgba(232,212,77,0.12);
-  --blue:  #4da6ff;
-  --green: #34c759;
-  --red:   #ff453a;
-  --t1:    rgba(255,255,255,0.93);
-  --t2:    rgba(255,255,255,0.52);
-  --t3:    rgba(255,255,255,0.28);
-  --font:  'DM Sans', system-ui, sans-serif;
-  --mono:  'DM Mono', monospace;
+  --bg:     #0e1117;
+  --glass:  rgba(255,255,255,0.045);
+  --border: rgba(255,255,255,0.09);
+  --borderH:rgba(255,255,255,0.18);
+  --y:      #e8d44d; --y2: rgba(232,212,77,0.14);
+  --blue:   #4da6ff; --b2: rgba(77,166,255,0.15);
+  --green:  #34c759; --g2: rgba(52,199,89,0.14);
+  --red:    #ff453a;
+  --t1:     rgba(255,255,255,0.94);
+  --t2:     rgba(255,255,255,0.55);
+  --t3:     rgba(255,255,255,0.28);
+  --font:   'DM Sans', system-ui, sans-serif;
+  --mono:   'DM Mono', monospace;
 }
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--bg);color:var(--t1)}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; font-family:var(--font); background:var(--bg); color:var(--t1); }
 
-.wrap { height:100vh; display:flex; flex-direction:column; }
+/* ─── LAYOUT ROOT ─── */
+.wrap {
+  height:100vh;
+  display:grid;
+  grid-template-rows: auto 1fr auto;
+  container-type:size; container-name:hc;
+}
 
-/* ── HEADER ── */
+/* ─── HEADER ─── */
 .hdr {
   display:flex; align-items:center; justify-content:space-between;
-  padding:clamp(7px,1.8vh,12px) clamp(10px,2vw,16px);
-  background:rgba(14,17,23,.97); border-bottom:1px solid var(--border);
-  flex-shrink:0; gap:8px;
+  padding:clamp(6px,1.5cqh,12px) clamp(8px,2cqw,16px);
+  background:rgba(14,17,23,0.96);
+  border-bottom:1px solid var(--border);
+  gap:8px; flex-shrink:0;
 }
-.hdr-l { display:flex; align-items:center; gap:7px; min-width:0; }
-.m-ico { width:20px; height:20px; border-radius:6px; background:rgba(52,199,89,.12); border:1px solid rgba(52,199,89,.25); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
-.m-name { font-size:clamp(9px,1.6vw,11px); font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.spill { display:flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px; background:rgba(255,255,255,.06); border:1px solid var(--border); font-family:var(--mono); font-size:clamp(8px,1.4vw,10px); color:var(--t2); flex-shrink:0; }
+.hdr-l { display:flex; align-items:center; gap:6px; min-width:0; flex:1; }
+.m-ico {
+  width:clamp(18px,4cqw,22px); height:clamp(18px,4cqw,22px);
+  border-radius:6px; background:var(--g2); border:1px solid rgba(52,199,89,.28);
+  display:flex; align-items:center; justify-content:center;
+  font-size:clamp(9px,2cqw,12px); flex-shrink:0;
+}
+.m-name {
+  font-size:clamp(9px,1.8cqw,11px); font-weight:500;
+  letter-spacing:.08em; text-transform:uppercase; color:var(--t2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pill {
+  display:flex; align-items:center; gap:4px;
+  padding:3px clamp(6px,1.5cqw,10px); border-radius:10px;
+  background:rgba(255,255,255,.05); border:1px solid var(--border);
+  font-family:var(--mono); font-size:clamp(7px,1.4cqw,10px); color:var(--t2);
+  white-space:nowrap; flex-shrink:0;
+}
 .dot { width:5px; height:5px; border-radius:50%; }
-.d-ok { background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 1.5s ease-in-out infinite; }
-.d-w  { background:rgba(255,255,255,.3); }
-.d-y  { background:var(--y); box-shadow:0 0 6px var(--y); }
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.d-ok  { background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 1.4s ease-in-out infinite; }
+.d-w   { background:rgba(255,255,255,.25); }
+.d-y   { background:var(--y); box-shadow:0 0 6px var(--y); }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
 
-/* ── MAIN LAYOUT ── */
-.main {
-  flex:1; display:grid;
-  grid-template-columns:1fr clamp(110px,30%,190px);
+/* ─── BODY — Vidéo + Sidebar ─── */
+.body {
+  display:grid;
+  grid-template-columns: 1fr clamp(100px,28cqw,200px);
   overflow:hidden; min-height:0;
 }
 
-/* Vidéo */
+/* Zone vidéo */
 .video-zone {
   position:relative; background:#000;
   display:flex; align-items:center; justify-content:center;
   overflow:hidden; border-right:1px solid var(--border);
 }
-.video-zone img { width:100%; height:100%; object-fit:cover; }
+.video-zone img {
+  width:100%; height:100%; object-fit:cover;
+  display:block;
+}
+.no-video {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:8px; color:var(--t3); text-align:center;
+  padding:16px;
+}
+.no-video-ico { font-size:clamp(24px,6cqmin,48px); }
+.no-video-txt { font-family:var(--mono); font-size:clamp(8px,1.5cqw,10px); letter-spacing:.08em; text-transform:uppercase; }
 
-/* Badge geste actuel */
+/* Badge geste courant (overlay vidéo) */
 .gesture-badge {
   position:absolute; top:8px; left:8px; z-index:5;
-  padding:5px 11px; border-radius:7px;
-  background:rgba(52,199,89,.15); border:1px solid rgba(52,199,89,.3);
-  font-family:var(--mono); font-size:clamp(9px,1.5vw,11px); color:var(--green);
-  letter-spacing:.08em; text-transform:uppercase; transition:all .25s;
-  max-width:calc(100% - 20px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  padding:4px 10px; border-radius:7px;
+  background:rgba(52,199,89,.12); border:1px solid rgba(52,199,89,.28);
+  font-family:var(--mono); font-size:clamp(8px,1.5cqw,10px);
+  color:var(--green); letter-spacing:.08em; text-transform:uppercase;
+  max-width:calc(100% - 20px);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  transition:all .2s;
 }
-.gesture-badge.active {
-  background:rgba(77,166,255,.2); border-color:rgba(77,166,255,.4); color:var(--blue);
-}
-.gesture-badge.confirmed {
-  background:rgba(232,212,77,.18); border-color:rgba(232,212,77,.4); color:var(--y);
+.gesture-badge.detecting { background:var(--b2); border-color:rgba(77,166,255,.35); color:var(--blue); }
+.gesture-badge.confirmed { background:var(--y2); border-color:rgba(232,212,77,.4); color:var(--y); }
+
+/* Barre de progression confirmation */
+.confirm-bar {
+  position:absolute; bottom:0; left:0; height:3px;
+  background:var(--y); width:0%; transition:width .1s linear;
+  z-index:6;
 }
 
-/* Toast validation */
-.toast {
-  position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
-  padding:7px 18px; border-radius:20px;
-  background:rgba(52,199,89,.9); color:#0e1117;
-  font-family:var(--mono); font-size:clamp(10px,1.8vw,12px); font-weight:700;
-  letter-spacing:.08em; z-index:10; white-space:nowrap;
-  display:none; box-shadow:0 4px 16px rgba(52,199,89,.4);
-  animation:toastIn .25s ease;
-}
-@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-
-/* ── SIDEBAR COMMANDES ── */
+/* ─── SIDEBAR ─── */
 .sidebar {
-  background:rgba(14,17,23,.95); display:flex; flex-direction:column; overflow:hidden;
+  display:flex; flex-direction:column;
+  overflow:hidden; background:rgba(0,0,0,.12);
 }
 .sb-head {
-  padding:7px 10px 5px; border-bottom:1px solid var(--border);
-  font-family:var(--mono); font-size:9px; letter-spacing:.10em;
-  text-transform:uppercase; color:var(--t3); flex-shrink:0;
+  padding:clamp(5px,1.2cqh,8px) clamp(6px,1.5cqw,10px);
+  font-family:var(--mono); font-size:clamp(7px,1.2cqw,9px);
+  letter-spacing:.10em; text-transform:uppercase; color:var(--t3);
+  border-bottom:1px solid var(--border); flex-shrink:0;
 }
 
-.cmd-list {
-  flex:1; overflow-y:auto; padding:6px; display:flex; flex-direction:column; gap:4px;
+/* Liste des gestes */
+.gesture-list {
+  flex:1; overflow-y:auto; padding:4px 0;
 }
-.cmd-list::-webkit-scrollbar{width:3px}
-.cmd-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}
+.gesture-list::-webkit-scrollbar { width:2px; }
+.gesture-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.10); }
 
-.command-item {
-  padding:clamp(6px,1.5vh,9px) 9px; border-radius:8px;
-  background:rgba(255,255,255,.04); border:1px solid var(--border);
-  font-size:clamp(9px,1.6vw,11px); color:var(--t2);
-  transition:all .22s ease; cursor:default;
-  display:flex; align-items:center; gap:6px;
-  white-space:nowrap; overflow:hidden;
+.g-item {
+  display:flex; align-items:center; gap:clamp(5px,1cqw,8px);
+  padding:clamp(4px,1cqh,6px) clamp(6px,1.5cqw,10px);
+  border-left:2px solid transparent;
+  transition:all .18s; cursor:default;
 }
-.cmd-emoji { font-size:clamp(11px,2vw,14px); flex-shrink:0; }
-.cmd-label { overflow:hidden; text-overflow:ellipsis; }
-.command-item.active {
-  background:rgba(52,199,89,.12); border-color:rgba(52,199,89,.35);
-  color:var(--green); font-weight:600;
-  box-shadow:0 0 10px rgba(52,199,89,.08);
+.g-item:hover { background:rgba(255,255,255,.03); }
+.g-item.active {
+  background:var(--y2);
+  border-left-color:var(--y);
 }
-.command-item.flash {
-  background:rgba(255,255,255,.14); color:var(--t1);
+.g-item.confirmed {
+  background:var(--g2);
+  border-left-color:var(--green);
+  animation:flashRow .4s ease;
+}
+@keyframes flashRow { 0%{background:rgba(232,212,77,.3)} 100%{background:var(--g2)} }
+
+.g-emoji { font-size:clamp(12px,2.5cqmin,16px); flex-shrink:0; line-height:1; }
+.g-info  { min-width:0; }
+.g-label {
+  font-family:var(--mono); font-size:clamp(7px,1.3cqw,9px);
+  letter-spacing:.05em; text-transform:uppercase; color:var(--t2);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.g-action {
+  font-family:var(--mono); font-size:clamp(6px,1.1cqw,8px); color:var(--t3);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.g-prog {
+  height:2px; background:var(--border); border-radius:1px;
+  margin-top:2px; overflow:hidden;
+}
+.g-prog-fill { height:100%; background:var(--y); width:0%; transition:width .1s; }
+
+/* ─── FOOTER — Dernier geste confirmé ─── */
+.ftr {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:clamp(5px,1.2cqh,8px) clamp(8px,2cqw,14px);
+  background:rgba(255,255,255,.02);
+  border-top:1px solid var(--border);
+  gap:10px; flex-shrink:0;
+}
+.last-gesture {
+  display:flex; align-items:center; gap:8px; min-width:0; flex:1;
+}
+.last-emoji { font-size:clamp(14px,3cqmin,20px); flex-shrink:0; }
+.last-info  { min-width:0; }
+.last-label {
+  font-family:var(--mono); font-size:clamp(8px,1.5cqw,10px);
+  color:var(--t1); letter-spacing:.06em;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.last-action {
+  font-family:var(--mono); font-size:clamp(7px,1.2cqw,9px); color:var(--t3);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.last-time {
+  font-family:var(--mono); font-size:clamp(7px,1.2cqw,9px); color:var(--t3);
+  flex-shrink:0;
+}
+
+/* MODE COMPACT — cacher la sidebar si trop petit */
+@container hc (max-width: 320px) {
+  .body { grid-template-columns: 1fr; }
+  .sidebar { display:none; }
+}
+/* MODE TRÈS COMPACT — réduire footer */
+@container hc (max-height: 200px) {
+  .ftr { display:none; }
+  .sb-head { display:none; }
 }
 </style>
 </head>
 <body>
+
 <div class="wrap">
 
   <!-- HEADER -->
@@ -136,100 +219,239 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
       <div class="m-ico">✋</div>
       <span class="m-name">{{ config.name if config else 'Contrôle Gestuel' }}</span>
     </div>
-    <div class="spill">
-      <div class="dot d-ok" id="gesture-dot"></div>
-      <span id="gesture-status">SCANNING</span>
+    <div class="pill">
+      <div class="dot d-w" id="dot"></div>
+      <span id="status">EN ATTENTE</span>
     </div>
   </header>
 
-  <!-- MAIN -->
-  <div class="main">
+  <!-- BODY -->
+  <div class="body">
 
-    <!-- VIDÉO -->
+    <!-- Zone vidéo -->
     <div class="video-zone">
-      <div class="gesture-badge" id="current-gesture">SCANNING...</div>
-      <div class="toast" id="status-toast">✓ VALIDÉ</div>
-      <img src="/video_feed" id="main-video" alt="Flux caméra"
-           onerror="this.style.display='none'">
+      <!-- Flux MJPEG depuis vision_service -->
+      <img id="video" src="/video_feed" alt="Flux main"
+           onerror="this.style.display='none'; document.getElementById('noVideo').style.display='flex'">
+
+      <!-- Placeholder si pas de vidéo -->
+      <div id="noVideo" class="no-video" style="display:none; position:absolute; inset:0;">
+        <div class="no-video-ico">✋</div>
+        <div class="no-video-txt">En attente du flux vidéo</div>
+      </div>
+
+      <!-- Badge geste courant -->
+      <div class="gesture-badge" id="badge">EN ATTENTE</div>
+
+      <!-- Barre de confirmation -->
+      <div class="confirm-bar" id="confirmBar"></div>
     </div>
 
-    <!-- COMMANDES -->
-    <div class="sidebar">
-      <div class="sb-head">Commandes</div>
-      <div class="cmd-list">
-        <div class="command-item" id="START_SYSTEM">
-          <span class="cmd-emoji">🖐</span>
-          <span class="cmd-label">Pleine main : Start</span>
-        </div>
-        <div class="command-item" id="STOP_SYSTEM">
-          <span class="cmd-emoji">✊</span>
-          <span class="cmd-label">Poing : Stop</span>
-        </div>
-        <div class="command-item" id="READ_TEXT">
-          <span class="cmd-emoji">☝️</span>
-          <span class="cmd-label">Index : Lire texte</span>
-        </div>
-        <div class="command-item" id="TRIGGER_FLORENCE">
-          <span class="cmd-emoji">👍</span>
-          <span class="cmd-label">Pouce : Florence-2</span>
-        </div>
+    <!-- Sidebar gestes -->
+    <aside class="sidebar">
+      <div class="sb-head">Gestes (10)</div>
+      <div class="gesture-list" id="gestureList">
+        <!-- Généré par JS -->
       </div>
-    </div>
+    </aside>
 
   </div>
+
+  <!-- FOOTER -->
+  <footer class="ftr">
+    <div class="last-gesture">
+      <span class="last-emoji" id="lastEmoji">—</span>
+      <div class="last-info">
+        <div class="last-label" id="lastLabel">Aucun geste confirmé</div>
+        <div class="last-action" id="lastAction">—</div>
+      </div>
+    </div>
+    <span class="last-time" id="lastTime">—</span>
+  </footer>
+
 </div>
 
 <script>
-const socket  = io();
-const badge   = document.getElementById('current-gesture');
-const toast   = document.getElementById('status-toast');
-const dot     = document.getElementById('gesture-dot');
-const statEl  = document.getElementById('gesture-status');
-const vimg    = document.getElementById('main-video');
+const socket = io({ transports: ['websocket', 'polling'] });
 
-/* ── Logique originale conservée ── */
-socket.on('plugin_data', function(data) {
-  if (data.plugin === "hand_control") {
-    const gesture     = data.gesture || 'NONE';
-    const isConfirmed = data.status === "confirmed";
+/* ─── CATALOGUE DES GESTES (chargé depuis config ou défault) ─── */
+const GESTURES = {
+  START_SYSTEM:   { emoji: '🖐', label: 'Main ouverte',  action: 'Lance Voice' },
+  STOP_SYSTEM:    { emoji: '✊', label: 'Poing fermé',   action: 'Kill module' },
+  READ_TEXT:      { emoji: '☝', label: 'Index levé',    action: 'Lance OCR' },
+  TRIGGER_VISION: { emoji: '👍', label: 'Pouce levé',    action: 'Lance Vision' },
+  PEACE:          { emoji: '✌', label: 'Victoire (V)',  action: 'Lance Danger' },
+  OK:             { emoji: '👌', label: 'OK',             action: 'Snapshot' },
+  POINTING_DOWN:  { emoji: '👇', label: 'Index bas',     action: 'Volume -' },
+  PINCH:          { emoji: '🤏', label: 'Pincement',     action: 'Capture vidéo' },
+  SWIPE_LEFT:     { emoji: '👈', label: 'Swipe gauche',  action: 'Module préc.' },
+  SWIPE_RIGHT:    { emoji: '👉', label: 'Swipe droite',  action: 'Module suiv.' },
+};
 
-    // 1. Badge geste en cours
-    if (gesture !== 'NONE') {
-      badge.textContent = gesture.replace('_', ' ');
-      badge.className   = 'gesture-badge active';
-      dot.className     = 'dot d-y';
-      statEl.textContent= gesture.replace('_', ' ');
-    } else {
-      badge.textContent = 'SCANNING...';
-      badge.className   = 'gesture-badge';
-      dot.className     = 'dot d-ok';
-      statEl.textContent= 'SCANNING';
+/* ─── RENDU SIDEBAR ─── */
+function renderSidebar() {
+  const list = document.getElementById('gestureList');
+  list.innerHTML = '';
+  Object.entries(GESTURES).forEach(([id, g]) => {
+    const item = document.createElement('div');
+    item.className = 'g-item';
+    item.id = 'g-' + id;
+    item.innerHTML = `
+      <span class="g-emoji">${g.emoji}</span>
+      <div class="g-info">
+        <div class="g-label">${g.label}</div>
+        <div class="g-action">${g.action}</div>
+        <div class="g-prog"><div class="g-prog-fill" id="prog-${id}"></div></div>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+renderSidebar();
+
+/* ─── ÉTAT ─── */
+let currentGesture = null;
+let progressTimer  = null;
+const CONFIRM_DURATION_MS = 800;
+
+/* ─── MISE À JOUR BADGE ─── */
+function setBadge(gesture, state) {
+  const badge = document.getElementById('badge');
+  badge.className = 'gesture-badge ' + (state || '');
+  if (!gesture || gesture === 'NONE') {
+    badge.textContent = 'En attente';
+    badge.className = 'gesture-badge';
+    stopProgress();
+    return;
+  }
+  const g = GESTURES[gesture] || {};
+  badge.textContent = (g.emoji || '') + ' ' + (g.label || gesture).toUpperCase();
+}
+
+/* ─── BARRE DE PROGRESSION ─── */
+function startProgress() {
+  stopProgress();
+  const bar = document.getElementById('confirmBar');
+  let pct = 0;
+  progressTimer = setInterval(() => {
+    pct += (100 / (CONFIRM_DURATION_MS / 80));
+    bar.style.width = Math.min(pct, 100) + '%';
+    if (pct >= 100) stopProgress();
+  }, 80);
+}
+
+function stopProgress() {
+  clearInterval(progressTimer);
+  document.getElementById('confirmBar').style.width = '0%';
+}
+
+/* ─── MISE À JOUR SIDEBAR ─── */
+function activateSidebarItem(gesture, confirmed) {
+  document.querySelectorAll('.g-item').forEach(el => {
+    el.classList.remove('active', 'confirmed');
+  });
+  if (!gesture || gesture === 'NONE') return;
+  const item = document.getElementById('g-' + gesture);
+  if (item) {
+    item.classList.add(confirmed ? 'confirmed' : 'active');
+    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  // Barre de progression dans l'item
+  const prog = document.getElementById('prog-' + gesture);
+  if (prog) {
+    prog.style.width = confirmed ? '0%' : '50%';
+    if (!confirmed) {
+      let pct = 0;
+      const iv = setInterval(() => {
+        pct += 8;
+        prog.style.width = Math.min(pct, 100) + '%';
+        if (pct >= 100) clearInterval(iv);
+      }, 80);
+    }
+  }
+}
+
+/* ─── MISE À JOUR FOOTER ─── */
+function updateFooter(gesture, action) {
+  const g = GESTURES[gesture] || {};
+  document.getElementById('lastEmoji').textContent  = g.emoji  || '—';
+  document.getElementById('lastLabel').textContent  = g.label  || gesture;
+  document.getElementById('lastAction').textContent = action   || g.action || '—';
+  const now = new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  document.getElementById('lastTime').textContent = now;
+}
+
+/* ─── RÉCEPTION DONNÉES PLUGIN ─── */
+socket.on('plugin_data', (data) => {
+  if (!data) return;
+  if (data.plugin !== 'hand_control' && data.module !== 'hand_control') return;
+
+  const gesture = data.gesture || 'NONE';
+  const status  = data.status  || '';
+
+  if (status === 'confirmed') {
+    // Geste confirmé → flash jaune → vert
+    setBadge(gesture, 'confirmed');
+    activateSidebarItem(gesture, true);
+    stopProgress();
+    updateFooter(gesture, data.action || '');
+
+    // Update statut header
+    document.getElementById('dot').className = 'dot d-y';
+    document.getElementById('status').textContent = 'CONFIRMÉ';
+
+    setTimeout(() => {
+      setBadge(null, '');
+      activateSidebarItem(null, false);
+      document.getElementById('dot').className = 'dot d-ok';
+      document.getElementById('status').textContent = 'ACTIF';
+    }, 1200);
+
+  } else if (gesture !== 'NONE' && status !== 'ready') {
+    // Geste en cours de confirmation
+    if (gesture !== currentGesture) {
+      setBadge(gesture, 'detecting');
+      activateSidebarItem(gesture, false);
+      startProgress();
+      currentGesture = gesture;
     }
 
-    // 2. Highlight commande (logique originale)
-    document.querySelectorAll('.command-item').forEach(el => el.classList.remove('active'));
-    const activeItem = document.getElementById(gesture);
-    if (activeItem) activeItem.classList.add('active');
-
-    // 3. Validation confirmée (toast + flash)
-    if (isConfirmed && gesture !== 'NONE') {
-      badge.className = 'gesture-badge confirmed';
-      toast.innerHTML = '✅ ' + gesture.replace('_', ' ');
-      toast.style.display = 'block';
-
-      if (activeItem) {
-        activeItem.classList.add('flash');
-        setTimeout(() => activeItem.classList.remove('flash'), 300);
-      }
-      setTimeout(() => { toast.style.display = 'none'; }, 2000);
+  } else if (gesture === 'NONE') {
+    if (currentGesture !== null) {
+      setBadge(null, '');
+      activateSidebarItem(null, false);
+      stopProgress();
+      currentGesture = null;
     }
+  }
+
+  // Statut connexion
+  if (status === 'ready') {
+    document.getElementById('dot').className = 'dot d-ok';
+    document.getElementById('status').textContent = 'ACTIF';
+  }
+  if (status === 'stopped') {
+    document.getElementById('dot').className = 'dot d-w';
+    document.getElementById('status').textContent = 'PAUSÉ';
   }
 });
 
+/* ─── CONNEXION SOCKET ─── */
+socket.on('connect',    () => {
+  document.getElementById('dot').className = 'dot d-ok';
+  document.getElementById('status').textContent = 'CONNECTÉ';
+});
 socket.on('disconnect', () => {
-  dot.className = 'dot';
-  dot.style.background = '#ff453a';
-  statEl.textContent = 'DÉCONNECTÉ';
+  document.getElementById('dot').className = 'dot';
+  document.getElementById('dot').style.background = 'var(--red)';
+  document.getElementById('status').textContent = 'DÉCONNECTÉ';
+});
+
+/* ─── FALLBACK image vidéo ─── */
+const videoEl = document.getElementById('video');
+videoEl.addEventListener('load', () => {
+  document.getElementById('noVideo').style.display = 'none';
+  videoEl.style.display = 'block';
 });
 </script>
 </body>
