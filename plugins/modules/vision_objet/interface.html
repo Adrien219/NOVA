@@ -7,235 +7,508 @@
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════════
-   MODULE : VISION OBJET — S.H.O.S design system
-   Logique originale (plugin_data / renderDetections) conservée
-═══════════════════════════════════════════════ */
 :root {
-  --bg:    #0e1117;
-  --glass: rgba(255,255,255,0.055);
-  --border:rgba(255,255,255,0.09);
-  --y:     #e8d44d;
-  --blue:  #4da6ff;
-  --green: #34c759;
-  --red:   #ff453a;
-  --t1:    rgba(255,255,255,0.93);
-  --t2:    rgba(255,255,255,0.52);
-  --t3:    rgba(255,255,255,0.28);
-  --font:  'DM Sans', system-ui, sans-serif;
-  --mono:  'DM Mono', monospace;
+  --bg:#0e1117; --glass:rgba(255,255,255,0.055);
+  --border:rgba(255,255,255,0.09); --bh:rgba(255,255,255,0.18);
+  --y:#e8d44d; --y2:rgba(232,212,77,0.12); --ybr:rgba(232,212,77,0.3);
+  --blue:#4da6ff; --blue2:rgba(77,166,255,0.12); --bluebr:rgba(77,166,255,0.3);
+  --green:#34c759; --red:#ff453a;
+  --t1:rgba(255,255,255,0.93); --t2:rgba(255,255,255,0.52); --t3:rgba(255,255,255,0.28);
+  --font:'DM Sans',system-ui,sans-serif; --mono:'DM Mono',monospace;
 }
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--bg);color:var(--t1)}
 
-/* ── LAYOUT PRINCIPAL ── */
-.wrap { height:100vh; display:flex; flex-direction:column; }
+.wrap{height:100vh;display:flex;flex-direction:column}
 
 /* ── HEADER ── */
-.hdr {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:clamp(7px,1.8vh,12px) clamp(10px,2vw,16px);
-  background:rgba(14,17,23,.97); border-bottom:1px solid var(--border);
-  flex-shrink:0; gap:8px;
+.hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 14px;background:rgba(14,17,23,.97);
+  border-bottom:1px solid var(--border);flex-shrink:0;gap:8px;
 }
-.hdr-l { display:flex; align-items:center; gap:7px; min-width:0; }
-.m-ico { width:20px; height:20px; border-radius:6px; background:rgba(77,166,255,.12); border:1px solid rgba(77,166,255,.25); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
-.m-name { font-size:clamp(9px,1.6vw,11px); font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.spill {
-  display:flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px;
-  background:rgba(255,255,255,.06); border:1px solid var(--border);
-  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px); color:var(--t2); flex-shrink:0;
-}
-.dot { width:5px; height:5px; border-radius:50%; }
-.d-ok { background:var(--green); box-shadow:0 0 6px var(--green); animation:blink 1.5s ease-in-out infinite; }
-.d-w  { background:rgba(255,255,255,.3); }
+.hdr-l{display:flex;align-items:center;gap:8px;min-width:0}
+.m-ico{width:22px;height:22px;border-radius:6px;background:var(--blue2);border:1px solid var(--bluebr);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.m-name{font-size:11px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);white-space:nowrap}
+.chip{display:flex;align-items:center;gap:4px;padding:3px 9px;border-radius:10px;background:rgba(255,255,255,.06);border:1px solid var(--border);font-family:var(--mono);font-size:9.5px;color:var(--t2)}
+.dot{width:5px;height:5px;border-radius:50%}
+.d-ok{background:var(--green);box-shadow:0 0 6px var(--green);animation:blink 1.5s ease infinite}
+.d-off{background:var(--red)}
+.d-w{background:rgba(255,255,255,.25)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
 
-/* ── ZONE CENTRALE ── */
-.main {
-  flex:1; display:grid;
-  grid-template-columns:1fr clamp(100px,28%,180px);
-  overflow:hidden; min-height:0;
+/* Boutons header */
+.hdr-r{display:flex;align-items:center;gap:6px}
+.hbtn{
+  padding:4px 10px;border-radius:7px;border:1px solid var(--border);
+  background:rgba(255,255,255,.05);color:var(--t2);
+  font-family:var(--mono);font-size:9px;cursor:pointer;
+  transition:all .15s;letter-spacing:.04em;text-transform:uppercase;
+}
+.hbtn:hover{border-color:var(--bh);color:var(--t1)}
+.hbtn.danger{border-color:rgba(255,69,58,.3);color:var(--red)}
+.hbtn.danger:hover{background:rgba(255,69,58,.12)}
+.hbtn.active-btn{background:var(--blue2);border-color:var(--bluebr);color:var(--blue)}
+.conf-badge{
+  padding:3px 9px;border-radius:7px;
+  background:var(--y2);border:1px solid var(--ybr);
+  font-family:var(--mono);font-size:9px;color:var(--y);
 }
 
-/* Vidéo */
-.video-zone {
-  position:relative; background:#000;
-  display:flex; align-items:center; justify-content:center;
-  overflow:hidden; border-right:1px solid var(--border);
+/* ── MAIN LAYOUT ── */
+.main{
+  flex:1;display:grid;
+  grid-template-columns:1fr clamp(140px,28%,210px);
+  overflow:hidden;min-height:0;
 }
-.video-zone img { width:100%; height:100%; object-fit:cover; display:block; }
-.video-zone img[src=""] { display:none; }
 
-/* Ligne de scan HUD */
-.scan-line {
-  position:absolute; left:0; right:0; height:1.5px;
-  background:linear-gradient(90deg, transparent, var(--blue), transparent);
+/* ── VIDEO ZONE ── */
+.video-zone{
+  position:relative;background:#000;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;border-right:1px solid var(--border);
+}
+.video-zone img{width:100%;height:100%;object-fit:cover;display:block}
+.no-signal{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  color:var(--t3);font-family:var(--mono);font-size:11px;
+}
+.no-signal span{font-size:2rem}
+
+/* Scan line */
+.scan-line{
+  position:absolute;left:0;right:0;height:1.5px;
+  background:linear-gradient(90deg,transparent,var(--blue),transparent);
   box-shadow:0 0 8px var(--blue);
-  animation:scan 3s linear infinite; top:0; pointer-events:none;
+  animation:scan 3s linear infinite;top:0;pointer-events:none;
 }
-@keyframes scan { 0%{top:0} 50%{top:100%} 100%{top:0} }
+@keyframes scan{0%{top:0}50%{top:100%}100%{top:0}}
 
-/* Badge geste overlay */
-.ai-badge {
-  position:absolute; top:8px; left:8px; z-index:5;
-  padding:4px 10px; border-radius:6px;
-  background:rgba(77,166,255,.18); border:1px solid rgba(77,166,255,.35);
-  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px); color:var(--blue);
-  letter-spacing:.08em; transition:all .3s;
+/* Overlays */
+.ov-tl{position:absolute;top:8px;left:8px;z-index:5;display:flex;flex-direction:column;gap:4px}
+.ov-tr{position:absolute;top:8px;right:8px;z-index:5;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.ov-br{position:absolute;bottom:8px;right:8px;z-index:5}
+.badge{
+  padding:3px 9px;border-radius:6px;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;
+  backdrop-filter:blur(8px);
 }
-.ai-badge.alert { background:rgba(52,199,89,.18); border-color:rgba(52,199,89,.35); color:var(--green); }
+.badge-blue{background:rgba(77,166,255,.18);border:1px solid var(--bluebr);color:var(--blue)}
+.badge-green{background:rgba(52,199,89,.15);border:1px solid rgba(52,199,89,.3);color:var(--green)}
+.badge-y{background:rgba(232,212,77,.14);border:1px solid var(--ybr);color:var(--y)}
+.badge-red{background:rgba(255,69,58,.15);border:1px solid rgba(255,69,58,.3);color:var(--red)}
 
-/* Compteur overlay */
-.count-badge {
-  position:absolute; top:8px; right:8px; z-index:5;
-  padding:3px 8px; border-radius:6px;
-  background:rgba(232,212,77,.14); border:1px solid rgba(232,212,77,.3);
-  font-family:var(--mono); font-size:10px; color:var(--y);
-}
+/* FPS ticker */
+.fps-tick{font-size:9px;opacity:.6}
 
-/* ── SIDEBAR DÉTECTIONS ── */
-.sidebar {
-  display:flex; flex-direction:column;
-  background:rgba(14,17,23,.95); overflow-y:auto; min-width:0;
-}
-.sidebar::-webkit-scrollbar { width:3px; }
-.sidebar::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); }
-
-.sb-head {
-  padding:8px 10px 6px; border-bottom:1px solid var(--border);
-  font-family:var(--mono); font-size:9px; letter-spacing:.10em;
-  text-transform:uppercase; color:var(--t3); flex-shrink:0;
+/* ── SIDEBAR ── */
+.sidebar{
+  display:flex;flex-direction:column;
+  background:rgba(14,17,23,.95);overflow:hidden;
 }
 
-/* Zone des cartes détection */
-#detection-list {
-  flex:1; padding:6px; display:flex; flex-direction:column; gap:5px;
-  overflow-y:auto;
+/* Compteurs */
+.counters{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;
+  border-bottom:1px solid var(--border);flex-shrink:0;
 }
-#detection-list::-webkit-scrollbar { width:3px; }
-#detection-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); }
+.cnt-box{
+  padding:10px 10px 8px;background:rgba(255,255,255,.02);
+  display:flex;flex-direction:column;gap:2px;
+}
+.cnt-box:first-child{border-right:1px solid var(--border)}
+.cnt-n{font-family:var(--mono);font-size:1.6rem;font-weight:500;line-height:1;color:var(--t1)}
+.cnt-l{font-family:var(--mono);font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--t3)}
+.cnt-n.det{color:var(--blue)}
+.cnt-n.tot{color:var(--y)}
 
-#no-detection {
-  padding:12px 8px; text-align:center;
-  font-size:10px; color:var(--t3); font-family:var(--mono);
-  line-height:1.5;
+/* Section titre */
+.sec-title{
+  padding:7px 10px 5px;
+  font-family:var(--mono);font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:var(--t3);
+  border-bottom:1px solid var(--border);flex-shrink:0;
 }
 
-.detection-card {
-  padding:7px 9px; border-radius:8px;
-  background:rgba(255,255,255,.04); border:1px solid var(--border);
-  transition:all .25s ease; animation:cardIn .25s ease;
+/* Détections courantes */
+.det-list{
+  flex:0 0 auto;max-height:38%;
+  overflow-y:auto;border-bottom:1px solid var(--border);
 }
-.detection-card.active {
-  background:rgba(52,199,89,.08); border-color:rgba(52,199,89,.3);
-}
-@keyframes cardIn { from{opacity:0;transform:translateX(6px)} to{opacity:1;transform:none} }
+.det-list::-webkit-scrollbar{width:2px}
+.det-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
 
-.det-name {
-  font-size:clamp(10px,1.6vw,12px); font-weight:600; color:var(--t1);
-  text-transform:capitalize; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+.det-item{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04);
+  transition:background .15s;
 }
-.det-count {
-  font-family:var(--mono); font-size:9px; color:var(--t3); margin-top:2px;
+.det-item:hover{background:rgba(255,255,255,.03)}
+.det-item:last-child{border-bottom:none}
+.det-emoji{font-size:14px;flex-shrink:0;width:20px;text-align:center}
+.det-info{flex:1;min-width:0}
+.det-label{font-size:11px;font-weight:500;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.det-conf{font-family:var(--mono);font-size:8.5px;color:var(--t3)}
+.det-bar{height:2px;border-radius:1px;background:rgba(255,255,255,.06);margin-top:3px}
+.det-bar-fill{height:100%;border-radius:1px;background:var(--blue);transition:width .3s}
+.det-empty{padding:12px 10px;font-family:var(--mono);font-size:9px;color:var(--t3);text-align:center}
+
+/* Historique */
+.hist-list{flex:1;overflow-y:auto;min-height:0}
+.hist-list::-webkit-scrollbar{width:2px}
+.hist-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px}
+
+.hist-item{
+  padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03);
+  display:flex;align-items:flex-start;gap:5px;
 }
-.det-bar { height:2px; background:rgba(255,255,255,.08); border-radius:1px; margin-top:5px; overflow:hidden; }
-.det-bar-fill { height:100%; background:var(--green); border-radius:1px; transition:width .4s; }
+.hist-item:last-child{border-bottom:none}
+.hist-ts{font-family:var(--mono);font-size:7.5px;color:var(--t3);flex-shrink:0;padding-top:1px}
+.hist-labels{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:2px}
+.hist-tag{
+  font-family:var(--mono);font-size:7.5px;
+  padding:1px 5px;border-radius:3px;
+  background:var(--blue2);border:1px solid rgba(77,166,255,.15);color:var(--blue);
+}
+.hist-tag.danger{background:rgba(255,69,58,.1);border-color:rgba(255,69,58,.2);color:var(--red)}
+.hist-count{font-family:var(--mono);font-size:7px;color:var(--t3);flex-shrink:0;padding-top:2px}
+
+/* Commandes rapides */
+.quick-cmds{
+  display:flex;gap:5px;padding:8px 10px;
+  border-top:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;
+}
+.qbtn{
+  flex:1;min-width:30px;padding:5px 4px;border-radius:6px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border);
+  font-family:var(--mono);font-size:8px;color:var(--t2);
+  cursor:pointer;transition:all .15s;text-align:center;
+}
+.qbtn:hover{border-color:var(--bh);color:var(--t1)}
+.qbtn.warn:hover{border-color:rgba(255,69,58,.4);color:var(--red);background:rgba(255,69,58,.08)}
+
+/* Toast */
+.toast{
+  position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  padding:6px 14px;border-radius:8px;
+  background:rgba(14,17,23,.97);border:1px solid var(--bh);
+  font-family:var(--mono);font-size:10px;color:var(--y);
+  opacity:0;transition:opacity .2s;z-index:99;pointer-events:none;white-space:nowrap;
+}
+.toast.show{opacity:1}
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <!-- HEADER -->
-  <header class="hdr">
+  <div class="hdr">
     <div class="hdr-l">
       <div class="m-ico">👁</div>
-      <span class="m-name">{{ config.name if config else 'Vision Objet' }}</span>
+      <span class="m-name">Vision d'Objet</span>
+      <div class="chip"><div class="dot d-w" id="mqttDot"></div><span id="mqttLabel">MQTT</span></div>
+      <div class="chip"><div class="dot d-w" id="modeDot"></div><span id="modeLabel">YOLO11n</span></div>
+      <div class="conf-badge" id="confBadge">conf: 0.45</div>
     </div>
-    <div class="spill">
-      <div class="dot d-ok" id="ai-dot"></div>
-      <span id="ai-status">MEDIAPIPE</span>
+    <div class="hdr-r">
+      <button class="hbtn" onclick="sendCmd('conf_up')">Conf ▲</button>
+      <button class="hbtn" onclick="sendCmd('conf_down')">Conf ▼</button>
+      <button class="hbtn" onclick="sendCmd('snapshot_request')" id="snapBtn">📸 Snap</button>
+      <button class="hbtn active-btn" id="toggleBtn" onclick="toggleDetection()">● Actif</button>
+      <button class="hbtn danger" onclick="sendCmd('clear')">🧹 Clear</button>
     </div>
-  </header>
+  </div>
 
   <!-- MAIN -->
   <div class="main">
 
     <!-- VIDÉO -->
-    <div class="video-zone">
-      <div class="scan-line"></div>
-      <div class="ai-badge" id="ai-badge">IA ACTIVE</div>
-      <div class="count-badge" id="count-badge" style="display:none">0 obj.</div>
-      <img src="/video_feed" id="video_stream" alt="Vision Objet"
-           onerror="this.style.display='none'">
+    <div class="video-zone" id="videoZone">
+      <div class="no-signal" id="noSignal"><span>📡</span>En attente du flux...</div>
+      <img src="/video_feed" style="width: 100%; height: auto; border-radius: 8px;">
+      <div class="scan-line" id="scanLine"></div>
+
+      <!-- Overlays -->
+      <div class="ov-tl">
+        <div class="badge badge-blue" id="aiBadge">YOLO11n · MEDIAPIPE</div>
+        <div class="badge badge-blue fps-tick" id="fpsBadge">0 FPS</div>
+      </div>
+      <div class="ov-tr">
+        <div class="badge badge-y" id="cntBadge">0 objets</div>
+        <div class="badge badge-green" id="statusBadge" style="display:none">DÉTECTION ACTIVE</div>
+      </div>
+      <div class="ov-br">
+        <div class="badge badge-blue" id="tsBadge">—</div>
+      </div>
     </div>
 
     <!-- SIDEBAR -->
     <div class="sidebar">
-      <div class="sb-head">Détections</div>
-      <div id="detection-list">
-        <div id="no-detection">Aucun<br>objet<br>détecté...</div>
-      </div>
-    </div>
 
+      <!-- Compteurs -->
+      <div class="counters">
+        <div class="cnt-box">
+          <div class="cnt-n det" id="cntCur">0</div>
+          <div class="cnt-l">Détectés</div>
+        </div>
+        <div class="cnt-box">
+          <div class="cnt-n tot" id="cntTot">0</div>
+          <div class="cnt-l">Total</div>
+        </div>
+      </div>
+
+      <!-- Détections courantes -->
+      <div class="sec-title">Détections · Scène</div>
+      <div class="det-list" id="detList">
+        <div class="det-empty" id="detEmpty">Aucun objet détecté</div>
+      </div>
+
+      <!-- Historique -->
+      <div class="sec-title">Historique</div>
+      <div class="hist-list" id="histList"></div>
+
+      <!-- Commandes rapides -->
+      <div class="quick-cmds">
+        <div class="qbtn" onclick="sendCmd('toggle')">⏯ Toggle</div>
+        <div class="qbtn" onclick="sendCmd('snapshot_request')">📸</div>
+        <div class="qbtn warn" onclick="sendCmd('clear')">🧹</div>
+      </div>
+
+    </div>
   </div>
+
 </div>
+<div class="toast" id="toast"></div>
 
 <script>
-const socket = io();
-const detList   = document.getElementById('detection-list');
-const noDet     = document.getElementById('no-detection');
-const aiBadge   = document.getElementById('ai-badge');
-const countBadge= document.getElementById('count-badge');
+const socket = io({ transports: ['websocket', 'polling'] });
 
-/* ── Logique originale conservée ── */
-socket.on('plugin_data', function(data) {
-  if (data.plugin === "vision_objet") {
-    renderDetections(data.found);
+// ─── ÉTAT ───────────────────────────────────────────
+let active      = true;
+let totalCount  = 0;
+let lastFrame   = 0;
+let fps         = 0;
+let fpsTimer    = null;
+let frameCount  = 0;
+let history     = [];
+const DANGER_LABELS = new Set(['knife','gun','fire','scissors','person falling','person']);
+
+// ─── SOCKET.IO ──────────────────────────────────────
+socket.on('connect', () => {
+  setDot('mqttDot', 'ok');
+  setText('mqttLabel', 'MQTT ●');
+  toast('✅ Connecté');
+});
+socket.on('vision_backend_changed', (d) => {
+  if (!d) return;
+  const b = d.backend || d.active || '';
+  // Mettre à jour le badge backend dans l'interface
+  const badge = document.getElementById('aiBadge');
+  if (badge) badge.textContent = b.toUpperCase();
+  const modeDot = document.getElementById('modeDot');
+  if (modeDot) modeDot.className = 'dot d-ok';
+  const modeLabel = document.getElementById('modeLabel');
+  if (modeLabel) modeLabel.textContent = b.toUpperCase();
+  console.log('[VisionObjet] Backend changé :', b);
+});
+
+socket.on('disconnect', () => {
+  setDot('mqttDot', 'off');
+  setText('mqttLabel', 'MQTT ✗');
+});
+
+// Données de détection
+socket.on('plugin_data', d => {
+  if (d.plugin !== 'vision_objet') return;
+  renderDetections(d.detections || [], d.count || 0, d.total || 0, d.threshold);
+});
+
+// Frame vidéo annotée (base64 ou URL)
+socket.on('vision_frame', d => {
+  showFrame(d.frame || d.url || '');
+});
+
+// Compatibilité : event générique nova
+socket.on('nova_event', d => {
+  if (d.topic === 'shos/plugins/vision_objet/data') {
+    try {
+      const data = typeof d.payload === 'string' ? JSON.parse(d.payload) : d.payload;
+      renderDetections(data.detections || [], data.count || 0, data.total || 0, data.threshold);
+    } catch(e) {}
+  }
+  if (d.topic === 'shos/camera/processed' && d.frame_b64) {
+    showFrame('data:image/jpeg;base64,' + d.frame_b64);
   }
 });
 
-function renderDetections(objects) {
-  // Nettoyage (conserve le no-detection placeholder)
-  const cards = document.querySelectorAll('.detection-card');
-  cards.forEach(c => c.remove());
+// Flux /video_feed direct (img src)
+function pollVideoFeed() {
+  const img = document.getElementById('videoImg');
+  if (!img.src || img.src === window.location.href) {
+    img.src = '/video_feed?t=' + Date.now();
+  }
+  img.onload  = () => { showFrameEl(); countFps(); };
+  img.onerror = () => {};
+}
 
-  if (!objects || objects.length === 0) {
-    noDet.style.display = 'block';
-    aiBadge.textContent = 'SCAN EN COURS';
-    aiBadge.classList.remove('alert');
-    countBadge.style.display = 'none';
+// ─── RENDU DÉTECTIONS ───────────────────────────────
+const EMOJIS = {
+  person:'🧍',car:'🚗',dog:'🐕',cat:'🐈',chair:'🪑',
+  bottle:'🍶',cup:'☕',laptop:'💻',phone:'📱',book:'📖',
+  tv:'📺',knife:'🔪',scissors:'✂️',clock:'🕐',bird:'🐦',
+  default:'📦'
+};
+function emoji(label) {
+  return EMOJIS[label.toLowerCase()] || EMOJIS.default;
+}
+
+function renderDetections(detections, count, total, conf) {
+  // Compteurs
+  setText('cntCur', count);
+  setText('cntTot', total);
+  totalCount = total;
+  setText('cntBadge', count + ' objet' + (count > 1 ? 's' : ''));
+
+  // Badge conf
+  if (conf) setText('confBadge', `conf: ${conf.toFixed(2)}`);
+
+  // Liste détections
+  const list = document.getElementById('detList');
+  const empty = document.getElementById('detEmpty');
+
+  if (!detections || detections.length === 0) {
+    list.innerHTML = '';
+    list.appendChild(empty);
+    empty.style.display = '';
     return;
   }
+  empty.style.display = 'none';
+  list.innerHTML = detections.map(d => {
+    const danger = DANGER_LABELS.has(d.label.toLowerCase());
+    const pct    = Math.round((d.conf || 0) * 100);
+    return `
+    <div class="det-item">
+      <span class="det-emoji">${emoji(d.label)}</span>
+      <div class="det-info">
+        <div class="det-label" style="color:${danger ? 'var(--red)' : 'var(--t1)'}">${d.label}</div>
+        <div class="det-conf">${pct}% confiance</div>
+        <div class="det-bar"><div class="det-bar-fill" style="width:${pct}%;background:${danger ? 'var(--red)' : 'var(--blue)'}"></div></div>
+      </div>
+    </div>`;
+  }).join('');
 
-  noDet.style.display = 'none';
-  aiBadge.textContent = objects.length + ' OBJET' + (objects.length>1?'S':'') + ' D\u00c9TECT\u00c9' + (objects.length>1?'S':'');
-  aiBadge.classList.add('alert');
-  countBadge.textContent = objects.length + ' obj.';
-  countBadge.style.display = 'block';
+  // Historique
+  const ts     = new Date().toTimeString().slice(0, 8);
+  const labels = detections.map(d => d.label);
+  history.unshift({ ts, labels, count });
+  if (history.length > 60) history.pop();
+  renderHistory();
+}
 
-  // Comptage occurrences (logique originale)
-  const counts = {};
-  objects.forEach(obj => counts[obj] = (counts[obj] || 0) + 1);
-  const maxCount = Math.max(...Object.values(counts));
+function renderHistory() {
+  const c = document.getElementById('histList');
+  c.innerHTML = history.slice(0, 40).map(h => `
+    <div class="hist-item">
+      <span class="hist-ts">${h.ts}</span>
+      <div class="hist-labels">
+        ${h.labels.map(l => `<span class="hist-tag ${DANGER_LABELS.has(l.toLowerCase()) ? 'danger' : ''}">${l}</span>`).join('')}
+      </div>
+      <span class="hist-count">×${h.count}</span>
+    </div>`).join('');
+}
 
-  for (const [name, count] of Object.entries(counts)) {
-    const card = document.createElement('div');
-    card.className = 'detection-card active';
-    card.innerHTML =
-      '<div class="det-name">' + name + '</div>' +
-      '<div class="det-count">x' + count + '</div>' +
-      '<div class="det-bar"><div class="det-bar-fill" style="width:' + Math.round((count/maxCount)*100) + '%"></div></div>';
-    detList.appendChild(card);
-    setTimeout(() => card.classList.remove('active'), 600);
+// ─── AFFICHAGE FRAME ────────────────────────────────
+function showFrame(src) {
+  const img = document.getElementById('videoImg');
+  const ns  = document.getElementById('noSignal');
+  if (!src) return;
+  img.src = src;
+  img.style.display = '';
+  ns.style.display  = 'none';
+  countFps();
+}
+function showFrameEl() {
+  document.getElementById('videoImg').style.display = '';
+  document.getElementById('noSignal').style.display = 'none';
+}
+function countFps() {
+  frameCount++;
+  const now = Date.now();
+  if (now - lastFrame >= 1000) {
+    fps = frameCount;
+    frameCount = 0;
+    lastFrame  = now;
+    setText('fpsBadge', fps + ' FPS');
   }
 }
 
-socket.on('disconnect', () => {
-  document.getElementById('ai-status').textContent = 'HORS LIGNE';
-  document.getElementById('ai-dot').className = 'dot';
-  document.getElementById('ai-dot').style.background = '#ff453a';
-});
+// ─── COMMANDES ──────────────────────────────────────
+function sendCmd(cmd) {
+  const topic   = cmd === 'snapshot_request'
+    ? 'shos/camera/snapshot_request'
+    : 'shos/plugins/vision_objet/cmd';
+  const payload = cmd === 'snapshot_request'
+    ? { trigger: 'manual' }
+    : { cmd };
+
+  socket.emit('mqtt_publish', { topic, payload: JSON.stringify(payload) });
+  toast(`→ ${cmd}`);
+
+  if (cmd === 'snapshot_request') { flashBtn('snapBtn'); }
+}
+
+function toggleDetection() {
+  active = !active;
+  const btn = document.getElementById('toggleBtn');
+  btn.textContent = active ? '● Actif' : '○ Pausé';
+  btn.className   = 'hbtn ' + (active ? 'active-btn' : '');
+  document.getElementById('statusBadge').style.display = active ? '' : 'none';
+  sendCmd('toggle');
+}
+
+// ─── UTILS ──────────────────────────────────────────
+function setDot(id, state) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'dot ' + (state === 'ok' ? 'd-ok' : state === 'off' ? 'd-off' : 'd-w');
+}
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => t.classList.remove('show'), 1800);
+}
+function flashBtn(id) {
+  const b = document.getElementById(id);
+  if (!b) return;
+  b.style.background = 'rgba(232,212,77,.2)';
+  setTimeout(() => b.style.background = '', 400);
+}
+
+// ─── TIMESTAMP LIVE ─────────────────────────────────
+setInterval(() => {
+  setText('tsBadge', new Date().toLocaleTimeString('fr-FR'));
+}, 1000);
+
+// ─── INIT ───────────────────────────────────────────
+// Essayer de connecter le flux vidéo MJPEG direct
+setTimeout(() => {
+  const img = document.getElementById('videoImg');
+  img.src = '/video_feed';
+  img.style.display = '';
+  document.getElementById('noSignal').style.display = 'none';
+  img.onerror = () => {
+    img.style.display = 'none';
+    document.getElementById('noSignal').style.display = '';
+  };
+  img.onload = () => {
+    document.getElementById('noSignal').style.display = 'none';
+    countFps();
+  };
+}, 300);
 </script>
 </body>
 </html>

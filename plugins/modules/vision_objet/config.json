@@ -1,11 +1,33 @@
 {
   "id":          "vision_objet",
   "name":        "Vision d'Objet",
-  "description": "Détection et suivi d'objets dans la scène",
-  "icon":        "binoculars",
+  "description": "Détection temps réel YOLO11n · Source MQTT",
+  "icon":        "👁",
+  "version":     "2.0.0",
   "template":    "interface.html",
+  "entry_point": "plugins.modules.vision_objet.main",
+  "enabled":     true,
+
+  "settings": {
+    "model":           "yolo11n",
+    "conf_threshold":  0.45,
+    "frame_skip":      2,
+    "jpeg_quality":    50,
+    "max_history":     100,
+    "source_topic":    "shos/camera/raw",
+    "result_topic":    "shos/plugins/vision_objet/data",
+    "processed_topic": "shos/camera/processed"
+  },
 
   "actions": [
+    {
+      "id":           "toggle_detect",
+      "label":        "Toggle",
+      "icon":         "⏯",
+      "description":  "Activer / désactiver la détection",
+      "mqtt_topic":   "shos/plugins/vision_objet/cmd",
+      "mqtt_payload": { "cmd": "toggle" }
+    },
     {
       "id":           "snapshot",
       "label":        "Snap",
@@ -15,12 +37,20 @@
       "mqtt_payload": { "trigger": "manual" }
     },
     {
-      "id":           "toggle_detect",
-      "label":        "Toggle",
-      "icon":         "👁",
-      "description":  "Activer / désactiver la détection",
+      "id":           "conf_up",
+      "label":        "Conf ▲",
+      "icon":         "🎯",
+      "description":  "Augmenter le seuil de confiance",
       "mqtt_topic":   "shos/plugins/vision_objet/cmd",
-      "mqtt_payload": { "cmd": "toggle" }
+      "mqtt_payload": { "cmd": "conf_up" }
+    },
+    {
+      "id":           "conf_down",
+      "label":        "Conf ▼",
+      "icon":         "🎯",
+      "description":  "Diminuer le seuil de confiance",
+      "mqtt_topic":   "shos/plugins/vision_objet/cmd",
+      "mqtt_payload": { "cmd": "conf_down" }
     },
     {
       "id":           "clear_history",

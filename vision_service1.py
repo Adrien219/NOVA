@@ -44,7 +44,13 @@ import paho.mqtt.client as mqtt
 PORT_WEB    = 5051
 MQTT_BROKER = "localhost"
 MQTT_PORT   = 1883
-MQTT_TOPIC  = "shos/camera/vision"
+MQTT_TOPIC  = "shos/camera/vision"          # Topic générique (toujours publié)
+
+# Topics dédiés par backend — chaque module s'abonne à celui dont il a besoin
+MQTT_TOPIC_MP   = "shos/camera/vision/mediapipe"   # Hand Control
+MQTT_TOPIC_YOLO = "shos/camera/vision/yolo"         # Vision Objet
+MQTT_TOPIC_MOON = "shos/camera/vision/moondream"    # Descriptions scène
+# shos/camera/raw — frames JPEG brutes pour modules qui traitent eux-mêmes
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 MODELS_DIR   = PROJECT_ROOT / "models"
@@ -494,7 +500,28 @@ class VisionService:
         self._last_mqtt = now
         try:
             payload = {**meta, "fps": round(self._fps, 1), "ts": now}
-            self.mqtt.publish(MQTT_TOPIC, json.dumps(payload), qos=0)
+            data = json.dumps(payload)
+
+            # 1. Topic générique — reçu par tous les modules
+            self.mqtt.publish(MQTT_TOPIC, data, qos=0)
+
+            # 2. Topic dédié par backend — chaque module écoute le sien
+            backend_name = meta.get("backend", "")
+            if backend_name == "mediapipe":
+                self.mqtt.publish(MQTT_TOPIC_MP,   data, qos=0)
+            elif backend_name in ("yolo11n", "yolo"):
+                self.mqtt.publish(MQTT_TOPIC_YOLO, data, qos=0)
+            elif backend_name == "moondream":
+                self.mqtt.publish(MQTT_TOPIC_MOON, data, qos=0)
+
+            # 3. Statut global — pour le dashboard
+            self.mqtt.publish("shos/camera/status", json.dumps({
+                "backend":   backend_name,
+                "fps":       round(self._fps, 1),
+                "available": {n: b.is_available() for n, b in self.backends.items()},
+                "ts":        now,
+            }), qos=0)
+
         except Exception:
             pass
 

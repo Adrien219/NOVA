@@ -1520,7 +1520,8 @@ function ppSetVision(backend) {
   if (btn) btn.classList.add('on');
 
   // Appel direct au vision_service
-  fetch('http://' + location.hostname + ':5051/api/backend', {
+  // Appel via proxy nova.py (évite CORS - le navigateur ne peut pas appeler :5051 directement)
+  fetch('/api/backend', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ backend: backend })

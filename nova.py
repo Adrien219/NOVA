@@ -943,6 +943,73 @@ def handle_snapshot_request():
     else:
         logger.warning("📸 Impossible de capturer : aucune image dans global_frame")
 
+
+@socketio.on('mqtt_publish')
+def handle_mqtt_publish(data):
+    """
+    Reçoit un message du navigateur et le publie sur MQTT.
+    Utilisé par tous les modules pour envoyer des commandes.
+    Format : { topic: str, payload: str|dict }
+    """
+    if not data:
+        return
+    try:
+        topic   = str(data.get('topic', '')).strip()
+        payload = data.get('payload', '{}')
+        if not topic:
+            return
+        if isinstance(payload, dict):
+            payload = json.dumps(payload)
+        elif not isinstance(payload, str):
+            payload = str(payload)
+        if mqtt_bridge and mqtt_bridge.client:
+            mqtt_bridge.client.publish(topic, payload, qos=0)
+            logger.debug("📡 mqtt_publish : %s → %s", topic, payload[:80])
+    except Exception as e:
+        logger.warning("mqtt_publish handler : %s", e)
+
+
+@socketio.on('module_cmd')
+def handle_module_cmd(data):
+    """
+    Raccourci : envoie une commande à un module via son topic MQTT.
+    Format : { module: str, cmd: str, ...params }
+    """
+    if not data:
+        return
+    try:
+        module = str(data.get('module', '')).strip()
+        if not module:
+            return
+        topic   = f"shos/plugins/{module}/cmd"
+        payload = {k: v for k, v in data.items() if k != 'module'}
+        if mqtt_bridge and mqtt_bridge.client:
+            mqtt_bridge.client.publish(topic, json.dumps(payload), qos=0)
+            logger.debug("📡 module_cmd : %s → %s", topic, payload)
+    except Exception as e:
+        logger.warning("module_cmd handler : %s", e)
+
+
+@socketio.on('vision_switch')
+def handle_vision_switch(data):
+    """
+    Switch le backend vision directement depuis le navigateur.
+    Format : { backend: 'mediapipe'|'yolo11n'|'moondream' }
+    """
+    if not data:
+        return
+    backend = str(data.get('backend', 'mediapipe')).strip()
+    try:
+        import requests as _req
+        r = _req.post('http://localhost:5051/api/backend',
+                      json={'backend': backend}, timeout=5)
+        resp = r.json()
+        socketio.emit('vision_backend_changed', resp)
+        logger.info("🔄 Vision switch → %s (via SocketIO)", backend)
+    except Exception as e:
+        logger.warning("vision_switch : %s", e)
+        socketio.emit('vision_backend_changed', {'ok': False, 'msg': str(e)})
+
 # ============================================================================
 # BACKGROUND TASKS
 # ============================================================================
@@ -1000,6 +1067,36 @@ def video_feed():
         stream_with_context(generate_frames()),
         mimetype='multipart/x-mixed-replace; boundary=frame',
     )
+
+@app.route('/api/backend', methods=['GET'])
+def proxy_backend_get():
+    """Proxy GET → vision_service:5051/api/backend (evite CORS depuis le navigateur)."""
+    try:
+        import requests as _req
+        r = _req.get('http://localhost:5051/api/backend', timeout=3)
+        return jsonify(r.json())
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': str(e), 'active': 'mediapipe',
+                        'available': {'mediapipe': True, 'yolo11n': False, 'moondream': False},
+                        'all': ['mediapipe', 'yolo11n', 'moondream']}), 200
+
+@app.route('/api/backend', methods=['POST'])
+def proxy_backend_post():
+    """Proxy POST → vision_service:5051/api/backend (evite CORS depuis le navigateur)."""
+    try:
+        import requests as _req
+        data = request.get_json(silent=True) or {}
+        r = _req.post('http://localhost:5051/api/backend',
+                      json=data, timeout=5)
+        resp = r.json()
+        # Notifier via SocketIO pour mettre a jour tous les clients
+        try:
+            socketio.emit('vision_backend_changed', resp)
+        except Exception:
+            pass
+        return jsonify(resp)
+    except Exception as e:
+        return jsonify({'ok': False, 'msg': str(e)}), 500
 
 
 
