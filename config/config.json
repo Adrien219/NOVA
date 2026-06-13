@@ -48,7 +48,15 @@
                 "text_reader",
                 "voice_assistant"
             ]
+        },
+        "test_danger_moniteur": {
+            "name": "test danger moniteur",
+            "main_module": "danger_monitor",
+            "secondary_modules": [
+                "hand_control",
+                "voice_assistant"
+            ]
         }
     },
-    "current_active_profile": "test_vision_objet"
+    "current_active_profile": "test_danger_moniteur"
 }

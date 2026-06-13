@@ -1,7 +1,34 @@
 {
-    "id": "danger_monitor",
-    "name": "Moniteur de Danger",
-    "description": "Analyse des risques environnants",
-    "icon": "exclamation-triangle",
-    "template": "interface.html"
+  "id":          "danger_monitor",
+  "name":        "Moniteur de Danger",
+  "description": "Surveillance distance + gaz + vibration en temps réel",
+  "icon":        "exclamation-triangle",
+  "template":    "interface.html",
+
+  "actions": [
+    {
+      "id":           "activate",
+      "label":        "Activer",
+      "icon":         "🛡",
+      "description":  "Démarrer la surveillance",
+      "mqtt_topic":   "shos/plugins/danger_monitor/cmd",
+      "mqtt_payload": {"cmd": "start"}
+    },
+    {
+      "id":           "pause",
+      "label":        "Pause",
+      "icon":         "⏸",
+      "description":  "Mettre en pause",
+      "mqtt_topic":   "shos/plugins/danger_monitor/cmd",
+      "mqtt_payload": {"cmd": "stop"}
+    },
+    {
+      "id":           "clear_alerts",
+      "label":        "Effacer",
+      "icon":         "🧹",
+      "description":  "Effacer l'historique des alertes",
+      "mqtt_topic":   "shos/plugins/danger_monitor/cmd",
+      "mqtt_payload": {"cmd": "clear"}
+    }
+  ]
 }
