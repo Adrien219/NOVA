@@ -56,7 +56,15 @@
                 "hand_control",
                 "voice_assistant"
             ]
+        },
+        "test_lecture": {
+            "name": "test lecture",
+            "main_module": "text_reader",
+            "secondary_modules": [
+                "danger_monitor",
+                "vision_objet"
+            ]
         }
     },
-    "current_active_profile": "test_danger_moniteur"
+    "current_active_profile": "test_vision_objet"
 }

@@ -631,6 +631,64 @@ body::after {
 .sys-toast.show { opacity:1; transform:translateY(0); }
 .sys-toast.success { color:var(--green); border-color:rgba(52,199,89,.4); }
 .sys-toast.error { color:var(--red); border-color:rgba(255,69,58,.4); }
+/* ─── OVERLAY CONFIG MODULE ──────────────────────────────────── */
+.config-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(6px);
+  align-items: center;
+  justify-content: center;
+}
+.config-overlay.open { display: flex; }
+.config-modal {
+  position: relative;
+  width: clamp(320px, 90vw, 1100px);
+  height: clamp(400px, 88vh, 900px);
+  background: #0e1117;
+  border: 1px solid rgba(232,212,77,0.3);
+  border-radius: 14px;
+  box-shadow: 0 0 40px rgba(232,212,77,0.12);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.config-modal-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(255,255,255,0.04);
+  border-bottom: 1px solid rgba(255,255,255,0.09);
+  flex-shrink: 0;
+}
+.config-modal-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  color: #e8d44d;
+}
+.config-modal-close {
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  background: rgba(255,69,58,0.12);
+  border: 1px solid rgba(255,69,58,0.3);
+  color: #ff453a;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.config-modal-close:hover { background: rgba(255,69,58,0.25); }
+.config-modal iframe {
+  flex: 1;
+  border: none;
+  width: 100%;
+  background: transparent;
+}
 </style>
 </head>
 <body>
@@ -1310,21 +1368,7 @@ try {
    On recharge les iframes des modules pour qu'ils prennent
    le nouveau flux annoté (boxes YOLO ou caption Moondream).
 ─────────────────────────────────────────────────────────────── */
-window.addEventListener('message', (ev) => {
-  if (!ev.data || ev.data.type !== 'vision_backend_changed') return;
-  console.info('[SHOS] Backend changé →', ev.data.backend, '— rechargement des modules');
-
-  // Forcer rechargement des 3 iframes principales
-  ['iframe-main', 'iframe-s1', 'iframe-s2'].forEach(id => {
-    const iframe = document.getElementById(id);
-    if (iframe && iframe.src && iframe.src !== 'about:blank') {
-      // Astuce : ajouter/changer un paramètre pour forcer rechargement
-      const url = new URL(iframe.src, location.href);
-      url.searchParams.set('_v', Date.now());
-      iframe.src = url.toString();
-    }
-  });
-});
+// postMessage handler déplacé dans overlay config (voir bas de page)
 
 
 
@@ -1520,8 +1564,7 @@ function ppSetVision(backend) {
   if (btn) btn.classList.add('on');
 
   // Appel direct au vision_service
-  // Appel via proxy nova.py (évite CORS - le navigateur ne peut pas appeler :5051 directement)
-  fetch('/api/backend', {
+  fetch('http://' + location.hostname + ':5051/api/backend', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ backend: backend })
@@ -1599,6 +1642,70 @@ document.addEventListener('keydown', (e) => {
 
 /* ── INIT ───────────────────────────────────────────────────── */
 applyProfile();
+</script>
+<!-- ── OVERLAY CONFIG MODULE ── -->
+<div class="config-overlay" id="configOverlay" onclick="closeConfigOverlay(event)">
+  <div class="config-modal" id="configModal">
+    <div class="config-modal-hdr">
+      <span class="config-modal-title" id="configModalTitle">Configuration</span>
+      <button class="config-modal-close" onclick="closeConfigOverlay(null)">✕</button>
+    </div>
+    <iframe id="configModalIframe" src="about:blank" title="Configuration module"></iframe>
+  </div>
+</div>
+
+<script>
+/* ── OVERLAY CONFIG MODULE ─────────────────────────────────────── */
+function openConfigOverlay(moduleId, title) {
+  const overlay = document.getElementById('configOverlay');
+  const iframe  = document.getElementById('configModalIframe');
+  const ttl     = document.getElementById('configModalTitle');
+  if (!overlay || !iframe) return;
+  iframe.src = '/module/' + moduleId + '/config';
+  ttl.textContent = title || ('Configuration · ' + moduleId);
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeConfigOverlay(event) {
+  if (event && event.target !== document.getElementById('configOverlay')) return;
+  const overlay = document.getElementById('configOverlay');
+  const iframe  = document.getElementById('configModalIframe');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  if (iframe) iframe.src = 'about:blank';
+  document.body.style.overflow = '';
+}
+
+// Écouter postMessage depuis les iframes modules (bouton ⚙)
+window.addEventListener('message', (ev) => {
+  if (!ev.data) return;
+
+  // Ouvrir page config d'un module
+  if (ev.data.type === 'open_module_config') {
+    openConfigOverlay(ev.data.module_id, ev.data.title);
+    return;
+  }
+
+  // Backend vision changé — rechargement iframes
+  if (ev.data.type === 'vision_backend_changed') {
+    console.info('[SHOS] Backend changé →', ev.data.backend);
+    ['iframe-main', 'iframe-s1', 'iframe-s2'].forEach(id => {
+      const iframe = document.getElementById(id);
+      if (iframe && iframe.src && iframe.src !== 'about:blank') {
+        const url = new URL(iframe.src, location.href);
+        url.searchParams.set('_v', Date.now());
+        iframe.src = url.toString();
+      }
+    });
+    return;
+  }
+});
+
+// Fermer avec Escape
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeConfigOverlay(null);
+});
 </script>
 </body>
 </html>

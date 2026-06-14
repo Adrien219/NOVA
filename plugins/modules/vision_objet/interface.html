@@ -224,7 +224,7 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
     <!-- VIDÉO -->
     <div class="video-zone" id="videoZone">
       <div class="no-signal" id="noSignal"><span>📡</span>En attente du flux...</div>
-      <img src="/video_feed" style="width: 100%; height: auto; border-radius: 8px;">
+      <img id="videoImg" src="/video_feed" style="width: 100%; height: auto; border-radius: 8px;">
       <div class="scan-line" id="scanLine"></div>
 
       <!-- Overlays -->
@@ -497,6 +497,7 @@ setInterval(() => {
 // Essayer de connecter le flux vidéo MJPEG direct
 setTimeout(() => {
   const img = document.getElementById('videoImg');
+  if (!img) { console.warn('[VisionObjet] videoImg introuvable'); return; }
   img.src = '/video_feed';
   img.style.display = '';
   document.getElementById('noSignal').style.display = 'none';

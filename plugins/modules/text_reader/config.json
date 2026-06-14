@@ -1,7 +1,42 @@
 {
-    "id": "text_reader",
-    "name": "Lecteur de Texte",
-    "description": "Reconnaissance optique de caractères (OCR)",
-    "icon": "font",
-    "template": "interface.html"
+  "id":          "text_reader",
+  "name":        "Lecteur de Texte",
+  "description": "OCR temps réel — Tesseract + EasyOCR fallback",
+  "icon":        "font",
+  "template":    "interface.html",
+
+  "actions": [
+    {
+      "id":           "scan_now",
+      "label":        "Lire",
+      "icon":         "📸",
+      "description":  "Forcer une lecture OCR immédiate",
+      "mqtt_topic":   "shos/plugins/text_reader/cmd",
+      "mqtt_payload": {"cmd": "snapshot"}
+    },
+    {
+      "id":           "read_aloud",
+      "label":        "Parler",
+      "icon":         "🔊",
+      "description":  "Lire le texte à voix haute",
+      "mqtt_topic":   "shos/plugins/text_reader/cmd",
+      "mqtt_payload": {"cmd": "read_aloud"}
+    },
+    {
+      "id":           "toggle_ocr",
+      "label":        "Toggle",
+      "icon":         "⏸",
+      "description":  "Activer / Désactiver l'OCR",
+      "mqtt_topic":   "shos/plugins/text_reader/cmd",
+      "mqtt_payload": {"cmd": "toggle"}
+    },
+    {
+      "id":           "clear",
+      "label":        "Effacer",
+      "icon":         "🧹",
+      "description":  "Effacer le texte affiché",
+      "mqtt_topic":   "shos/plugins/text_reader/cmd",
+      "mqtt_payload": {"cmd": "clear"}
+    }
+  ]
 }

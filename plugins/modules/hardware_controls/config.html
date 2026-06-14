@@ -592,44 +592,43 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ── 30 ACTIONS ──
+// ── 30 ACTIONS — IDs alignes avec actions.py ──
 const ACTIONS = [
-  // Audio
-  { id: 'vol_up',   label: '🔊 Volume +',              group: 'Audio' },
-  { id: 'vol_down', label: '🔉 Volume −',              group: 'Audio' },
-  { id: 'mute',     label: '🔇 Mute',                  group: 'Audio' },
-  { id: 'mic_on',   label: '🎤 Activer Micro',         group: 'Audio' },
-  { id: 'mic_off',  label: '🎤 Désactiver Micro',      group: 'Audio' },
-  // Vidéo
-  { id: 'photo',     label: '📸 Capturer Photo',       group: 'Vidéo' },
-  { id: 'rec_start', label: '⏺ Enreg. Démarrer',      group: 'Vidéo' },
-  { id: 'rec_stop',  label: '⏹ Enreg. Arrêter',       group: 'Vidéo' },
-  { id: 'bright_up', label: '☀️ Luminosité +',         group: 'Vidéo' },
-  { id: 'bright_dn', label: '🌑 Luminosité −',         group: 'Vidéo' },
-  // Détection
-  { id: 'det_obj',  label: '🎯 Toggle Objets',         group: 'Détection' },
-  { id: 'det_hand', label: '✋ Toggle Mains',           group: 'Détection' },
-  { id: 'det_pose', label: '🧍 Toggle Pose',           group: 'Détection' },
-  { id: 'thr_up',   label: '⬆️ Seuil Danger +',       group: 'Détection' },
-  { id: 'thr_dn',   label: '⬇️ Seuil Danger −',       group: 'Détection' },
-  // Modules
-  { id: 'mod_vis',  label: '👁 Module Vision',         group: 'Modules' },
-  { id: 'mod_voc',  label: '🗣 Module Vocal',          group: 'Modules' },
-  { id: 'mod_ges',  label: '✋ Module Gestes',         group: 'Modules' },
-  { id: 'mod_txt',  label: '📖 Lecteur Texte',         group: 'Modules' },
-  { id: 'mod_dan',  label: '🚨 Monitoring Danger',     group: 'Modules' },
-  // Système
-  { id: 'sys_reboot',label: '🔄 Redémarrer Pi',       group: 'Système' },
-  { id: 'sys_off',   label: '⛔ Arrêter Système',     group: 'Système' },
-  { id: 'sys_lock',  label: '🔒 Verrouiller',         group: 'Système' },
-  { id: 'scr_up',    label: '☀️ Écran Bright +',      group: 'Système' },
-  { id: 'scr_dn',    label: '🌑 Écran Bright −',      group: 'Système' },
-  // Fichiers
-  { id: 'run_script',label: '🐍 Exécuter Script',     group: 'Scripts' },
-  { id: 'open_doc',  label: '📄 Ouvrir Document',     group: 'Scripts' },
-  { id: 'launch_app',label: '🚀 Lancer App',          group: 'Scripts' },
-  { id: 'snap_last', label: '📸 Dernier Snapshot',    group: 'Scripts' },
-  { id: 'null',      label: '⊘ Aucune Action',        group: 'Scripts' },
+  // Modules (8)
+  { id: 'launch_voice',          label: 'Lancer Voice Assistant',   group: 'Modules' },
+  { id: 'launch_vision',         label: 'Lancer Vision Objet',      group: 'Modules' },
+  { id: 'launch_ocr',            label: 'Lancer Lecteur Texte',     group: 'Modules' },
+  { id: 'launch_streaming',      label: 'Lancer Streaming',         group: 'Modules' },
+  { id: 'launch_danger',         label: 'Lancer Danger Monitor',    group: 'Modules' },
+  { id: 'launch_hand',           label: 'Lancer Hand Control',      group: 'Modules' },
+  { id: 'launch_joystick',       label: 'Lancer Joystick',          group: 'Modules' },
+  { id: 'kill_module',           label: 'Arreter module actif',     group: 'Modules' },
+  // Systeme (7)
+  { id: 'reboot',                label: 'Redemarrer Pi',            group: 'Systeme' },
+  { id: 'shutdown',              label: 'Eteindre Pi',              group: 'Systeme' },
+  { id: 'screenshot',            label: 'Capture ecran',            group: 'Systeme' },
+  { id: 'snapshot_video',        label: 'Snapshot video',           group: 'Systeme' },
+  { id: 'restart_nova',          label: 'Redemarrer Nova',          group: 'Systeme' },
+  { id: 'sync_time',             label: 'Synchroniser horloge',     group: 'Systeme' },
+  { id: 'mute_system',           label: 'Couper le son',            group: 'Systeme' },
+  // Reglages (8)
+  { id: 'volume_up',             label: 'Volume +',                 group: 'Reglages' },
+  { id: 'volume_down',           label: 'Volume -',                 group: 'Reglages' },
+  { id: 'brightness_up',        label: 'Luminosite +',             group: 'Reglages' },
+  { id: 'brightness_down',      label: 'Luminosite -',             group: 'Reglages' },
+  { id: 'gas_threshold_up',     label: 'Seuil gaz +',              group: 'Reglages' },
+  { id: 'gas_threshold_down',   label: 'Seuil gaz -',              group: 'Reglages' },
+  { id: 'distance_threshold_up',label: 'Seuil distance +',         group: 'Reglages' },
+  { id: 'distance_threshold_down',label:'Seuil distance -',        group: 'Reglages' },
+  // Scripts (3)
+  { id: 'run_python_file',       label: 'Executer fichier .py',     group: 'Scripts' },
+  { id: 'run_shell_cmd',         label: 'Commande shell',           group: 'Scripts' },
+  { id: 'run_benchmark',         label: 'Lancer benchmark',         group: 'Scripts' },
+  // MQTT (4)
+  { id: 'mqtt_publish',          label: 'Publier MQTT',             group: 'MQTT' },
+  { id: 'mqtt_alert',            label: 'Alerte broadcast',         group: 'MQTT' },
+  { id: 'mqtt_info',             label: 'Info broadcast',           group: 'MQTT' },
+  { id: 'mqtt_ping',             label: 'Ping bus MQTT',            group: 'MQTT' },
 ];
 
 // ── STATE ──
@@ -787,19 +786,20 @@ function runScript() {
   res.className = 'script-result';
   res.textContent = '⏳ Exécution...';
   
-  fetch(`/api/hardware/execute-script`, {
+  // Appel route reelle /module/hardware_controls/api/execute avec action run_python_file
+  fetch('/module/hardware_controls/api/execute', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ script_name: name })
+    body: JSON.stringify({ action_id: 'run_python_file', params: { file: name } })
   })
   .then(r => r.json())
   .then(d => {
-    res.className = 'script-result ' + (d.status === 'ok' ? 'ok' : 'err');
-    res.textContent = d.output || d.error || d.message || JSON.stringify(d);
+    res.className = 'script-result ' + (d.ok ? 'ok' : 'err');
+    res.textContent = d.output || d.msg || JSON.stringify(d);
   })
-  .catch(() => {
-    res.className = 'script-result ok';
-    res.textContent = `✓ Script simulé: python3 ${name}`;
+  .catch(e => {
+    res.className = 'script-result err';
+    res.textContent = 'Erreur : ' + e.message;
   });
 }
 
@@ -807,7 +807,7 @@ function runScript() {
 function saveConfig() {
   localStorage.setItem('nova_hw_config', JSON.stringify(config));
   
-  fetch('/api/hardware/config', {
+  fetch('/module/hardware_controls/api/config', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(config)
@@ -816,13 +816,19 @@ function saveConfig() {
   showToast('💾 Configuration sauvegardée!');
 }
 
-// ── LOAD ──
+// ── LOAD — depuis serveur puis localStorage en fallback ──
 function loadConfig() {
-  const saved = localStorage.getItem('nova_hw_config');
-  if (!saved) return;
+  // Essayer le serveur d'abord
+  fetch('/module/hardware_controls/api/config')
+    .then(r => r.json())
+    .then(c => { if (c && typeof c === 'object') { Object.assign(config, c); applyLoadedConfig(); } })
+    .catch(() => {});
+}
+
+function applyLoadedConfig() {
   try {
-    const c = JSON.parse(saved);
-    Object.assign(config, c);
+    const c = config;
+    if (!c) return;
     // Restore labels
     config.buttons.forEach((a, i) => {
       const action = ACTIONS.find(x => x.id === a);
@@ -858,17 +864,19 @@ function showToast(msg) {
 
 // ── SYSTEM STATUS ──
 function updateSysStatus() {
-  fetch('/api/hardware/system-info')
+  fetch('/api/system_status')
     .then(r => r.json())
     .then(d => {
-      document.getElementById('cpu-val').textContent  = d.cpu_percent?.toFixed(1) + '%';
-      document.getElementById('ram-val').textContent  = d.memory_percent?.toFixed(1) + '%';
-      document.getElementById('temp-val').textContent = d.temperature?.toFixed(1) + '°C';
+      // /api/system_status retourne cpu, ram, temp selon nova.py
+      document.getElementById('cpu-val').textContent  = (d.cpu  ?? d.cpu_percent  ?? '?') + '%';
+      document.getElementById('ram-val').textContent  = (d.ram  ?? d.memory_percent ?? '?') + '%';
+      document.getElementById('temp-val').textContent = (d.temp ?? d.temperature  ?? '?') + 'C';
     })
     .catch(() => {
-      document.getElementById('cpu-val').textContent  = (30 + Math.random()*20).toFixed(1) + '%';
-      document.getElementById('ram-val').textContent  = (50 + Math.random()*20).toFixed(1) + '%';
-      document.getElementById('temp-val').textContent = (55 + Math.random()*10).toFixed(1) + '°C';
+      // Pas de donnees reelles disponibles
+      document.getElementById('cpu-val').textContent  = '--';
+      document.getElementById('ram-val').textContent  = '--';
+      document.getElementById('temp-val').textContent = '--';
     });
 }
 

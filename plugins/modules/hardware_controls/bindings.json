@@ -1,0 +1,34 @@
+{
+  "joy": {
+    "C": null,
+    "E": null,
+    "N": null,
+    "S": null,
+    "W": null,
+    "center": "mqtt_ping",
+    "down": "snapshot_video",
+    "right": "mute_system",
+    "up": "run_benchmark"
+  },
+  "buttons": [
+    "launch_voice",
+    "launch_vision",
+    "launch_ocr",
+    "launch_streaming",
+    "launch_streaming",
+    "launch_danger",
+    "launch_hand",
+    "launch_joystick",
+    "kill_module",
+    "launch_joystick",
+    "reboot",
+    "shutdown",
+    "volume_up",
+    "volume_down",
+    "brightness_up",
+    "mute_system"
+  ],
+  "pot": "volume_up",
+  "mic": "launch_voice",
+  "ir": "screenshot"
+}

@@ -5,130 +5,137 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>S.H.O.S · Lecteur Texte</title>
 <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-/* ═══════════════════════════════════════════════
-   MODULE : LECTEUR TEXTE (OCR) — S.H.O.S
-   Logique originale (plugin_data / text_reader) conservée
-═══════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   TEXT READER V3 — Adaptatif fluide
+   Container queries + clamp()
+══════════════════════════════════════════════════════════════ */
 :root {
-  --bg:    #0e1117;
-  --glass: rgba(255,255,255,0.055);
-  --border:rgba(255,255,255,0.09);
-  --y:     #e8d44d;
-  --y2:    rgba(232,212,77,0.12);
-  --blue:  #4da6ff;
-  --green: #34c759;
-  --red:   #ff453a;
-  --amber: #ffa340;
-  --t1:    rgba(255,255,255,0.93);
-  --t2:    rgba(255,255,255,0.52);
-  --t3:    rgba(255,255,255,0.28);
-  --font:  'DM Sans', system-ui, sans-serif;
-  --mono:  'DM Mono', monospace;
+  --bg:     #0e1117;
+  --glass:  rgba(255,255,255,0.045);
+  --border: rgba(255,255,255,0.09);
+  --y:      #e8d44d; --y2: rgba(232,212,77,0.12); --ybr: rgba(232,212,77,0.3);
+  --blue:   #4da6ff;
+  --green:  #34c759;
+  --red:    #ff453a;
+  --t1:     rgba(255,255,255,0.93);
+  --t2:     rgba(255,255,255,0.52);
+  --t3:     rgba(255,255,255,0.28);
+  --mono:   'DM Mono', monospace;
 }
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--bg);color:var(--t1)}
+html,body{height:100%;overflow:hidden;font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--t1)}
+.wrap{height:100vh;display:grid;grid-template-rows:auto 1fr auto;container-type:size;container-name:tr}
 
-/* ── LAYOUT ── */
-.wrap { height:100vh; display:flex; flex-direction:column; }
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:clamp(6px,1.5cqh,12px) clamp(8px,2cqw,16px);
+  background:rgba(14,17,23,.97);border-bottom:1px solid var(--border);
+  gap:8px;flex-shrink:0}
+.hdr-l{display:flex;align-items:center;gap:7px;min-width:0;flex:1}
+.m-ico{width:clamp(18px,4cqw,22px);height:clamp(18px,4cqw,22px);border-radius:6px;
+  background:var(--y2);border:1px solid var(--ybr);
+  display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.m-name{font-size:clamp(9px,1.8cqw,11px);font-weight:500;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pill{display:flex;align-items:center;gap:4px;padding:3px clamp(6px,1.5cqw,10px);
+  border-radius:10px;background:rgba(255,255,255,.06);border:1px solid var(--border);
+  font-family:var(--mono);font-size:clamp(7px,1.4cqw,10px);color:var(--t2);white-space:nowrap}
+.dot{width:5px;height:5px;border-radius:50%}
+.d-y {background:var(--y);box-shadow:0 0 6px var(--y);animation:blink 1.5s ease infinite}
+.d-ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+.d-w {background:rgba(255,255,255,.25)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
-/* ── HEADER ── */
-.hdr {
-  display:flex; align-items:center; justify-content:space-between;
-  padding:clamp(7px,1.8vh,12px) clamp(10px,2vw,16px);
-  background:rgba(14,17,23,.97); border-bottom:1px solid var(--border);
-  flex-shrink:0; gap:8px;
-}
-.hdr-l { display:flex; align-items:center; gap:7px; min-width:0; }
-.m-ico { width:20px; height:20px; border-radius:6px; background:var(--y2); border:1px solid rgba(232,212,77,.28); display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
-.m-name { font-size:clamp(9px,1.6vw,11px); font-weight:500; letter-spacing:.08em; text-transform:uppercase; color:var(--t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.spill {
-  display:flex; align-items:center; gap:4px; padding:3px 9px; border-radius:10px;
-  background:rgba(255,255,255,.06); border:1px solid var(--border);
-  font-family:var(--mono); font-size:clamp(8px,1.4vw,10px); color:var(--t2); flex-shrink:0; transition:all .3s;
-}
-.dot { width:5px; height:5px; border-radius:50%; }
-.d-y  { background:var(--y); box-shadow:0 0 6px var(--y); animation:scan-dot 1.5s ease-in-out infinite; }
-.d-ok { background:var(--green); box-shadow:0 0 6px var(--green); }
-.d-w  { background:rgba(255,255,255,.3); }
-@keyframes scan-dot{0%,100%{opacity:1}50%{opacity:.3}}
+.hdr-r{display:flex;gap:4px;flex-shrink:0}
+.hbtn{padding:3px 9px;border-radius:6px;border:1px solid var(--border);
+  background:rgba(255,255,255,.05);color:var(--t2);
+  font-family:var(--mono);font-size:clamp(7px,1.3cqw,9px);
+  cursor:pointer;transition:all .15s;letter-spacing:.04em;text-transform:uppercase}
+.hbtn:hover{border-color:rgba(255,255,255,.18);color:var(--t1)}
+.hbtn.active{border-color:var(--ybr);color:var(--y);background:var(--y2)}
 
-/* ── VIEWFINDER (zone vidéo) ── */
-.viewport {
-  position:relative; flex:1;
-  background:#000; display:flex; align-items:center; justify-content:center;
-  overflow:hidden; min-height:0;
-}
-.viewport img { width:100%; height:100%; object-fit:cover; display:block; opacity:.8; }
+/* VIEWFINDER */
+.viewport{position:relative;background:#000;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;min-height:0}
+.viewport img{width:100%;height:100%;object-fit:cover;display:block;opacity:.85}
+.no-video{display:none;position:absolute;inset:0;flex-direction:column;
+  align-items:center;justify-content:center;gap:6px;color:var(--t3)}
+.no-video-ico{font-size:clamp(24px,6cqmin,40px)}
+.no-video-txt{font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase}
 
-/* Zone de visée OCR */
-.aim-box {
-  position:absolute; z-index:3; pointer-events:none;
-  width:clamp(60%,72%,80%); height:clamp(25%,32%,40%);
-  border:1.5px solid var(--y); box-shadow:0 0 16px rgba(232,212,77,.2);
-  top:50%; left:50%; transform:translate(-50%,-60%);
-}
-/* Coins du viseur */
-.aim-box::before, .aim-box::after {
-  content:''; position:absolute; width:10px; height:10px; border-color:var(--y); border-style:solid;
-}
-.aim-box::before { top:-1px; left:-1px; border-width:2px 0 0 2px; }
-.aim-box::after  { bottom:-1px; right:-1px; border-width:0 2px 2px 0; }
+/* Zone visée OCR */
+.aim-box{position:absolute;z-index:3;pointer-events:none;
+  width:clamp(60%,72%,80%);height:clamp(25%,32%,40%);
+  border:1.5px solid var(--y);
+  box-shadow:0 0 16px rgba(232,212,77,.2);
+  top:50%;left:50%;transform:translate(-50%,-60%)}
+.aim-box::before,.aim-box::after{content:'';position:absolute;
+  width:10px;height:10px;border-color:var(--y);border-style:solid}
+.aim-box::before{top:-1px;left:-1px;border-width:2px 0 0 2px}
+.aim-box::after{bottom:-1px;right:-1px;border-width:0 2px 2px 0}
+.aim-label{position:absolute;top:-18px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:8px;letter-spacing:.12em;
+  color:var(--y);text-transform:uppercase;white-space:nowrap}
 
-/* Label zone OCR */
-.aim-label {
-  position:absolute; top:-18px; left:50%; transform:translateX(-50%);
-  font-family:var(--mono); font-size:8px; letter-spacing:.12em;
-  color:var(--y); text-transform:uppercase; white-space:nowrap;
-}
-
-/* Ligne de scan animée */
-.scan-beam {
-  position:absolute; left:0; right:0; height:1.5px; z-index:4; pointer-events:none;
-  background:linear-gradient(90deg, transparent, var(--y), transparent);
+/* Scan beam */
+.scan-beam{position:absolute;left:0;right:0;height:1.5px;z-index:4;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--y),transparent);
   box-shadow:0 0 10px rgba(232,212,77,.5);
-  animation:beamMove 2.2s linear infinite;
-}
-@keyframes beamMove { 0%{top:35%;opacity:0} 5%{opacity:1} 90%{opacity:1} 100%{top:65%;opacity:0} }
+  animation:beam 2.2s linear infinite}
+@keyframes beam{0%{top:35%;opacity:0}5%{opacity:1}90%{opacity:1}100%{top:65%;opacity:0}}
+.scan-beam.pause{animation-play-state:paused;opacity:.2}
 
-/* ── PANNEAU RÉSULTAT ── */
-.result-panel {
-  flex-shrink:0; height:clamp(80px,28%,130px);
-  background:rgba(14,17,23,.96); border-top:1px solid var(--border);
-  display:flex; flex-direction:column; overflow:hidden;
-}
-.result-head {
-  display:flex; align-items:center; gap:8px;
-  padding:5px 12px; border-bottom:1px solid var(--border); flex-shrink:0;
-}
-.result-label {
-  font-family:var(--mono); font-size:9px; letter-spacing:.10em;
-  text-transform:uppercase; color:var(--t3);
-}
-.result-status {
-  font-family:var(--mono); font-size:9px; color:var(--t2);
-  margin-left:auto; letter-spacing:.06em; transition:color .3s;
-}
-.result-status.detected { color:var(--green); }
-.result-status.scanning { color:var(--y); }
+/* Badge overlay backend */
+.backend-tag{position:absolute;bottom:8px;right:8px;z-index:5;
+  padding:2px 8px;border-radius:5px;
+  background:rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.12);
+  font-family:var(--mono);font-size:9px;color:var(--t2)}
 
-.result-body { flex:1; overflow-y:auto; padding:8px 12px; }
-.result-body::-webkit-scrollbar { width:3px; }
-.result-body::-webkit-scrollbar-thumb { background:rgba(255,255,255,.08); }
+/* RÉSULTAT */
+.result-panel{flex-shrink:0;background:rgba(14,17,23,.97);
+  border-top:1px solid var(--border);display:flex;flex-direction:column;
+  max-height:clamp(100px,35cqh,180px)}
+.result-head{display:flex;align-items:center;gap:8px;
+  padding:clamp(4px,1cqh,6px) clamp(8px,2cqw,12px);
+  border-bottom:1px solid var(--border);flex-shrink:0}
+.result-label{font-family:var(--mono);font-size:clamp(7px,1.3cqw,9px);
+  letter-spacing:.10em;text-transform:uppercase;color:var(--t3);flex:1}
+.result-status{font-family:var(--mono);font-size:clamp(7px,1.3cqw,9px);
+  color:var(--t2);letter-spacing:.06em;transition:color .3s;white-space:nowrap}
+.result-status.detected{color:var(--green)}
+.result-status.scanning{color:var(--y)}
 
-#no-text {
-  font-size:clamp(9px,1.6vw,11px); color:var(--t3); font-family:var(--mono);
-  font-style:italic; padding-top:4px;
-}
-#output {
-  display:none;
-  font-size:clamp(11px,2vw,14px); line-height:1.6; color:var(--t1);
-  white-space:pre-wrap; font-family:var(--mono);
-  border-left:2px solid var(--y); padding-left:8px;
-  animation:fadeText .3s ease;
-}
-@keyframes fadeText { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+/* Boutons action résultat */
+.result-actions{display:flex;gap:4px}
+.ract{padding:2px 7px;border-radius:5px;border:1px solid var(--border);
+  background:none;color:var(--t3);font-family:var(--mono);
+  font-size:clamp(7px,1.2cqw,9px);cursor:pointer;transition:all .15s}
+.ract:hover{color:var(--t1);border-color:var(--ybr)}
+.ract.flash{color:var(--y);border-color:var(--ybr);background:var(--y2)}
+
+.result-body{flex:1;overflow-y:auto;padding:clamp(6px,1.5cqh,10px) clamp(8px,2cqw,12px)}
+.result-body::-webkit-scrollbar{width:3px}
+.result-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08)}
+#no-text{font-size:clamp(9px,1.6cqw,11px);color:var(--t3);font-family:var(--mono);
+  font-style:italic;padding-top:2px}
+#output{display:none;font-size:clamp(11px,2cqw,14px);line-height:1.6;color:var(--t1);
+  white-space:pre-wrap;font-family:var(--mono);
+  border-left:2px solid var(--y);padding-left:8px;animation:fadeT .3s ease}
+@keyframes fadeT{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* FOOTER stats */
+.ftr{display:flex;align-items:center;justify-content:space-between;
+  padding:clamp(4px,1cqh,7px) clamp(8px,2cqw,12px);
+  background:rgba(255,255,255,.02);border-top:1px solid var(--border);flex-shrink:0}
+.ftr-info{font-family:var(--mono);font-size:clamp(7px,1.3cqw,9px);
+  color:var(--t3);display:flex;gap:8px}
+.ftr-info span b{color:var(--t2);font-weight:400}
+
+/* Compact */
+@container tr (max-height:200px){.result-panel,.ftr{display:none}}
+@container tr (max-width:280px){.hdr-r{display:none}.aim-label{display:none}}
 </style>
 </head>
 <body>
@@ -140,20 +147,29 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
       <div class="m-ico">📖</div>
       <span class="m-name">{{ config.name if config else 'Lecteur Texte' }}</span>
     </div>
-    <div class="spill" id="status-pill">
-      <div class="dot d-y" id="status-dot"></div>
+    <div class="pill">
+      <div class="dot d-y" id="dot"></div>
       <span id="status">SCAN EN COURS</span>
+    </div>
+    <div class="hdr-r">
+      <button class="hbtn active" id="btn-toggle" onclick="toggleOCR()">⏸</button>
+      <button class="hbtn" onclick="doSnapshot()" title="Forcer une lecture">📸</button>
     </div>
   </header>
 
   <!-- VIEWFINDER -->
   <div class="viewport">
-    <div class="scan-beam"></div>
-    <img src="/video_feed" id="video_stream" alt="OCR Stream"
-         onerror="this.style.display='none'">
+    <div class="scan-beam" id="scan-beam"></div>
+    <img src="/video_feed" id="video" alt="OCR Stream"
+         onerror="onVideoErr()">
+    <div class="no-video" id="no-video">
+      <div class="no-video-ico">📖</div>
+      <div class="no-video-txt">Flux indisponible</div>
+    </div>
     <div class="aim-box">
       <div class="aim-label">Zone d'extraction OCR</div>
     </div>
+    <div class="backend-tag" id="backend-tag">OCR</div>
   </div>
 
   <!-- RÉSULTAT -->
@@ -161,6 +177,11 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
     <div class="result-head">
       <span class="result-label">Texte extrait</span>
       <span class="result-status" id="result-status">En attente...</span>
+      <div class="result-actions">
+        <button class="ract" id="btn-copy" onclick="copyText()" title="Copier">📋</button>
+        <button class="ract" onclick="readAloud()" title="Lire à voix haute">🔊</button>
+        <button class="ract" onclick="clearText()" title="Effacer">🧹</button>
+      </div>
     </div>
     <div class="result-body">
       <div id="no-text">Positionnez le texte dans la zone de visée...</div>
@@ -168,58 +189,181 @@ html,body{height:100%;overflow:hidden;font-family:var(--font);background:var(--b
     </div>
   </div>
 
+  <!-- FOOTER -->
+  <footer class="ftr">
+    <div class="ftr-info">
+      <span>Lectures <b id="stat-count">0</b></span>
+      <span>Dernière <b id="stat-chars">—</b> car.</span>
+    </div>
+  </footer>
+
 </div>
 
 <script>
-const socket     = io();
-const output     = document.getElementById('output');
-const noText     = document.getElementById('no-text');
-const statusEl   = document.getElementById('status');
-const statusDot  = document.getElementById('status-dot');
-const resultStat = document.getElementById('result-status');
+const socket = io({transports:['websocket','polling']});
 
-let clearTimer;
+let isActive   = true;
+let clearTimer = null;
+let currentText = '';
 
-/* ── Logique originale conservée ── */
-socket.on('plugin_data', function(data) {
-  if (data.plugin === "text_reader") {
-    if (data.text && data.text.trim().length > 2) {
-      // Affichage texte
-      noText.style.display = 'none';
-      output.style.display = 'block';
-      output.textContent   = data.text;
+/* ─── COMMANDES MQTT ─── */
+function sendCmd(cmd, params) {
+  socket.emit('mqtt_publish', {
+    topic:   'shos/plugins/text_reader/cmd',
+    payload: JSON.stringify({cmd, ...(params||{})}),
+  });
+}
 
-      // Feedback visuel
-      statusEl.textContent   = 'TEXTE DÉTECTÉ';
-      statusDot.className    = 'dot d-ok';
-      resultStat.textContent = 'DÉTECTÉ ✓';
-      resultStat.className   = 'result-status detected';
+function toggleOCR() {
+  isActive = !isActive;
+  const btn  = document.getElementById('btn-toggle');
+  const beam = document.getElementById('scan-beam');
+  btn.textContent = isActive ? '⏸' : '▶';
+  btn.className   = 'hbtn' + (isActive ? ' active' : '');
+  beam.className  = 'scan-beam' + (isActive ? '' : ' pause');
+  setStatus(isActive ? 'SCAN EN COURS' : 'EN PAUSE', isActive ? 'd-y' : 'd-w');
+  sendCmd('toggle');
+}
 
-      // Timer de nettoyage (logique originale)
+function doSnapshot() {
+  sendCmd('snapshot');
+  // Feedback visuel
+  const btn = document.querySelector('.hbtn:nth-child(2)');
+  if (btn) { btn.classList.add('active'); setTimeout(() => btn.classList.remove('active'), 600); }
+}
+
+function copyText() {
+  if (!currentText) return;
+  navigator.clipboard.writeText(currentText).then(() => {
+    const btn = document.getElementById('btn-copy');
+    btn.classList.add('flash');
+    setTimeout(() => btn.classList.remove('flash'), 800);
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = currentText;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+function readAloud() {
+  sendCmd('read_aloud');
+}
+
+function clearText() {
+  currentText = '';
+  sendCmd('clear');
+  document.getElementById('output').style.display = 'none';
+  document.getElementById('no-text').style.display = 'block';
+  setStatus('SCAN EN COURS', 'd-y');
+  document.getElementById('result-status').textContent = 'En attente...';
+  document.getElementById('result-status').className   = 'result-status';
+  document.getElementById('stat-chars').textContent = '—';
+}
+
+/* ─── STATUT ─── */
+function setStatus(text, dotCls) {
+  document.getElementById('status').textContent = text;
+  document.getElementById('dot').className = 'dot ' + dotCls;
+}
+
+/* ─── VIDÉO FALLBACK ─── */
+function onVideoErr() {
+  const vid = document.getElementById('video');
+  vid.style.display = 'none';
+  document.getElementById('no-video').style.display = 'flex';
+  setTimeout(() => {
+    vid.src = '/video_feed?t=' + Date.now();
+    vid.style.display = 'block';
+    document.getElementById('no-video').style.display = 'none';
+  }, 5000);
+}
+
+/* ─── RÉCEPTION DONNÉES ─── */
+socket.on('plugin_data', (data) => {
+  if (!data) return;
+  if (data.plugin !== 'text_reader' && data.module !== 'text_reader') return;
+
+  const type = data.type;
+
+  // Mettre à jour le badge backend
+  if (data.backend) {
+    document.getElementById('backend-tag').textContent =
+      data.backend.toUpperCase().replace('TESSERACT_CLI', 'TESS·CLI');
+  }
+
+  if (type === 'text') {
+    const text = data.text || '';
+    if (text.trim().length > 2) {
+      currentText = text;
+      document.getElementById('no-text').style.display   = 'none';
+      document.getElementById('output').style.display    = 'block';
+      document.getElementById('output').textContent      = text;
+      document.getElementById('stat-chars').textContent  = data.chars || text.length;
+      document.getElementById('stat-count').textContent  = data.count || '?';
+
+      setStatus('TEXTE DÉTECTÉ', 'd-ok');
+      document.getElementById('result-status').textContent = 'DÉTECTÉ ✓';
+      document.getElementById('result-status').className   = 'result-status detected';
+
       clearTimeout(clearTimer);
       clearTimer = setTimeout(() => {
-        output.style.display = 'none';
-        noText.style.display = 'block';
-        statusEl.textContent   = 'SCAN EN COURS';
-        statusDot.className    = 'dot d-y';
-        resultStat.textContent = 'En attente...';
-        resultStat.className   = 'result-status';
-      }, 3000);
-
-    } else {
-      statusEl.textContent   = 'ANALYSE EN COURS';
-      statusDot.className    = 'dot d-w';
-      resultStat.textContent = 'Traitement...';
-      resultStat.className   = 'result-status scanning';
+        setStatus(isActive ? 'SCAN EN COURS' : 'EN PAUSE', isActive ? 'd-y' : 'd-w');
+        document.getElementById('result-status').textContent = 'En attente...';
+        document.getElementById('result-status').className   = 'result-status';
+      }, 4000);
     }
+  }
+
+  else if (type === 'empty') {
+    if (!currentText) {
+      setStatus(isActive ? 'SCAN EN COURS' : 'EN PAUSE', isActive ? 'd-y' : 'd-w');
+    }
+    document.getElementById('result-status').textContent = 'Analyse...';
+    document.getElementById('result-status').className   = 'result-status scanning';
+  }
+
+  else if (type === 'status') {
+    isActive = !!data.active;
+    const btn  = document.getElementById('btn-toggle');
+    const beam = document.getElementById('scan-beam');
+    btn.textContent = isActive ? '⏸' : '▶';
+    btn.className   = 'hbtn' + (isActive ? ' active' : '');
+    beam.className  = 'scan-beam' + (isActive ? '' : ' pause');
+    if (data.status === 'ready') {
+      setStatus('SCAN EN COURS', 'd-y');
+    } else if (data.status === 'paused') {
+      setStatus('EN PAUSE', 'd-w');
+    } else if (data.status === 'offline') {
+      setStatus('HORS LIGNE', 'd-w');
+    } else if (data.status === 'error') {
+      setStatus('ERREUR OCR', 'd-w');
+      document.getElementById('no-text').textContent = data.msg || 'Erreur OCR';
+    }
+  }
+
+  else if (type === 'cleared') {
+    currentText = '';
+    document.getElementById('output').style.display  = 'none';
+    document.getElementById('no-text').style.display = 'block';
+    document.getElementById('no-text').textContent   = 'Positionnez le texte dans la zone de visée...';
+    document.getElementById('stat-chars').textContent = '—';
+    document.getElementById('stat-count').textContent = '0';
   }
 });
 
-socket.on('disconnect', () => {
-  statusEl.textContent = 'DÉCONNECTÉ';
-  statusDot.className  = 'dot';
-  statusDot.style.background = '#ff453a';
+/* Compat ancienne version */
+socket.on('plugin_data', (data) => {
+  if (data && data.plugin === 'text_reader' && data.text && !data.type) {
+    socket.emit('plugin_data', {...data, type: 'text'});
+  }
 });
+
+socket.on('connect',    () => setStatus('SCAN EN COURS', 'd-y'));
+socket.on('disconnect', () => setStatus('DÉCONNECTÉ', 'd-w'));
 </script>
 </body>
 </html>

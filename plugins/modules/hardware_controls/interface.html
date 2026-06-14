@@ -461,11 +461,22 @@ html, body {
 const socket = io({ transports:['websocket','polling'] });
 
 let CONFIG = {
-  joy:     { N:null, S:null, E:null, W:null, C:null },
-  buttons: Array(16).fill(null),
-  pot:     'volume_up',
-  mic:     'launch_voice',
-  ir:      'screenshot'
+  joy: {
+    N: 'volume_up',
+    S: 'volume_down',
+    E: 'launch_vision',
+    W: 'launch_voice',
+    C: 'screenshot',
+  },
+  buttons: [
+    'launch_voice','launch_vision','launch_ocr','launch_danger',
+    'launch_hand','volume_up','volume_down','brightness_up',
+    'brightness_down','mute_system','screenshot','snapshot_video',
+    'mqtt_ping','restart_nova','mqtt_alert','kill_module',
+  ],
+  pot: 'volume_up',
+  mic: 'launch_voice',
+  ir:  'snapshot_video',
 };
 
 let HISTORY = [];
@@ -502,13 +513,49 @@ async function loadConfig() {
     if (r.ok) {
       const d = await r.json();
       if (d && typeof d === 'object') {
-        CONFIG = { ...CONFIG, ...d };
+        // Merger : conserver les valeurs par défaut pour les clés null/undefined
+        if (d.joy) {
+          Object.keys(d.joy).forEach(k => {
+            if (d.joy[k] && d.joy[k] !== 'null') CONFIG.joy[k] = d.joy[k];
+          });
+        }
+        if (Array.isArray(d.buttons)) {
+          d.buttons.forEach((v, i) => {
+            if (v && v !== 'null') CONFIG.buttons[i] = v;
+          });
+        }
+        if (d.pot && d.pot !== 'null') CONFIG.pot = d.pot;
+        if (d.mic && d.mic !== 'null') CONFIG.mic = d.mic;
+        if (d.ir  && d.ir  !== 'null') CONFIG.ir  = d.ir;
+        console.info('[HW] Config chargee depuis serveur');
       }
     }
   } catch(e) {
-    console.warn('[HW] Config non trouvée, valeurs par défaut');
+    console.warn('[HW] Config serveur non disponible — valeurs par defaut');
   }
   renderAll();
+  testConnectivity();
+}
+
+// Test de connectivite au demarrage
+async function testConnectivity() {
+  try {
+    const r = await fetch('/module/hardware_controls/api/execute', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action_id: 'mqtt_ping', source: 'init_test', device: 'interface' })
+    });
+    const d = await r.json();
+    if (d.ok) {
+      console.info('[HW] Connectivite OK - mqtt_ping:', d.msg);
+      showToast('Hardware Controls pret', 'success');
+    } else {
+      console.warn('[HW] API repond mais action echouee:', d.msg);
+    }
+  } catch(e) {
+    console.warn('[HW] /api/execute inaccessible:', e.message);
+    showToast('API non disponible - verifier nova.py', 'error');
+  }
 }
 
 
@@ -519,8 +566,6 @@ async function loadConfig() {
 
 
 function openConfigInParent() {
-  // Envoie un postMessage au user_interface (window.parent)
-  // qui va ouvrir le modal overlay
   try {
     if (window.parent && window.parent !== window) {
       window.parent.postMessage({
@@ -529,15 +574,16 @@ function openConfigInParent() {
         title: 'Configuration des commandes'
       }, '*');
     } else {
-      // Fallback : si pas dans une iframe, ouvrir dans la même page
       window.location.href = '/module/hardware_controls/config';
     }
   } catch (e) {
-    // Fallback ultime
     window.open('/module/hardware_controls/config', '_blank');
   }
 }
-</script>
+
+/* ═══════════════════════════════════════════════════════════════
+   [SUITE DU SCRIPT — fusion des 2 blocs pour eviter ReferenceError]
+═══════════════════════════════════════════════════════════════ */
 
 
 
@@ -816,7 +862,8 @@ async function setVisionBackend(backend) {
   if (btn) btn.classList.add('loading');
 
   try {
-    const r = await fetch('http://' + location.hostname + ':5051/api/backend', {
+    // Proxy nova.py — evite CORS (plus d'appel direct :5051)
+    const r = await fetch('/api/backend', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ backend: backend })
@@ -828,21 +875,20 @@ async function setVisionBackend(backend) {
     if (!d.ok) {
       if (btn) btn.classList.add('active');
       showToast(d.msg || 'Backend non disponible', 'error');
-      addHistory({ source:'virt', device:'Vision', action:`✗ ${backend}`, ts:Date.now() });
+      addHistory({ source:'virt', device:'Vision', action:'x ' + backend, ts:Date.now() });
       return;
     }
 
     if (btn) btn.classList.add('active');
-    showToast(`✓ ${backend.toUpperCase()}`, 'success');
-    addHistory({ source:'virt', device:'Vision', action:`→ ${backend}`, ts:Date.now() });
+    showToast('OK ' + backend.toUpperCase(), 'success');
+    addHistory({ source:'virt', device:'Vision', action:'-> ' + backend, ts:Date.now() });
 
-    // Notifier user_interface parent pour recharger les iframes modules
+    // Notifier parent + socket
     try {
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type:'vision_backend_changed', backend:backend }, '*');
       }
     } catch(e) {}
-
     socket.emit('vision_backend_changed', { backend: backend });
 
   } catch(e) {
@@ -851,10 +897,10 @@ async function setVisionBackend(backend) {
   }
 }
 
-// Init état du backend au chargement
+// Init etat backend au chargement via proxy
 async function initVisionState() {
   try {
-    const r = await fetch('http://' + location.hostname + ':5051/api/backend');
+    const r = await fetch('/api/backend');
     const d = await r.json();
     if (d.active) {
       document.querySelectorAll('.ai-btn').forEach(b => b.classList.remove('active'));
@@ -875,10 +921,7 @@ function addHistory(entry) {
   if (HISTORY.length > HISTORY_MAX) HISTORY.length = HISTORY_MAX;
   renderHistory();
 
-  // Persistance localStorage
-  try {
-    localStorage.setItem('shos_hw_history', JSON.stringify(HISTORY.slice(0, 20)));
-  } catch(e) {}
+  // Pas de localStorage (non supporté dans iframes) — persistance via serveur uniquement
 }
 
 function renderHistory() {
@@ -905,14 +948,10 @@ function renderHistory() {
 function clearHistory() {
   HISTORY = [];
   renderHistory();
-  try { localStorage.removeItem('shos_hw_history'); } catch(e) {}
+  // Historique efface en memoire
 }
 
-// Restaurer historique au chargement
-try {
-  const saved = localStorage.getItem('shos_hw_history');
-  if (saved) HISTORY = JSON.parse(saved) || [];
-} catch(e) {}
+// Historique en memoire seulement (pas de localStorage dans iframe)
 
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1011,12 +1050,12 @@ socket.on('vision_backend_changed', d => {
    TOAST
 ═══════════════════════════════════════════════════════════════ */
 
-function showToast(msg, kind) {
+function showToast(msg, kind, duration) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.className = 'toast show' + (kind ? ' ' + kind : '');
   clearTimeout(window._toastTimer);
-  window._toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), duration || 2500);
 }
 
 

@@ -1,9 +1,20 @@
 {
+  "id":           "hardware_controls",
   "name":         "Hardware Controls",
   "template":     "interface.html",
-  "description":  "Commandes physiques : joystick, keypad 4x4, potentiometre, micro, infrarouge",
+  "entry_point":  "plugins.modules.hardware_controls.main",
+  "description":  "Commandes physiques configurables : joystick, keypad 4x4, potentiometre, micro, IR",
   "icon":         "🎛",
   "version":      "1.0.0",
   "global":       true,
-  "category":     "system"
+  "category":     "system",
+  "actions": [
+    {
+      "id":           "execute_action",
+      "label":        "Exécuter une action",
+      "description":  "Lance une action du catalogue via hardware_controls",
+      "mqtt_topic":   "shos/plugins/hardware_controls/cmd",
+      "mqtt_payload": {"cmd": "execute", "action_id": ""}
+    }
+  ]
 }
