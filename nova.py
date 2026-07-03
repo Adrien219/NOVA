@@ -1,7 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-S.H.O.S V3.0 - Application Flask pour Raspberry Pi 4B
-"""
 
 import subprocess
 import signal
@@ -146,7 +143,7 @@ _mount_streaming_blueprint()
 
 
 # ============================================================================
-# MEDIAPIPE - DÉTECTION D'OBJETS (REMPLACE YOLO)
+# MEDIAPIPE - DÉTECTION D'OBJETS 
 # ============================================================================
 #class MediaPipeObjectDetector:
  #   """
