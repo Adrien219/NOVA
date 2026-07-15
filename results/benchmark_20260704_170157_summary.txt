@@ -1,0 +1,39 @@
+======================================================================
+SHOS — RAPPORT DE BENCHMARK
+Date       : 2026-07-04 17:03:01
+Plateforme : Non-Raspberry Pi
+OS         : Windows-11-10.0.26200-SP0
+Python     : 3.12.10
+Durée test : 60 secondes
+======================================================================
+
+── 1. PERFORMANCES VIDÉO / DÉTECTION ──────────────────────────────
+  FPS observé (pipeline)  : 4.15 fps
+  Frames reçues           : 249
+  Topic MQTT observé      : shos/camera/vision
+  Intervalle inter-frame  : 241.75 ms (moy)
+  Jitter inter-frame      : 35.37 ms (écart-type)
+  Latence E2E             : [ajouter 'timestamp':time.time() dans vision_service.py]
+
+── 2. RESSOURCES SYSTÈME ──────────────────────────────────────────
+  CPU moyen               : 39.68 %
+  CPU max (pic)           : 80.8 %
+  CPU min                 : 0.0 %
+  RAM utilisée (moy)      : 83.2 %
+  RAM utilisée (max)      : 94.5 %
+  Température             : [Non disponible sur cette plateforme]
+
+── 3. LATENCE MQTT ────────────────────────────────────────────────
+  Messages envoyés        : 100
+  Messages reçus          : 100
+  Perte paquets           : 0.0 %
+  Latence moyenne         : 0.0 ms
+  Latence médiane         : 0.0 ms
+  Latence min             : 0.0 ms
+  Latence max             : 0.0 ms
+  Latence P95             : 0.0 ms
+  Latence P99             : 0.0 ms
+
+======================================================================
+FIN DU RAPPORT — Fichiers CSV détaillés dans le dossier results/
+======================================================================

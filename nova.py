@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import subprocess
 import signal
 import sys, os, time, json, logging, psutil
@@ -27,9 +26,9 @@ config_manager = ConfigManager()
 global_frame = None
 frame_lock = Lock()
 
-# ============================================================================
+
 # CONFIGURATION LOGGING
-# ============================================================================
+
 logging.getLogger('socketio').setLevel(logging.ERROR)
 logging.getLogger('engineio').setLevel(logging.ERROR)
 
@@ -40,9 +39,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger("SHOS_V3.0")
 
-# ============================================================================
+
 # INITIALISATION FLASK, PATHS & CONFIGURATION
-# ============================================================================
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 template_dir = PROJECT_ROOT / "templates"
@@ -74,9 +73,9 @@ if not (PLUGINS_BASE_DIR / "hand_control" / "interface.html").exists():
 else:
     print(f"✅ Structure des modules validée.")
 
-# ============================================================================
+
 # MODULES DYNAMIQUES
-# ============================================================================
+
 
 AVAILABLE_MODULES = {}
 
@@ -108,7 +107,7 @@ def load_dynamic_modules():
 
 load_dynamic_modules()
 
-# ── VIDEO STREAMING BLUEPRINT ────────────────────────────────────────────────
+# ── VIDEO STREAMING BLUEPRINT 
 _streaming_mqtt    = None
 _streaming_metrics = None
 _streaming_ok      = False
@@ -141,287 +140,8 @@ def _mount_streaming_blueprint():
 _mount_streaming_blueprint()
 
 
-
-# ============================================================================
-# MEDIAPIPE - DÉTECTION D'OBJETS 
-# ============================================================================
-#class MediaPipeObjectDetector:
- #   """
- #   Détection d'objets ultra-légère pour Raspberry Pi.
-  #  Utilise EfficientDet-Lite0 (.tflite) au lieu de YOLO.
-  #  """
-
-  #  def __init__(self, model_path="models/efficientdet_lite0.tflite", confidence=0.5):
-  #      self.confidence = confidence
-  #      self.available = True
-
-   #     try:
-    #        import mediapipe as mp
-    #        from mediapipe.tasks import python
-    #        from mediapipe.tasks.python import vision
-
-    #        if os.path.exists(model_path):
-    #            logger.info(f"✅ Chargement MediaPipe Object Detector: {model_path}")
-     #           base_options = python.BaseOptions(model_asset_path=model_path)
-
-                # On utilise le mode IMAGE pour une intégration facile comme remplacement de YOLO
-     #           options = vision.ObjectDetectorOptions(
-      #              base_options=base_options,
-      #              score_threshold=self.confidence,
-     #               running_mode=vision.RunningMode.IMAGE
-      #            )
-      #          self.detector = vision.ObjectDetector.create_from_options(options)
-   #         else:
-    #            logger.warning(f"⚠️ Modèle non trouvé: {model_path}")
-   #             self.available = False
-
-   #     except ImportError:
-   #         logger.warning("⚠️ MediaPipe Tasks pas installé. Détection désactivée.")
-   #         self.available = False
-
-  #  def detect(self, frame):
-   #     """
-   #     Détecte les objets avec la même structure de retour que l'ancien YOLO.
-  #      """
-   #     if not self.available or frame is None:
-         #     return frame, {"objects": [], "count": 0, "inference_time_ms": 0}
-
-   #     import mediapipe as mp
-  #      import time
-   #     import cv2
-
-    #    start_time = time.time()
-
-    #    try:
-            # MediaPipe attend une image au format RGB
-     #       rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-      #      mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
-
-            # Inférence
-     #       detection_result = self.detector.detect(mp_image)
-     #       inference_time = (time.time() - start_time) * 1000
-
-      #      detections = []
-     #       annotated_frame = frame.copy()
-
-      #      for detection in detection_result.detections:
-                # Extraction de la boîte
-     #           bbox = detection.bounding_box
-      #          x1 = int(bbox.origin_x)
-     #           y1 = int(bbox.origin_y)
-     #           x2 = x1 + int(bbox.width)
-     #          y2 = y1 + int(bbox.height)
-
-                # Extraction de la catégorie
-     #           category = detection.categories[0]
-      #          class_name = category.category_name
-      #          conf = float(category.score)
-
-       #         detections.append({
-       #             "class": class_name,
-       #             "confidence": round(conf, 3),
-       #             "box": [x1, y1, x2, y2]
-       #         })
-
-                # Dessin sur l'image
-       #         cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-        #        label = f"{class_name} {conf:.2f}"
-        #        cv2.putText(annotated_frame, label, (x1, max(y1-10, 10)),
-       #                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-      #      return annotated_frame, {
-       #         "objects": detections,
-       #         "count": len(detections),
-       #         "inference_time_ms": round(inference_time, 2)
-       #    }
-
-        #except Exception as e:
-       #     logger.error(f"❌ Erreur MediaPipe Detect: {e}")
-       #     return frame, {"objects": [], "count": 0, "inference_time_ms": 0, "error": str(e)}
-
-
-# ============================================================================
-# YOLOV8N - DÉTECTION D'OBJETS
-# ============================================================================
-#class YOLOv8nDetector:
-   # """
-   # Détection d'objets légère pour Raspberry Pi
-   # Utilise le modèle YOLOv8n (nano = très rapide)
-   # """
-
- #   def __init__(self, model_path="models/yolov8n.pt", confidence=0.5):
-    #     """
-    #     Args:
-    #         model_path: Chemin vers yolov8n.pt
-    #         confidence: Seuil de confiance (0-1)
-     #    """
-    #     self.confidence = confidence
-     #    self.model = None
-    #     self.device = "cpu"  # Raspberry Pi n'a pas de GPU
-
-   #      try:
-    #         from ultralytics import YOLO
-
-    #         if os.path.exists(model_path):
-    #             logger.info(f"✅ Chargement YOLOv8n: {model_path}")
-   #              self.model = YOLO(model_path)
-    #             self.model.to(self.device)
-    #         else:
-    #             logger.warning(f"⚠️ Modèle YOLOv8n non trouvé: {model_path}")
-    #             logger.info("   Télécharger: python -m pip install ultralytics")
-   #              logger.info("   Puis: from ultralytics import YOLO; YOLO('yolov8n.pt')")
-   #      except ImportError:
-    #         logger.warning("⚠️ ultralytics pas installé. Détection désactivée.")
-    #         self.model = None
-
-  #  def detect(self, frame):
-    #     """
-     #    Détecte les objets dans une frame
-
-     #    Returns:
-       #      (frame_annotated, detections_dict)
-       #      detections_dict = {
-      #           "objects": [{"class": "person", "confidence": 0.95, "box": [x1,y1,x2,y2]}, ...],
-       #          "inference_time_ms": 45
-       #      }
-      #   """
-   #     if self.model is None:
-  #          return frame, {"objects": [], "count": 0, "inference_time_ms": 0}
-
-   #     try:
-   #         start_time = time.time()
-   #         results = self.model.predict(frame, conf=self.confidence, verbose=False)
-   #         inference_time = (time.time() - start_time) * 1000
-
-   #         detections = []
-   #         annotated_frame = frame.copy()
-
-   #         if results and len(results) > 0:
-   #             result = results[0]
-
-  #              if result.boxes is not None:
-   #                 for box in result.boxes:
-   #                     x1, y1, x2, y2 = map(int, box.xyxy[0])
-   #                     confidence = float(box.conf[0])
-  #                      class_id = int(box.cls[0])
-   #                     class_name = self.model.names[class_id]
-
-   #                     detections.append({
-   #                         "class": class_name,
-   #                         "confidence": round(confidence, 3),
-   #                         "box": [x1, y1, x2, y2],
-   #                         "class_id": class_id
-     #                      })
-
-   #                     # Dessiner la boîte
-   #                     cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-   #                     label = f"{class_name} {confidence:.2f}"
-   #                     cv2.putText(annotated_frame, label, (x1, y1-10),
-   #                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-    #        return annotated_frame, {
-    #            "objects": detections,
-      #          "count": len(detections),
-     #           "inference_time_ms": round(inference_time, 2)
-      #      }
-
-     #   except Exception as e:
-      #      logger.error(f"❌ Erreur YOLOv8n: {e}")
-       #     return frame, {"objects": [], "count": 0, "inference_time_ms": 0, "error": str(e)}
-
-
-# ============================================================================
-# GESTURE RECOGNITION - DÉTECTION DE GESTES
-# ============================================================================
-#class GestureDetector:
-   # """Détecteur de gestes avec MediaPipe"""
-
-   # def __init__(self):
-   #     self.current_gesture = "NONE"
-   #     self.last_gesture = "NONE"
-
-   #     try:
-   #         import mediapipe as mp
-  #          self.mp = mp
-   #         self.hands = mp.solutions.hands.Hands(
-   #             static_image_mode=False,
-    #            max_num_hands=1,
-    #            min_detection_confidence=0.7,
-    #            min_tracking_confidence=0.5
-   #         )
-    #        self.available = True
-    #        logger.info("✅ MediaPipe chargé")
-   #     except ImportError:
-   #         self.available = False
-   #         logger.warning("⚠️ MediaPipe non disponible - gestes désactivés")
-
-  #  def detect(self, frame):
-   #     """
-   #     Détecte un geste
-
-    #    Returns:
-   #         gesture_name (str): "NONE", "THUMBS_UP", "PEACE", "PALM", "FIST", etc.
-    #    """
-   #     if not self.available:
-  #          return "NONE", frame
-
-   #     try:
-   #         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    #        results = self.hands.process(rgb_frame)
-
-   #         if results.multi_hand_landmarks and len(results.multi_hand_landmarks) > 0:
-   #             hand = results.multi_hand_landmarks[0]
-   #             gesture = self._classify_gesture(hand)
-  #              self.current_gesture = gesture
-  #              return gesture, frame
-
-   #         self.current_gesture = "NONE"
-   #         return "NONE", frame
-
-  #      except Exception as e:
-   #         logger.error(f"❌ Erreur détection geste: {e}")
-   #         return "NONE", frame
-
-   # def _classify_gesture(self, hand):
-   #     """Classifie un geste basé sur les landmarks"""
-        # Landmarks importants
-  #      thumb_tip = hand.landmark[4]
-   #     index_tip = hand.landmark[8]
-  #      middle_tip = hand.landmark[12]
-  #      ring_tip = hand.landmark[16]
-  #      pinky_tip = hand.landmark[20]
-
-  #      palm = hand.landmark[0]
-
-        # Calcul distances
- #       thumb_up = thumb_tip.y < palm.y
- #       index_up = index_tip.y < palm.y
-  #      middle_up = middle_tip.y < palm.y
-   #     ring_up = ring_tip.y < palm.y
-  #      pinky_up = pinky_tip.y < palm.y
-
-        # Détection simples
-    #    if thumb_up and not (index_up or middle_up or ring_up or pinky_up):
-    #        return "THUMBS_UP"
-
-    #    if index_up and middle_up and not (ring_up or pinky_up):
-    #        return "PEACE"
-
-   #     if index_up and not (middle_up or ring_up or pinky_up):
-   #         return "POINT"
-
-   #     if thumb_up and index_up and middle_up and ring_up and pinky_up:
-  #          return "PALM"
-
- #       if not (thumb_up or index_up or middle_up or ring_up or pinky_up):
-  #          return "FIST"
-
-  #      return "UNKNOWN"
-
-
-# ============================================================================
 # SNAPSHOT MANAGER - CAPTURE PHOTOS
-# ============================================================================
+
 class SnapshotManager:
     """Gère la capture de snapshots avec horodatage"""
 
@@ -490,9 +210,9 @@ class SnapshotManager:
         ]
 
 
-# ============================================================================
+
 # INITIALISATION DES MODULES
-# ============================================================================
+
 
 logger.info("🚀 Initialisation S.H.O.S V3.0...")
 
@@ -511,14 +231,8 @@ detection_stats = {"objects": 0, "inference_time_ms": 0}
 camera_stats = {"frames": 0, "errors": 0}
 
 
-
-
-
-
-
-# ════════════════════════════════════════════════════════════════════
 # ORCHESTRATOR BRIDGE — Relais MQTT → SocketIO
-# ════════════════════════════════════════════════════════════════════
+
 
 SUBSCRIPTIONS_ORCHESTRATOR_ADDITIONS = [
     ("shos/orchestrator/decision", 1),
@@ -543,9 +257,9 @@ def dispatch_orchestrator(topic, payload_raw, socketio):
     return True
 
 
-# ============================================================================
+
 # GESTIONNAIRE MQTT UNIVERSEL (DYNAMIC DISCOVERY)
-# ============================================================================
+
 
 class MQTTHandler:
     def __init__(self, host='localhost', port=1883):
@@ -638,9 +352,9 @@ class MQTTHandler:
 mqtt_bridge = MQTTHandler()
 
 
-# ════════════════════════════════════════════════════════════════════
+
 # ROUTE /api/system_status — supprime les 404 répétés du dashboard
-# ════════════════════════════════════════════════════════════════════
+
 
 @app.route('/api/system_status')
 def api_system_status():
@@ -663,9 +377,9 @@ def api_system_status():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-# ============================================================================
+
 # ROUTES PRINCIPALES (WEB UI)
-# ============================================================================
+
 
 DEFAULT_PROFILE = {'name': 'ADRIEN_ASUS', 'id': '01'}
 
@@ -729,9 +443,8 @@ def user_interface():
                 profile['name'], profile['main_module'], profile['secondary_modules'])
     return render_template('user_interface.html', profile=profile)
 
-# ============================================================================
 # GESTION DES PROFILS (API & MANAGER)
-# ============================================================================
+
 
 @app.route('/profile_manager')
 def profile_manager():
@@ -820,9 +533,9 @@ def module_config_route(module_id):
         return f"<h2>Erreur</h2><p>{e}</p>", 500
 
 
-# ============================================================================
+
 # ROUTES MODULES DYNAMIQUES
-# ============================================================================
+
 
 @app.route('/module/<path:module_id>')
 def universal_module_route(module_id):
@@ -860,9 +573,9 @@ def universal_module_route(module_id):
         logger.error(f"❌ Erreur lors du rendu : {e}")
         return f"<h2>Erreur de rendu</h2><p>{e}</p>", 500
 
-# ============================================================================
+
 # API SUPPRESSION PROFIL
-# ============================================================================
+
 
 @app.route('/api/delete_profile', methods=['POST'])
 def api_delete_profile():
@@ -884,9 +597,9 @@ def api_delete_profile():
     except Exception as e:
         return jsonify({"status":"error","message":str(e)}), 500
 
-# ============================================================================
+
 # SOCKET.IO EVENTS
-# ============================================================================
+
 
 @socketio.on('connect')
 def handle_connect():
@@ -1007,9 +720,9 @@ def handle_vision_switch(data):
         logger.warning("vision_switch : %s", e)
         socketio.emit('vision_backend_changed', {'ok': False, 'msg': str(e)})
 
-# ============================================================================
+
 # BACKGROUND TASKS
-# ============================================================================
+
 
 def background_monitoring():
     """Monitoring système et caméra"""
@@ -1097,22 +810,6 @@ def proxy_backend_post():
 
 
 
-
-
-
-# ════════════════════════════════════════════════════════════════════
-# PATCH NOVA.PY — Routes API manquantes pour hardware_controls
-# ────────────────────────────────────────────────────────────────────
-# 3 routes à ajouter dans nova.py (n'importe où dans les routes Flask) :
-#
-#   POST /module/hardware_controls/api/execute    → exécute une action
-#   POST /module/hardware_controls/api/ir         → toggle LED infrarouge
-#   GET  /module/hardware_controls/api/config     → charge la config bindings
-#
-# Le code délègue tout à actions.py qui contient déjà les 30 actions
-# (volume, brightness, screenshot, reboot, etc.)
-# ════════════════════════════════════════════════════════════════════
-
 import sys
 import time
 import json
@@ -1165,9 +862,8 @@ def _load_hw_actions():
         return None
 
 
-# ════════════════════════════════════════════════════════════════════
 # ROUTE 1 : POST /module/hardware_controls/api/execute
-# ════════════════════════════════════════════════════════════════════
+
 @app.route('/module/hardware_controls/api/execute', methods=['POST'])
 def hw_api_execute():
     """
@@ -1219,9 +915,8 @@ def hw_api_execute():
         return jsonify({"ok": False, "msg": str(e)}), 500
 
 
-# ════════════════════════════════════════════════════════════════════
 # ROUTE 2 : POST /module/hardware_controls/api/ir
-# ════════════════════════════════════════════════════════════════════
+
 @app.route('/module/hardware_controls/api/ir', methods=['POST'])
 def hw_api_ir():
     """
@@ -1277,9 +972,8 @@ def hw_api_ir():
         return jsonify({"ok": False, "msg": str(e)}), 500
 
 
-# ════════════════════════════════════════════════════════════════════
 # ROUTE 3 : GET /module/hardware_controls/api/config
-# ════════════════════════════════════════════════════════════════════
+
 @app.route('/module/hardware_controls/api/config', methods=['GET', 'POST'])
 def hw_api_config():
     """
@@ -1322,7 +1016,7 @@ def hw_api_config():
         return jsonify({"ok": True, "msg": "Configuration sauvée"})
     except Exception as e:
         return jsonify({"ok": False, "msg": str(e)}), 500
-# --- GESTION DES SERVICES NOVA ---
+#  GESTION DES SERVICES NOVA 
 running_processes = []
 
 def start_nova_services():
@@ -1344,38 +1038,6 @@ def stop_nova_services(sig, frame):
         p.terminate()
     sys.exit(0)
 
-
-
-
-
-
-
-# ════════════════════════════════════════════════════════════════════
-# PATCH NOVA.PY — ROUTES ACTIONS PAR MODULE
-# ────────────────────────────────────────────────────────────────────
-# À coller dans nova.py, à la FIN du fichier
-# JUSTE AVANT  if __name__ == "__main__":
-#
-# Format à ajouter dans le config.json de chaque module qui veut
-# proposer des actions :
-#
-#   {
-#     "id": "voice_assistant",
-#     "name": "Assistant Vocal NOVA",
-#     ...
-#     "actions": [
-#       { "id": "start_listening", "label": "Start", "icon": "🎙",
-#         "description": "Démarrer l'écoute", "mqtt_topic": "shos/voice/cmd",
-#         "mqtt_payload": { "cmd": "start" } },
-#       { "id": "stop_listening",  "label": "Stop",  "icon": "⏸",
-#         "mqtt_topic": "shos/voice/cmd",
-#         "mqtt_payload": { "cmd": "stop" } }
-#     ]
-#   }
-#
-# Chaque action publie sur MQTT le payload défini.
-# Le module lui-même écoute son topic et exécute la commande.
-# ════════════════════════════════════════════════════════════════════
 
 @app.route('/module/<module_id>/api/actions', methods=['GET'])
 def module_api_actions(module_id):
@@ -1462,9 +1124,9 @@ def module_api_trigger_action(module_id):
         return jsonify({"ok": False, "msg": str(e)}), 500
 
 
-# ============================================================================
+
 # MAIN
-# ============================================================================
+
 
 if __name__ == '__main__':
     logger.info("="*70)

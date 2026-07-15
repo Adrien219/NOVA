@@ -52,9 +52,9 @@ try:
 except ImportError:
     _MQTT_V2 = False
 
-# -----------------------------------------------------------------------------
+
 # CONFIG
-# -----------------------------------------------------------------------------
+
 PROJECT_ROOT = Path(__file__).resolve().parent
 MODELS_DIR   = PROJECT_ROOT / "shos_models"
 
@@ -87,9 +87,8 @@ logging.basicConfig(
 logger = logging.getLogger("Orchestrator")
 
 
-# =============================================================================
 # COUCHE 1 - REGLES EXPERTES (fallback toujours actif)
-# =============================================================================
+
 class ExpertRules:
 
     @staticmethod
@@ -164,9 +163,8 @@ class ExpertRules:
         return "profile_7"
 
 
-# =============================================================================
 # COUCHE 2 - MODELES IA
-# =============================================================================
+
 class AIModels:
 
     def __init__(self, models_dir=MODELS_DIR):
@@ -351,9 +349,8 @@ class AIModels:
             return None, 0.0
 
 
-# =============================================================================
 # COUCHE 3 - ETAT SYSTEME AGREGE
-# =============================================================================
+
 class SystemState:
 
     def __init__(self):
@@ -380,9 +377,8 @@ class SystemState:
             return dict(self._state)
 
 
-# =============================================================================
 # COUCHE 4 - ORCHESTRATEUR
-# =============================================================================
+
 class NovaOrchestrator:
 
     def __init__(self, threshold=CONFIDENCE_THRESHOLD):
@@ -567,9 +563,9 @@ class NovaOrchestrator:
             logger.error("Erreur fatale : %s", e)
 
 
-# =============================================================================
+
 # MAIN
-# =============================================================================
+ 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="SHOS Orchestrator V2 - Hybride regles + IA")
